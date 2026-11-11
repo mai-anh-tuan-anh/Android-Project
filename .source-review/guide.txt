@@ -1,0 +1,77 @@
+HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG
+KHOA: CÔNG NGHỆ THÔNG TIN 1
+ |  | Học phần: Phát triển ứng dụng cho các thiết bị di động
+Trình độ đào  tạo: Đại học    
+Hình  thức đào tạo: Chính qui   |   |  | HƯỚNG DẪN DỰ ÁN NHÓM MÔN PHÁT TRIỂN ỨNG DỤNG CHO THIẾT BỊ DI ĐỘNG
+
+1. Số lượng sinh viên yêu cầu: 3-4 sinh viên/nhóm.
+2. Yêu cầu dự án nhóm:	
+	Các nhóm chủ động thảo luận để lựa chọn và đề xuất chủ đề và nội dung thực hiện của nhóm nhưng phải đảm bảo các nguyên tắc sau:
+Mỗi thành viên nhóm thực hiện xây dựng tối thiểu một chức năng.
+Thực hiện các bước từ đặc tả, phân tích thiết kế và xây dựng ứng dụng.
+Nội dung dự án nhóm sẽ được giáo viên xem xét thông qua trước khi nhóm thực hiện.
+3. Yêu cầu công việc cần thực hiện
+      Nhóm cần thực hiện các công việc sau:
+a. Phần công việc chung của cả nhóm
+Phân công nhiệm vụ từng thành viên cụ thể tham gia công việc chung của nhóm và đảm bảo từng thành viên phải thực hiện các công việc từ phân tích, thiết kế, xây dựng tối thiểu một chức năng của ứng dụng di động.
+Phân tích và mô tả yêu cầu của ứng dụng: yêu cầu chức năng, yêu cầu phi chức năng.
+Phân tích lựa chọn kiến trúc, công nghệ 
+Triển khai xây dựng phần khung, các chức năng chung của cả nhóm.
+Thực hiện giao tiếp, phối hợp trong nhóm để thực hiện thống nhất, đồng bộ giữa phần công việc chung và phần công việc từng cá nhân
+Chuẩn bị đầy đủ báo cáo, tài liệu theo yêu cầu và Thuyết trình và bảo vệ được kết quả công việc 
+b. Phần công việc từng cá nhân:
+Mỗi thành viên sẽ chọn làm tối thiểu một chức năng của ứng dụng, bao gồm:
+Mô tả chức năng và thiết kế giao diện cụ thể của chức năng.
+Xây dựng chức năng ứng dụng được phân công.
+Việc áp dụng kiến trúc, công nghệ đã lựa chọn khi xây dựng
+Áp dụng quy tắc bảo vệ dữ liệu cá nhân và quyền riêng tư.
+Chuẩn bị và thuyết trình, bảo vệ kết quả cá nhân.
+5. Đánh giá kết quả
+      Việc đánh giá kết quả sẽ thực hiện đối với nhóm và từng cá nhân bao gồm:
+
+C. Báo cáo cuối kỳ | D. Bảo vệ dự án cuối kỳ |  | 30% | 30% |  | Thiết kế giao diện | Phân tích thiết kế chức năng | Viết tài liệu thiết kế |  | Xây dựng giao diện ứng dụng | Xây dựng chức năng ứng dụng | Trình bày kết quả |  |  | CLO 1 | CLO1 | CLO3 | GPA | CLO 2 | CLO 2 | CLO3 | GPA |  | 3.0 | 4.0 | 3.0 | 10.0 | 3.0 | 4.0 | 3.0 | 10.0 |  | 
+
+     Chi tiết các tiêu chí đánh giá kết quả trong phụ lục kèm theo.
+     Trong quá trình bảo vệ dự án, giảng viên sẽ đặt câu hỏi làm rõ hoặc yêu cầu sinh viên trình bày cụ thể về mã nguồn ứng dụng
+
+PHỤ LỤC: TIÊU CHÍ ĐÁNH GIÁ
+
+CLO1: Vận dụng để thực hiện phân tích, thiết kế kiến trúc, chức năng và giao diện của ứng dụng di động.
+Thang đánh giá                                      | Fail - Below Expectation  
+< 40% | Beginning - Needs Improvement 40%-54% | Developing - Marginally adequate 
+55%-69% | Sufficient - Meet expectation 
+70%-84% | Exemplary - Exceeds expectations 85% - 100% |  | Tiêu chí |  |  |  |  |  |  | Phân tích thiết kế kiến trúc và chức năng của ứng dụng di động theo yêu cầu đề ra. | Không có khả năng vận dụng để phân tích thiết kế yêu cầu và ràng buộc. | Có thiết kế được 1-30% chức năng của ứng dụng và đúng khoảng 1-30% kiến trúc yêu cầu | Có thiết kế được 30-50% chức năng của ứng dụng và đúng khoảng 30-50% kiến trúc yêu cầu  | Có thiết kế được 50-75% chức năng của ứng dụng và đúng khoảng 50-75% kiến trúc yêu cầu | Có thiết kế được trên 75% chức năng của ứng dụng và đúng được trên 75% kiến trúc yêu cầu |  | Thiết kế giao diện ứng dụng di động đáp ứng chức năng được đề ra theo yêu cầu | Không có khả năng vận dụng công cụ để xây dựng giao diện đáp ứng yêu cầu chức năng. | Có sử dụng công cụ để thiết kế được 1- 30% số giao diện đáp ứng yêu cầu chức năng được thiết kế | Có sử dụng công cụ để thiết kế được 30- 50% số giao diện đáp ứng yêu cầu chức năng được thiết kế, giao diện có thể chưa được đẹp và hợp lý | Có sử dụng công cụ để thiết kế được 50- 75% số giao diện đáp ứng yêu cầu chức năng được thiết kế, giao diện được thiết kế đẹp và hợp lý cho các thao tác | Có sử dụng công cụ để thiết kế được trên 75% số giao diện đáp ứng yêu cầu chức năng được thiết kế, giao diện được thiết kế đẹp đáp ứng các nền tảng khác nhau, và được tối ưu |  | 
+CLO2: Vận dụng để xây dựng và triển khai ứng dụng di động theo tài liệu thiết kế một cách đầy đủ.
+Thang đánh giá                                      | Fail - Below Expectation  
+< 40% | Beginning - Needs Improvemen40%-54% | Developing - Marginally adequate 
+55%-69% | Sufficient - Meet expectation 
+70%-84% | Exemplary - Exceeds expectations 85% - 100% |  | Tiêu chí |  |  |  |  |  |  | Xây dựng giao diện ứng dụng di động theo đúng các thiết kế đã được thực hiện trong dự án  | Không có khả năng sử dụng IDE để hiện thực hóa bất kỳ giao diện nào đáp ứng chức năng đã được thiết kế. | Sử dụng IDE thiết kế vào viết mã được từ 1-30% số giao diện đã được thiết kế. Thành thạo ít nhất một kiểu layout | Sử dụng IDE thiết kế và viết mã được từ 30-50% số giao diện đã được thiết kế. Thành thạo ít nhất hai kiểu layout và có thể kết hợp với nhau trong giao diện | Sử dụng IDE thiết kế và viết mã được từ 50-75% số giao diện đã được thiết kế. Thành thạo các kiểu layout khác nhau, giao diện được xây dựng gần y hệt giao diện được thiết kế có thể có sai sót nhỏ | Sử dụng IDE thiết kế và viết mã được trên 75% số giao diện đã được thiết kế. Thành thạo các kiểu layout khác nhau, giao diện được xây dựng y hệt giao diện được thiết kế |  | Xây dựng chức năng ứng dụng di động và triển khai theo kiến trúc được thiết kế
+ | Không có khả năng lập trình hiện thực hóa chức năng đã được mô tả trong tài liệu thiết kế. | Có khả năng hiện thực hóa được từ 1-30% các chức năng đã được thiết kế.  | Có khả năng hiện thực hóa được từ 30-50% các chức năng đã được thiết kế. Bắt đầu tích hợp được các dịch vụ đơn giản | Có khả năng hiện thực hóa được từ 50-75% các chức năng đã được thiết kế. Biết cách triển khai ứng dụng trên các môi trường khác nhau và tích hợp.  | Có khả năng hiện thực hóa được trên 75% các chức năng đã được thiết kế. Triển khai và tích hợp đầy đủ theo kiến trúc ứng dụng đã được thiết kế |  | 
+CLO3: Trình bày thành thạo được kết quả dự án cá nhân của mình
+
+Thang đánh giá                                      | Fail - Below Expectation  
+< 40% | Beginning - Needs Improvemen40%-54% | Developing - Marginally adequate 
+55%-69% | Sufficient - Meet expectation 
+70%-84% | Exemplary - Exceeds expectations 85% - 100% |  | Tiêu chí |  |  |  |  |  |  | Viết được báo cáo kết quả dự án cá nhân của mình | Không viết được báo cáo kết quả dự án cá nhân của mình | Viết được báo cáo kết quả dự án cá nhân của mình với dưới 30	% các đề mục chính. Nội dung các mục còn sơ sài. | Viết được báo cáo kết quả dự án cá nhân của mình với khoảng 30-50% các đề mục chính. Nội dung các mục đã có các ý chính. | Viết được báo cáo kết quả dự án cá nhân của mình khoảng 50-70% các đề mục chính. Nội dung các mục đã có các ý chính. | Viết được báo cáo kết quả dự án cá nhân của mình với trên 70% các đề mục chính. Nội dung các mục đầy đủ. |  | Thuyết trình và bảo vệ được kết quả công việc của cá nhân trong dự án | Không thuyết trình, trình bày được kết quả cá nhân trong dự án | Trình bày được dưới 40% số nội dung yêu cầu của cá nhân trong dự án.
+Trình bày chưa lưu loát, chưa có trọng tâm.
+. | Trình bày được khoảng 40 -60% số nội dung yêu cầu của dự án.
+Trình bày chưa mạch lạc, nhưng chưa có trọng tâm.
+ | Trình bày được 60 - 80% số nội dung yêu cầu của dự án.
+Trình bày mạch lạc, có trọng tâm. | Trình bày được ít nhất 80% số nội dung yêu cầu của dự án.
+Trình bày mạch lạc, có trọng tâm, bảo vệ được ý kiến của mình và thuyết phục được người nghe. |  | Chủ đề nhóm đã chọn:
+8 | Ứng dụng Công thức nấu ăn | Tạo Phòng Chat (Create Chat Rooms): Users can create chat rooms for specific topics or events, with various settings for privacy and moderation.
+Nhóm Theo Sở Thích (Group by Interests): The application could allow users to join or create groups based on shared interests, hobbies, or professional connections.
+Chia Sẻ Nội Dung (Share Content): Users would be able to post and share content like text messages, images, videos, and links within chat rooms or interest groups.
+Tùy Chỉnh Hồ Sơ Cá Nhân (Customize Personal Profiles): Users can create and customize their profiles with information about their interests to connect with like-minded individuals.
+Thông Báo Đẩy (Push Notifications): Notifications alert users to new messages, group activities, or content that matches their interests.
+Bảo Mật và Quyền Riêng Tư (Security and Privacy): The application would feature security settings that allow users to control who can contact them or see their posts.
+Công Cụ Tìm Kiếm (Search Tools): Search functionality to find new groups, chat rooms, or content within the community.
+Tích Hợp Mạng Xã Hội (Social Media Integration): Ability to link with social media accounts for easy content sharing outside the app.
+Giao Diện Người Dùng Đa Ngôn Ngữ (Multilingual User Interface): Interface available in multiple languages for a broader community reach.
+Tương Tác Nội Dung (Content Interaction): Features for liking, commenting, and sharing content within the app to encourage engagement.
+Quản Lý Nhóm (Group Management): Tools for group administrators to manage memberships, moderate discussions, and curate content.
+Chat Riêng Tư (Private Messaging): Private messaging capabilities for one-on-one conversations outside of public chat rooms.
+Hỗ Trợ Đa Nền Tảng (Multi-Platform Support): Accessibility across different devices, such as smartphones, tablets, and desktop computers.
+Giao Diện Tùy Biến (Customizable Interface): Users can tailor the app's appearance to their liking with themes and layout options.
+Lịch Sự Kiện (Event Calendar): A feature to organize and advertise community events within chat groups.
+(Các module có vài module là optional) |  | Công nghệ nhóm đã chọn: Java, Android Studio, SQLite, Firebase,…
