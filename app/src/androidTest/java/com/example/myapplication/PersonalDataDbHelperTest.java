@@ -57,13 +57,19 @@ public class PersonalDataDbHelperTest {
     @Test
     public void collectionsNormalizeNamesAndReplaceRecipeMembershipOnEdit() {
         assertTrue(data.isCollectionNameAvailable("Bữa cơm nhà", null));
-        assertTrue(data.saveCollection("  Bữa   cơm nhà  ", Arrays.asList(recipeA, recipeB), null));
+        Long createdId = data.saveCollectionAndGetId("  Bữa\t\u00a0cơm   nhà  ", Arrays.asList(recipeA, recipeB), null);
+        assertTrue(createdId != null);
 
         PersonalDataDbHelper.CollectionRow collection = data.getCollections().get(0);
+        assertEquals(createdId.longValue(), collection.id);
         assertEquals("Bữa cơm nhà", collection.name);
         assertEquals(2, collection.recipeCount);
         assertFalse(data.isCollectionNameAvailable("BUA COM NHA", null));
         assertTrue(data.isCollectionNameAvailable("bữa cơm nhà", collection.id));
+        assertFalse(data.isCollectionNameAvailable(" \t\u00a0 ", null));
+        assertTrue(data.saveCollection("Đồ ăn", Collections.singletonList(recipeA), null));
+        assertTrue(data.isCollectionNameAvailable("Do an", null)); // Vietnamese đ remains a distinct letter.
+        assertFalse(data.isCollectionNameAvailable("ĐỒ ĂN", null));
 
         assertTrue(data.saveCollection("Bữa tối", Collections.singletonList(recipeB), collection.id));
         PersonalDataDbHelper.CollectionRow edited = data.getCollections().get(0);
@@ -71,6 +77,21 @@ public class PersonalDataDbHelperTest {
         assertEquals("Bữa tối", edited.name);
         assertEquals(1, edited.recipeCount);
         assertEquals(recipeB.id, data.getCollectionRecipes(edited.id).get(0).id);
+    }
+
+    @Test
+    public void deletingCollectionKeepsFavoriteAndRecipeNote() {
+        Long collectionId = data.saveCollectionAndGetId("Món cuối tuần", Collections.singletonList(recipeA), null);
+        assertTrue(collectionId != null);
+        data.addFavorite(recipeA);
+        data.saveNote(recipeA, "Nêm thêm tiêu");
+
+        assertTrue(data.deleteCollection(collectionId));
+
+        assertTrue(data.getCollections().isEmpty());
+        assertTrue(data.getCollectionRecipes(collectionId).isEmpty());
+        assertTrue(data.isFavorite(recipeA.id));
+        assertEquals("Nêm thêm tiêu", data.getNote(recipeA.id));
     }
 
     @Test
@@ -98,7 +119,33 @@ public class PersonalDataDbHelperTest {
     }
 
     @Test
-    public void mealPlanRejectsDuplicatesAndKeepsServingsWithinOneAndNinetyNine() {
+    public void revisitingTwoDayOldRecipeMovesItToTheTopWithoutDuplicate() {
+        data.recordViewedRecipe(recipeA);
+        data.recordViewedRecipe(recipeB);
+        long now = System.currentTimeMillis();
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{now - 2L * 24 * 60 * 60 * 1000, recipeA.id});
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{now - 24L * 60 * 60 * 1000, recipeB.id});
+
+        data.recordViewedRecipe(recipeA);
+
+        List<MainActivity.RecipePreview> history = data.getHistory();
+        assertEquals(2, history.size());
+        assertEquals(recipeA.id, history.get(0).id);
+    }
+
+    @Test
+    public void viewedHistoryExpiresAfterThreeDaysOnClient() {
+        data.recordViewedRecipe(recipeA);
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{System.currentTimeMillis() - 3L * 24 * 60 * 60 * 1000 - 1, recipeA.id});
+
+        assertTrue(data.getHistory().isEmpty());
+    }
+
+    @Test
+    public void mealPlanRejectsDuplicatesAndKeepsServingsWithinOneAndNineHundredNinetyNine() {
         data.addMealPlanRecipe(recipeA, 1);
         data.addMealPlanRecipe(recipeA, 5);
 
@@ -106,11 +153,11 @@ public class PersonalDataDbHelperTest {
         assertEquals(1, plan.size());
         assertEquals(1, plan.get(0).servings);
 
-        data.setMealPlanRecipeServings(recipeA.id, 99);
-        assertEquals(99, data.getMealPlanRecipes().get(0).servings);
+        data.setMealPlanRecipeServings(recipeA.id, 999);
+        assertEquals(999, data.getMealPlanRecipes().get(0).servings);
         assertIllegalArgument(() -> data.setMealPlanRecipeServings(recipeA.id, 0));
-        assertIllegalArgument(() -> data.setMealPlanRecipeServings(recipeA.id, 100));
-        assertEquals(99, data.getMealPlanRecipes().get(0).servings);
+        assertIllegalArgument(() -> data.setMealPlanRecipeServings(recipeA.id, 1000));
+        assertEquals(999, data.getMealPlanRecipes().get(0).servings);
     }
 
     @Test
@@ -119,7 +166,7 @@ public class PersonalDataDbHelperTest {
 
         assertIllegalArgument(() -> data.replaceMealPlanRecipes(Arrays.asList(
                 new PersonalDataDbHelper.PlannedRecipe(recipeB, 3),
-                new PersonalDataDbHelper.PlannedRecipe(recipeA, 100))));
+                new PersonalDataDbHelper.PlannedRecipe(recipeA, 1000))));
         List<PersonalDataDbHelper.PlannedRecipe> afterRollback = data.getMealPlanRecipes();
         assertEquals(1, afterRollback.size());
         assertEquals(recipeA.id, afterRollback.get(0).recipe.id);
@@ -134,6 +181,31 @@ public class PersonalDataDbHelperTest {
 
         data.replaceMealPlanRecipes(Collections.emptyList());
         assertTrue(data.getMealPlanRecipes().isEmpty());
+    }
+
+    @Test
+    public void mealPlanServingRangeMigrationPreservesExistingRows() {
+        data.close();
+        data = null;
+        context.deleteDatabase(TEST_DATABASE);
+
+        android.database.sqlite.SQLiteDatabase legacy = context.openOrCreateDatabase(
+                TEST_DATABASE, Context.MODE_PRIVATE, null);
+        legacy.execSQL("CREATE TABLE MealPlan (planId INTEGER PRIMARY KEY CHECK(planId=1), title TEXT NOT NULL)");
+        legacy.execSQL("INSERT INTO MealPlan(planId,title) VALUES(1,'Bữa cơm nhà')");
+        legacy.execSQL("CREATE TABLE MealPlanRecipe (planId INTEGER NOT NULL DEFAULT 1, recipeId TEXT NOT NULL, " +
+                "title TEXT NOT NULL, imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, " +
+                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 99), position INTEGER NOT NULL, " +
+                "PRIMARY KEY(planId,recipeId), FOREIGN KEY(planId) REFERENCES MealPlan(planId) ON DELETE CASCADE)");
+        legacy.execSQL("INSERT INTO MealPlanRecipe VALUES(1,'recipe-a','Món A','recipe_mi_y','20 phút','Dễ',99,0)");
+        legacy.setVersion(2);
+        legacy.close();
+
+        data = new PersonalDataDbHelper(context, TEST_DATABASE);
+        assertEquals(1, data.getMealPlanRecipes().size());
+        assertEquals(99, data.getMealPlanRecipes().get(0).servings);
+        data.setMealPlanRecipeServings(recipeA.id, 999);
+        assertEquals(999, data.getMealPlanRecipes().get(0).servings);
     }
 
     private static void assertIllegalArgument(Runnable operation) {

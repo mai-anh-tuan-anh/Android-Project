@@ -17,7 +17,8 @@ import java.util.Set;
 /** Local storage for personal recipes and the current meal plan (modules 5 and 6). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 2;
+    private static final int DB_VERSION = 3;
+    private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
@@ -49,15 +50,28 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) createMealPlanTables(db);
+        if (oldVersion < 3) migrateMealPlanServingRange(db);
     }
 
     private static void createMealPlanTables(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE MealPlan (planId INTEGER PRIMARY KEY CHECK(planId=1), title TEXT NOT NULL)");
         db.execSQL("INSERT OR IGNORE INTO MealPlan(planId,title) VALUES(1,'Bữa cơm nhà')");
+        createMealPlanRecipeTable(db);
+    }
+
+    private static void createMealPlanRecipeTable(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE MealPlanRecipe (planId INTEGER NOT NULL DEFAULT 1, recipeId TEXT NOT NULL, " +
                 "title TEXT NOT NULL, imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, " +
-                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 99), position INTEGER NOT NULL, " +
+                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 999), position INTEGER NOT NULL, " +
                 "PRIMARY KEY(planId,recipeId), FOREIGN KEY(planId) REFERENCES MealPlan(planId) ON DELETE CASCADE)");
+    }
+
+    private static void migrateMealPlanServingRange(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE MealPlanRecipe RENAME TO MealPlanRecipe_v2");
+        createMealPlanRecipeTable(db);
+        db.execSQL("INSERT INTO MealPlanRecipe(planId,recipeId,title,imageRes,duration,difficulty,servings,position) " +
+                "SELECT planId,recipeId,title,imageRes,duration,difficulty,servings,position FROM MealPlanRecipe_v2");
+        db.execSQL("DROP TABLE MealPlanRecipe_v2");
     }
 
     @Override
@@ -157,15 +171,22 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     List<MainActivity.RecipePreview> getHistory() {
+        deleteExpiredHistory(getWritableDatabase());
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM RecipeViewHistory " +
                 "ORDER BY viewedAt DESC, rowid DESC LIMIT 10");
     }
 
-    /** Upserts a recipe visit and retains only the 10 most recent IDs. */
+    private static void deleteExpiredHistory(SQLiteDatabase db) {
+        long cutoff = System.currentTimeMillis() - HISTORY_RETENTION_MS;
+        db.delete("RecipeViewHistory", "viewedAt<=?", new String[]{String.valueOf(cutoff)});
+    }
+
+    /** Keeps client-local recipe history for at most three days and ten recent IDs. */
     void recordViewedRecipe(MainActivity.RecipePreview recipe) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            deleteExpiredHistory(db);
             ContentValues value = recipeValues(recipe);
             value.put("viewedAt", System.currentTimeMillis());
             db.insertWithOnConflict("RecipeViewHistory", null, value, SQLiteDatabase.CONFLICT_REPLACE);
@@ -188,12 +209,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return rows;
     }
 
+    boolean deleteCollection(long collectionId) {
+        return getWritableDatabase().delete("Collection", "collectionId=?",
+                new String[]{String.valueOf(collectionId)}) > 0;
+    }
+
     List<MainActivity.RecipePreview> getCollectionRecipes(long collectionId) {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM CollectionRecipe WHERE collectionId=" + collectionId + " ORDER BY rowid");
     }
 
     boolean isCollectionNameAvailable(String name, Long collectionId) {
-        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        String clean = normalizeCollectionDisplayName(name);
         if (clean.isEmpty()) return false;
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT collectionId FROM Collection WHERE normalizedName=?",
@@ -213,8 +239,12 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     boolean saveCollection(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
-        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
-        if (clean.isEmpty()) return false;
+        return saveCollectionAndGetId(name, selected, collectionId) != null;
+    }
+
+    Long saveCollectionAndGetId(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
+        String clean = normalizeCollectionDisplayName(name);
+        if (clean.isEmpty()) return null;
         SQLiteDatabase db = getWritableDatabase();
         String normalized = normalizeName(clean);
         db.beginTransaction();
@@ -223,7 +253,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             try (Cursor cursor = db.rawQuery("SELECT collectionId FROM Collection WHERE normalizedName=?", new String[]{normalized})) {
                 if (cursor.moveToFirst()) duplicateId = cursor.getLong(0);
             }
-            if (duplicateId != null && (collectionId == null || duplicateId.longValue() != collectionId.longValue())) return false;
+            if (duplicateId != null && (collectionId == null || duplicateId.longValue() != collectionId.longValue())) return null;
 
             if (collectionId == null) {
                 ContentValues value = new ContentValues();
@@ -239,7 +269,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             }
             for (MainActivity.RecipePreview recipe : selected) addCollectionRecipe(db, collectionId, recipe);
             db.setTransactionSuccessful();
-            return true;
+            return collectionId;
         } finally {
             db.endTransaction();
         }
@@ -324,8 +354,8 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     private static void validateServings(int servings) {
-        if (servings < 1 || servings > 99) {
-            throw new IllegalArgumentException("servings must be between 1 and 99");
+        if (servings < 1 || servings > 999) {
+            throw new IllegalArgumentException("servings must be between 1 and 999");
         }
     }
 
@@ -350,6 +380,24 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         String clean = value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
         String decomposed = Normalizer.normalize(clean, Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "");
+    }
+
+    private static String normalizeCollectionDisplayName(String value) {
+        if (value == null || value.isEmpty()) return "";
+        StringBuilder normalized = new StringBuilder();
+        boolean pendingSpace = false;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)) {
+                pendingSpace = normalized.length() > 0;
+            } else {
+                if (pendingSpace) normalized.append(' ');
+                normalized.appendCodePoint(codePoint);
+                pendingSpace = false;
+            }
+        }
+        return normalized.toString();
     }
 
     static final class CollectionRow {

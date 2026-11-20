@@ -14,7 +14,7 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 
 ## 2. Khẩu phần và số lượng
 
-- `baseServings` của công thức và `servings` người dùng chọn là số nguyên dương. Giới hạn tối thiểu/tối đa chung **chưa được chốt**; không tự áp dụng `1..99` như yêu cầu dự án. Cần nhóm chốt miền hợp lệ trước khi module 3/6/7 tích hợp.
+- `baseServings` của công thức và `servings` người dùng chọn là số nguyên dương trong `1..999`, đã được người dùng chốt cho module 3/6/7. SQLite/UI phải cùng kiểm tra giới hạn. Migration module 6 giữ dữ liệu cũ và nới constraint từ `1..99` lên `1..999`.
 - Lượng nguyên liệu định lượng được tính bằng `lượng gốc × servings / baseServings`. Tính bằng số thập phân chính xác (Java `BigDecimal`), giữ giá trị gốc, và chỉ làm tròn khi hiển thị tới 2 chữ số thập phân. Với lượng nhỏ, dùng đơn vị phù hợp trong danh mục đơn vị nấu ăn ở mục K.4 của bàn giao. Khẩu phần mới không tự thay đổi thời gian nấu.
 - Lượng định tính như “vừa đủ”, “một ít” không nhân theo khẩu phần. Giữ nguyên mô tả định tính và không cộng nó với lượng số.
 - Mỗi món chỉ có một dòng trong kế hoạch hiện tại. Thêm lại món đã có sẽ mở/chọn dòng đó, không tạo bản trùng; người dùng chỉnh khẩu phần trên dòng hiện có.
@@ -38,6 +38,8 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
 - Khóa `Favorite` là `recipeId`; lưu lặp lại là idempotent. Bộ sưu tập và ghi chú cũng liên kết bằng `recipeId`, không nhân bản dữ liệu công thức.
+- Lịch sử xem là dữ liệu cục bộ, mỗi `recipeId` chỉ có một dòng; xem lại cập nhật thời điểm và đưa món lên đầu, sắp xếp thời điểm mới nhất trước, đồng thời xóa dòng quá 3 ngày. Xóa bộ sưu tập cần xác nhận; xóa bộ sưu tập và các liên kết của nó nhưng giữ `Favorite` và `RecipeNote` độc lập.
+- Khi tích hợp kho công thức thật, form tạo/sửa bộ sưu tập của module 5 lấy món từ toàn bộ kho khả dụng, không chỉ món yêu thích; hỗ trợ tìm kiếm và chỉ tải phần tiếp theo khi người dùng cuộn đến (lazy loading). Các lựa chọn đã tích phải giữ nguyên khi tìm kiếm hoặc tải thêm, dựa trên `recipeId` ổn định. Đây là mục tiêu tích hợp; bản preview hiện tại vẫn dùng 5 fixture.
 - Khi món bị gỡ khỏi kho công khai, ẩn khỏi danh mục công khai nhưng không xóa dữ liệu cá nhân đang tham chiếu. Giữ tên/ảnh snapshot tối thiểu để màn hình cá nhân hiển thị mục đã gỡ; ghi chú vẫn đọc được. Không tự xóa dòng mua sắm hoặc kế hoạch của người dùng khi đồng bộ.
 
 ## 6. Mô hình bảng SQLite tối thiểu đề xuất
@@ -62,7 +64,7 @@ Lượng thập phân lưu dạng chuỗi chuẩn để tránh sai số nhị ph
 ## 7. Điểm cần nhóm xác nhận trước khi đóng hợp đồng
 
 1. `recipeId` Firebase bất biến và danh mục `ingredientId` dùng chung đã được người dùng chấp nhận; cần chủ module 9 xác nhận cấu trúc triển khai.
-2. Giới hạn khẩu phần chung chưa chốt; nhóm cần quyết định trước tích hợp 3/6/7.
+2. Giới hạn khẩu phần `1..999` đã được người dùng chốt; chủ module 3/7 áp dụng cùng contract.
 3. Quy tắc trạng thái khi cập nhật số lượng tăng (đặt lại `Cần mua`) là đề xuất được người dùng giao Người 3 lựa chọn; chủ module 7 xác nhận chi tiết khi triển khai.
 4. Danh mục đơn vị và quy đổi cơ sở do người dùng cung cấp đã ghi tại bàn giao mục K.4. Người điều phối schema/module 7 chuyển danh mục đó thành dữ liệu chuẩn; chỉ thêm alias/quy đổi mới sau khi xác minh.
 

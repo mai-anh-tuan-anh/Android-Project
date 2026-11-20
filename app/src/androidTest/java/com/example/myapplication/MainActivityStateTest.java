@@ -22,12 +22,13 @@ public class MainActivityStateTest {
             scenario.onActivity(activity -> {
                 try {
                     setField(activity, "screen", MainActivity.Screen.MEAL_PLAN_PICKER);
+                    MealPlanViewModel viewModel = (MealPlanViewModel) getField(activity, "mealPlanViewModel");
                     @SuppressWarnings("unchecked")
-                    List<String> selected = (List<String>) getField(activity, "selectedPlanRecipeIds");
+                    List<String> selected = (List<String>) getField(viewModel, "selectedRecipeIds");
                     selected.clear();
                     selected.addAll(Arrays.asList("sample-ga-chien-nuoc-mam", "sample-com-rang-dua-bo"));
-                    setField(activity, "planPickerServings", 4);
-                    setField(activity, "planSearchQuery", "com");
+                    setField(viewModel, "pickerServings", 4);
+                    setField(viewModel, "searchQuery", "com");
                     Method render = MainActivity.class.getDeclaredMethod("render");
                     render.setAccessible(true);
                     render.invoke(activity);
@@ -41,11 +42,12 @@ public class MainActivityStateTest {
             scenario.onActivity(activity -> {
                 try {
                     assertEquals(MainActivity.Screen.MEAL_PLAN_PICKER, getField(activity, "screen"));
+                    MealPlanViewModel viewModel = (MealPlanViewModel) getField(activity, "mealPlanViewModel");
                     assertEquals(new ArrayList<>(Arrays.asList(
                             "sample-ga-chien-nuoc-mam", "sample-com-rang-dua-bo")),
-                            getField(activity, "selectedPlanRecipeIds"));
-                    assertEquals(4, getField(activity, "planPickerServings"));
-                    assertEquals("com", getField(activity, "planSearchQuery"));
+                            getField(viewModel, "selectedRecipeIds"));
+                    assertEquals(4, getField(viewModel, "pickerServings"));
+                    assertEquals("com", getField(viewModel, "searchQuery"));
                     assertEquals("com", ((android.widget.EditText) getField(activity,
                             "planPickerSearchInput")).getText().toString());
                 } catch (ReflectiveOperationException e) {
@@ -60,24 +62,19 @@ public class MainActivityStateTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
                 try {
-                    setField(activity, "planPickerServings", 7);
+                    MealPlanViewModel viewModel = (MealPlanViewModel) getField(activity, "mealPlanViewModel");
+                    setField(viewModel, "pickerServings", 7);
                     Method openPicker = MainActivity.class.getDeclaredMethod("openMealPlanPicker");
                     openPicker.setAccessible(true);
                     openPicker.invoke(activity);
-                    assertEquals(1, getField(activity, "planPickerServings"));
+                    assertEquals(1, viewModel.getPickerServings());
 
                     PersonalDataDbHelper.PlannedRecipe existing = new PersonalDataDbHelper.PlannedRecipe(
                             MainActivity.DESIGN_RECIPES.get(2), 3);
-                    Method resolve = MainActivity.class.getDeclaredMethod(
-                            "servingsForMealPlanSelection", PersonalDataDbHelper.PlannedRecipe.class);
-                    resolve.setAccessible(true);
-                    setField(activity, "planPickerServings", 2);
-                    assertEquals(2, resolve.invoke(activity, new Object[]{null}));
-                    assertEquals(3, resolve.invoke(activity, existing));
-
-                    setField(activity, "planPickerServings", 5);
-                    assertEquals(5, resolve.invoke(activity, new Object[]{null}));
-                    assertEquals(3, resolve.invoke(activity, existing));
+                    assertEquals(2, MealPlanViewModel.servingsForSelection(2, null));
+                    assertEquals(3, MealPlanViewModel.servingsForSelection(2, existing));
+                    assertEquals(5, MealPlanViewModel.servingsForSelection(5, null));
+                    assertEquals(3, MealPlanViewModel.servingsForSelection(5, existing));
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
@@ -85,16 +82,16 @@ public class MainActivityStateTest {
         }
     }
 
-    private static Object getField(MainActivity activity, String name) throws ReflectiveOperationException {
-        Field field = MainActivity.class.getDeclaredField(name);
+    private static Object getField(Object target, String name) throws ReflectiveOperationException {
+        Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
-        return field.get(activity);
+        return field.get(target);
     }
 
-    private static void setField(MainActivity activity, String name, Object value)
+    private static void setField(Object target, String name, Object value)
             throws ReflectiveOperationException {
-        Field field = MainActivity.class.getDeclaredField(name);
+        Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
-        field.set(activity, value);
+        field.set(target, value);
     }
 }
