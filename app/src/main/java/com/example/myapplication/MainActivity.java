@@ -17,6 +17,7 @@ import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,7 +33,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Local personal data and the current meal plan (modules 5 and 6). */
 public class MainActivity extends AppCompatActivity {
@@ -40,6 +43,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_PICKED_RECIPE_IDS = "module6.pickedRecipeIds";
     private static final String STATE_PICKER_SERVINGS = "module6.pickerServings";
     private static final String STATE_SEARCH_QUERY = "module6.searchQuery";
+    private static final String STATE_PICKER_SOURCE = "module6.pickerSource";
+    private static final String STATE_PICKER_COLLECTION_ID = "module6.pickerCollectionId";
     private static final String STATE_PICKER_SCROLL_Y = "module6.pickerScrollY";
     private static final String STATE_PLAN_SCROLL_Y = "module6.planScrollY";
     private static final int CREAM = Color.rgb(250, 249, 246);
@@ -73,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView collectionError;
     private TextView collectionSaveButton;
     private LinearLayout planPickerRows;
+    private TextView planPickerSourceButton;
     private EditText planPickerSearchInput;
     private ScrollView planPickerScrollView;
     private ScrollView mealPlanScrollView;
@@ -136,9 +142,19 @@ public class MainActivity extends AppCompatActivity {
         screen = Screen.valueOf(savedScreen);
         if (screen == Screen.MEAL_PLAN_PICKER) {
             ArrayList<String> savedIds = state.getStringArrayList(STATE_PICKED_RECIPE_IDS);
+            MealPlanViewModel.PickerSource savedSource;
+            String savedSourceName = state.getString(STATE_PICKER_SOURCE,
+                    MealPlanViewModel.PickerSource.ALL.name());
+            try {
+                savedSource = MealPlanViewModel.PickerSource.valueOf(savedSourceName == null
+                        ? MealPlanViewModel.PickerSource.ALL.name() : savedSourceName);
+            } catch (IllegalArgumentException invalidSource) {
+                savedSource = MealPlanViewModel.PickerSource.ALL;
+            }
             mealPlanViewModel.restorePickerDraft(savedIds,
                     state.getInt(STATE_PICKER_SERVINGS, MealPlanViewModel.MIN_SERVINGS),
-                    state.getString(STATE_SEARCH_QUERY, ""));
+                    state.getString(STATE_SEARCH_QUERY, ""), savedSource,
+                    state.getLong(STATE_PICKER_COLLECTION_ID, -1L));
             restoredPickerScrollY = Math.max(0, state.getInt(STATE_PICKER_SCROLL_Y, 0));
         } else {
             restoredMealPlanScrollY = Math.max(0, state.getInt(STATE_PLAN_SCROLL_Y, 0));
@@ -153,6 +169,8 @@ public class MainActivity extends AppCompatActivity {
                 outState.putStringArrayList(STATE_PICKED_RECIPE_IDS,
                         new ArrayList<>(mealPlanViewModel.getSelectedRecipeIds()));
                 outState.putInt(STATE_PICKER_SERVINGS, mealPlanViewModel.getPickerServings());
+                outState.putString(STATE_PICKER_SOURCE, mealPlanViewModel.getPickerSource().name());
+                outState.putLong(STATE_PICKER_COLLECTION_ID, mealPlanViewModel.getPickerCollectionId());
                 String query = planPickerSearchInput == null
                         ? mealPlanViewModel.getSearchQuery() : planPickerSearchInput.getText().toString();
                 outState.putString(STATE_SEARCH_QUERY, query);
@@ -180,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void render() {
         planPickerSearchInput = null;
+        planPickerSourceButton = null;
         planPickerScrollView = null;
         mealPlanScrollView = null;
         FrameLayout frame = new FrameLayout(this);
@@ -483,8 +502,22 @@ public class MainActivity extends AppCompatActivity {
         searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
         searchParams.topMargin = dp(14);
-        searchParams.bottomMargin = dp(18);
+        searchParams.bottomMargin = dp(10);
         page.addView(searchBox, searchParams);
+
+        planPickerSourceButton = text("", 14, GREEN, true);
+        planPickerSourceButton.setGravity(Gravity.CENTER_VERTICAL);
+        planPickerSourceButton.setSingleLine(true);
+        planPickerSourceButton.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        planPickerSourceButton.setMaxWidth(Math.round(getResources().getDisplayMetrics().widthPixels * 0.68f));
+        planPickerSourceButton.setPadding(dp(14), 0, dp(14), 0);
+        planPickerSourceButton.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
+        LinearLayout.LayoutParams sourceParams = new LinearLayout.LayoutParams(-2, dp(40));
+        sourceParams.bottomMargin = dp(14);
+        page.addView(planPickerSourceButton, sourceParams);
+        planPickerSourceButton.setOnClickListener(v -> showMealPlanSourceMenu(v));
+        updatePickerSourceButton();
+
         ScrollView scroll = scrollContent();
         planPickerScrollView = scroll;
         planPickerRows = vertical();
@@ -558,9 +591,23 @@ public class MainActivity extends AppCompatActivity {
     private void populateMealPlanPickerRows() {
         if (planPickerRows == null) return;
         planPickerRows.removeAllViews();
-        List<RecipePreview> matches = mealPlanViewModel.filterRecipes(MEAL_PLAN_PREVIEWS);
+        List<RecipePreview> sourceRecipes = getCurrentMealPlanPickerRecipes();
+        List<RecipePreview> matches = mealPlanViewModel.filterRecipes(sourceRecipes);
         if (matches.isEmpty()) {
-            TextView empty = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
+            String message;
+            if (!mealPlanViewModel.getSearchQuery().trim().isEmpty()) {
+                message = "Không tìm thấy món phù hợp.";
+            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.FAVORITES) {
+                message = "Chưa có món yêu thích nào.";
+            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.COLLECTION
+                    && mealPlanViewModel.getPickerCollectionId() > 0) {
+                message = "Bộ sưu tập này chưa có món nào.";
+            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.COLLECTION) {
+                message = "Chọn một bộ sưu tập để xem món.";
+            } else {
+                message = "Không tìm thấy món phù hợp.";
+            }
+            TextView empty = text(message, 14, MUTED, false);
             empty.setGravity(Gravity.CENTER);
             planPickerRows.addView(empty, new LinearLayout.LayoutParams(-1, dp(72)));
             return;
@@ -603,6 +650,70 @@ public class MainActivity extends AppCompatActivity {
         populateMealPlanPickerRows();
     }
 
+    private List<RecipePreview> getCurrentMealPlanPickerRecipes() {
+        return mealPlanViewModel.getPickerRecipes(MEAL_PLAN_PREVIEWS);
+    }
+
+    private void showMealPlanSourceMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, "Tất cả món");
+        menu.getMenu().add(0, 2, 1, "Món yêu thích");
+        Map<Integer, Long> collectionIdsByMenuId = new LinkedHashMap<>();
+        List<PersonalDataDbHelper.CollectionRow> collections = mealPlanViewModel.getRecipeCollections();
+        if (collections.isEmpty()) {
+            menu.getMenu().add(0, 3, 2, "Chưa có bộ sưu tập").setEnabled(false);
+        } else {
+            int menuId = 10;
+            int order = 2;
+            for (PersonalDataDbHelper.CollectionRow collection : collections) {
+                menu.getMenu().add(0, menuId, order++, "Bộ sưu tập: " + collection.name);
+                collectionIdsByMenuId.put(menuId, collection.id);
+                menuId++;
+            }
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.ALL, -1L);
+            } else if (item.getItemId() == 2) {
+                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.FAVORITES, -1L);
+            } else {
+                Long collectionId = collectionIdsByMenuId.get(item.getItemId());
+                if (collectionId == null) return false;
+                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.COLLECTION, collectionId);
+            }
+            updatePickerSourceButton();
+            populateMealPlanPickerRows();
+            if (planPickerScrollView != null) planPickerScrollView.scrollTo(0, 0);
+            return true;
+        });
+        menu.show();
+    }
+
+    private void updatePickerSourceButton() {
+        if (planPickerSourceButton == null || mealPlanViewModel == null) return;
+        String label;
+        switch (mealPlanViewModel.getPickerSource()) {
+            case FAVORITES:
+                label = "Yêu thích";
+                break;
+            case COLLECTION:
+                label = "Chọn bộ sưu tập";
+                for (PersonalDataDbHelper.CollectionRow collection : mealPlanViewModel.getRecipeCollections()) {
+                    if (collection.id == mealPlanViewModel.getPickerCollectionId()) {
+                        label = collection.name;
+                        break;
+                    }
+                }
+                break;
+            case ALL:
+            default:
+                label = "Tất cả món";
+                break;
+        }
+        planPickerSourceButton.setText(label + "  ▾");
+        planPickerSourceButton.setContentDescription("Nguồn món: " + label + ". Chạm để đổi nguồn.");
+    }
+
     private void openMealPlanPicker() {
         mealPlanViewModel.beginPicker();
         restoredPickerScrollY = 0;
@@ -616,7 +727,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveMealPlanSelection() {
-        if (!mealPlanViewModel.saveSelection(DESIGN_RECIPES)) {
+        if (!mealPlanViewModel.saveSelection(mealPlanViewModel.getAllSelectableRecipes(DESIGN_RECIPES))) {
             Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
             return;
         }

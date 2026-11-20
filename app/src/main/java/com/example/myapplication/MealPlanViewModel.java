@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -16,11 +17,14 @@ import java.util.Map;
 public final class MealPlanViewModel extends AndroidViewModel {
     static final int MIN_SERVINGS = 1;
     static final int MAX_SERVINGS = 999;
+    enum PickerSource { ALL, FAVORITES, COLLECTION }
 
     private final PersonalDataRepository repository;
     private final List<String> selectedRecipeIds = new ArrayList<>();
     private int pickerServings = MIN_SERVINGS;
     private String searchQuery = "";
+    private PickerSource pickerSource = PickerSource.ALL;
+    private long pickerCollectionId = -1L;
 
     public MealPlanViewModel(@NonNull Application application) {
         super(application);
@@ -29,6 +33,43 @@ public final class MealPlanViewModel extends AndroidViewModel {
 
     List<PersonalDataDbHelper.PlannedRecipe> getMealPlanRecipes() {
         return repository.getMealPlanRecipes();
+    }
+
+    List<PersonalDataDbHelper.CollectionRow> getRecipeCollections() { return repository.getCollections(); }
+
+    List<MainActivity.RecipePreview> getPickerRecipes(List<MainActivity.RecipePreview> defaultRecipes) {
+        switch (pickerSource) {
+            case FAVORITES:
+                return repository.getFavorites();
+            case COLLECTION:
+                return pickerCollectionId > 0 ? repository.getCollectionRecipes(pickerCollectionId)
+                        : new ArrayList<>();
+            case ALL:
+            default:
+                return new ArrayList<>(defaultRecipes);
+        }
+    }
+
+    List<MainActivity.RecipePreview> getAllSelectableRecipes(List<MainActivity.RecipePreview> defaultRecipes) {
+        Map<String, MainActivity.RecipePreview> recipesById = new LinkedHashMap<>();
+        addUniqueRecipes(recipesById, repository.getFavorites());
+        for (PersonalDataDbHelper.CollectionRow collection : repository.getCollections()) {
+            addUniqueRecipes(recipesById, repository.getCollectionRecipes(collection.id));
+        }
+        addUniqueRecipes(recipesById, defaultRecipes);
+        for (PersonalDataDbHelper.PlannedRecipe planned : repository.getMealPlanRecipes()) {
+            if (!recipesById.containsKey(planned.recipe.id)) {
+                recipesById.put(planned.recipe.id, planned.recipe);
+            }
+        }
+        return new ArrayList<>(recipesById.values());
+    }
+
+    private static void addUniqueRecipes(Map<String, MainActivity.RecipePreview> output,
+                                         List<MainActivity.RecipePreview> recipes) {
+        for (MainActivity.RecipePreview recipe : recipes) {
+            if (!output.containsKey(recipe.id)) output.put(recipe.id, recipe);
+        }
     }
 
     void removeMealPlanRecipe(String recipeId) { repository.removeMealPlanRecipe(recipeId); }
@@ -44,18 +85,33 @@ public final class MealPlanViewModel extends AndroidViewModel {
         }
         pickerServings = MIN_SERVINGS;
         searchQuery = "";
+        pickerSource = PickerSource.ALL;
+        pickerCollectionId = -1L;
     }
 
     void restorePickerDraft(List<String> recipeIds, int servings, String query) {
+        restorePickerDraft(recipeIds, servings, query, PickerSource.ALL, -1L);
+    }
+
+    void restorePickerDraft(List<String> recipeIds, int servings, String query,
+                            PickerSource source, long collectionId) {
         selectedRecipeIds.clear();
         if (recipeIds != null) selectedRecipeIds.addAll(recipeIds);
         pickerServings = Math.max(MIN_SERVINGS, Math.min(MAX_SERVINGS, servings));
         searchQuery = query == null ? "" : query;
+        pickerSource = source == null ? PickerSource.ALL : source;
+        pickerCollectionId = pickerSource == PickerSource.COLLECTION ? collectionId : -1L;
     }
 
     List<String> getSelectedRecipeIds() { return new ArrayList<>(selectedRecipeIds); }
     int getPickerServings() { return pickerServings; }
     String getSearchQuery() { return searchQuery; }
+    PickerSource getPickerSource() { return pickerSource; }
+    long getPickerCollectionId() { return pickerCollectionId; }
+    void setPickerSource(PickerSource source, long collectionId) {
+        pickerSource = source == null ? PickerSource.ALL : source;
+        pickerCollectionId = pickerSource == PickerSource.COLLECTION ? collectionId : -1L;
+    }
     void setPickerServings(int servings) {
         validateServings(servings);
         pickerServings = servings;
