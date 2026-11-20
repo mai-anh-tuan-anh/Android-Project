@@ -884,6 +884,7 @@ public class MainActivity extends AppCompatActivity {
         labels.addView(text(recipe.title, 14, TEXT, true));
         labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
         recipeRow.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        recipeRow.addView(favoriteToggleButton(recipe), new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout.LayoutParams recipeParams = new LinearLayout.LayoutParams(-1, dp(64));
         recipeParams.topMargin = dp(30);
         content.addView(recipeRow, recipeParams);
@@ -1094,6 +1095,7 @@ public class MainActivity extends AppCompatActivity {
         labels.addView(text(recipe.title, 14, TEXT, true));
         labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
         item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        item.addView(favoriteToggleButton(recipe), new LinearLayout.LayoutParams(dp(48), dp(48)));
         item.addView(text("›", 23, GREEN, false));
         item.setOnClickListener(v -> {
             openRecipeNote(recipe);
@@ -1101,6 +1103,31 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
         params.bottomMargin = dp(9);
         parent.addView(item, params);
+    }
+
+    private FrameLayout favoriteToggleButton(RecipePreview recipe) {
+        boolean favorite = personalDataViewModel.isFavorite(recipe.id);
+        FrameLayout button = new FrameLayout(this);
+        button.setFocusable(true);
+        button.setClickable(true);
+        button.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
+        ImageView star = iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
+        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER);
+        button.addView(star, iconParams);
+        updateFavoriteToggleDescription(button, favorite, recipe);
+        button.setOnClickListener(v -> {
+            boolean nowFavorite = !personalDataViewModel.isFavorite(recipe.id);
+            if (nowFavorite) personalDataViewModel.addFavorite(recipe);
+            else personalDataViewModel.removeFavorite(recipe.id);
+            star.setImageResource(nowFavorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline);
+            star.setColorFilter(GREEN);
+            updateFavoriteToggleDescription(button, nowFavorite, recipe);
+        });
+        return button;
+    }
+
+    private static void updateFavoriteToggleDescription(FrameLayout button, boolean favorite, RecipePreview recipe) {
+        button.setContentDescription((favorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
     }
 
     private void addSelectableRecipeRow(LinearLayout parent, RecipePreview recipe) {
