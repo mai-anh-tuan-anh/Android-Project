@@ -3,7 +3,7 @@
 **Phiên bản 1 · 20/11/2026**  
 Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với module Công thức/Khẩu phần.
 
-> Đây là phương án thống nhất đề xuất để nhóm dùng làm baseline kỹ thuật. Các quyết định bên dưới do người phụ trách Người 3 đề xuất theo yêu cầu của nhóm; chỉ ghi là quyết định chung đã duyệt sau khi các thành viên xác nhận. Phương án này không thay đổi bộ màn hình hoặc luồng đã thiết kế.
+> Đây là baseline dữ liệu module 5–7. Quyết định được người dùng chốt trong `BAN_GIAO_DU_AN_ANDROID.md` có hiệu lực cao hơn ghi chú đề xuất cũ tại đây. Các quy tắc cần chủ module khác xác nhận vẫn được đánh dấu chờ nhóm. Phương án không thay đổi bộ màn hình hoặc luồng đã thiết kế.
 
 ## 1. Mã định danh
 
@@ -14,8 +14,8 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 
 ## 2. Khẩu phần và số lượng
 
-- `baseServings` của công thức và `servings` người dùng chọn là số nguyên dương. Đề xuất chặn giá trị ngoài `1..99` để tránh đầu vào bất thường; dùng cùng quy tắc ở Chi tiết, Nấu hôm nay và Mua sắm.
-- Lượng nguyên liệu định lượng được tính bằng `lượng gốc × servings / baseServings`. Tính bằng số thập phân chính xác (Java `BigDecimal`), giữ giá trị gốc, và chỉ làm tròn khi hiển thị. Khẩu phần mới không tự thay đổi thời gian nấu.
+- `baseServings` của công thức và `servings` người dùng chọn là số nguyên dương. Giới hạn tối thiểu/tối đa chung **chưa được chốt**; không tự áp dụng `1..99` như yêu cầu dự án. Cần nhóm chốt miền hợp lệ trước khi module 3/6/7 tích hợp.
+- Lượng nguyên liệu định lượng được tính bằng `lượng gốc × servings / baseServings`. Tính bằng số thập phân chính xác (Java `BigDecimal`), giữ giá trị gốc, và chỉ làm tròn khi hiển thị tới 2 chữ số thập phân. Với lượng nhỏ, dùng đơn vị phù hợp trong danh mục đơn vị nấu ăn ở mục K.4 của bàn giao. Khẩu phần mới không tự thay đổi thời gian nấu.
 - Lượng định tính như “vừa đủ”, “một ít” không nhân theo khẩu phần. Giữ nguyên mô tả định tính và không cộng nó với lượng số.
 - Mỗi món chỉ có một dòng trong kế hoạch hiện tại. Thêm lại món đã có sẽ mở/chọn dòng đó, không tạo bản trùng; người dùng chỉnh khẩu phần trên dòng hiện có.
 
@@ -61,8 +61,8 @@ Lượng thập phân lưu dạng chuỗi chuẩn để tránh sai số nhị ph
 
 ## 7. Điểm cần nhóm xác nhận trước khi đóng hợp đồng
 
-1. Chấp nhận ID Firebase làm `recipeId` bất biến và danh mục `ingredientId` dùng chung.
-2. Chấp nhận giới hạn khẩu phần `1..99`.
-3. Chấp nhận quy tắc trạng thái khi cập nhật số lượng tăng: đặt lại `Cần mua`.
-4. Chốt danh mục đơn vị và các alias thật sự tương đương; không tự thêm quy đổi theo suy đoán.
+1. `recipeId` Firebase bất biến và danh mục `ingredientId` dùng chung đã được người dùng chấp nhận; cần chủ module 9 xác nhận cấu trúc triển khai.
+2. Giới hạn khẩu phần chung chưa chốt; nhóm cần quyết định trước tích hợp 3/6/7.
+3. Quy tắc trạng thái khi cập nhật số lượng tăng (đặt lại `Cần mua`) là đề xuất được người dùng giao Người 3 lựa chọn; chủ module 7 xác nhận chi tiết khi triển khai.
+4. Danh mục đơn vị và quy đổi cơ sở do người dùng cung cấp đã ghi tại bàn giao mục K.4. Người điều phối schema/module 7 chuyển danh mục đó thành dữ liệu chuẩn; chỉ thêm alias/quy đổi mới sau khi xác minh.
 
