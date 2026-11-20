@@ -381,11 +381,12 @@ public class MainActivity extends AppCompatActivity {
         ImageView image = recipeImage(recipe);
         imageFrame.addView(image, new FrameLayout.LayoutParams(-1, dp(96)));
         if (showFavorite) {
-            ImageView star = iconView(R.drawable.ic_star_outline, GREEN);
+            boolean favorite = data.isFavorite(recipe.id);
+            ImageView star = iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
             star.setBackground(roundRect(WHITE, WHITE, 18));
             FrameLayout starTouchTarget = new FrameLayout(this);
             starTouchTarget.setFocusable(true);
-            starTouchTarget.setContentDescription(data.isFavorite(recipe.id) ? "Bỏ yêu thích" : "Lưu yêu thích");
+            starTouchTarget.setContentDescription(favorite ? "Bỏ yêu thích" : "Lưu yêu thích");
             FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER);
             starTouchTarget.addView(star, iconParams);
             FrameLayout.LayoutParams touchParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
