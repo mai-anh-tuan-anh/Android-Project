@@ -19,7 +19,11 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
-        super(context, DB_NAME, null, DB_VERSION);
+        this(context, DB_NAME);
+    }
+
+    PersonalDataDbHelper(Context context, String databaseName) {
+        super(context, databaseName, null, DB_VERSION);
         debugBuild = (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
@@ -44,6 +48,12 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         // Add forward-only migrations here; personal data must never be dropped on upgrade.
     }
 
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.setForeignKeyConstraintsEnabled(true);
+    }
+
     void seedDesignPreviewIfNeeded(List<MainActivity.RecipePreview> recipes) {
         if (!debugBuild) return;
         SQLiteDatabase db = getWritableDatabase();
@@ -59,8 +69,8 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             addFavorite(db, recipes.get(1));
             addFavorite(db, recipes.get(2));
             addFavorite(db, recipes.get(3));
-            addHistory(db, recipes.get(2));
             addHistory(db, recipes.get(3));
+            addHistory(db, recipes.get(2));
             long family = addCollection(db, "Bữa cơm nhà");
             addCollectionRecipe(db, family, recipes.get(0));
             addCollectionRecipe(db, family, recipes.get(1));
@@ -135,7 +145,24 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     List<MainActivity.RecipePreview> getHistory() {
-        return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM RecipeViewHistory ORDER BY viewedAt DESC LIMIT 10");
+        return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM RecipeViewHistory " +
+                "ORDER BY viewedAt DESC, rowid DESC LIMIT 10");
+    }
+
+    /** Upserts a recipe visit and retains only the 10 most recent IDs. */
+    void recordViewedRecipe(MainActivity.RecipePreview recipe) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues value = recipeValues(recipe);
+            value.put("viewedAt", System.currentTimeMillis());
+            db.insertWithOnConflict("RecipeViewHistory", null, value, SQLiteDatabase.CONFLICT_REPLACE);
+            db.delete("RecipeViewHistory", "recipeId NOT IN (" +
+                    "SELECT recipeId FROM RecipeViewHistory ORDER BY viewedAt DESC, rowid DESC LIMIT 10)", null);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     List<CollectionRow> getCollections() {
@@ -151,6 +178,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
 
     List<MainActivity.RecipePreview> getCollectionRecipes(long collectionId) {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM CollectionRecipe WHERE collectionId=" + collectionId + " ORDER BY rowid");
+    }
+
+    boolean isCollectionNameAvailable(String name, Long collectionId) {
+        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        if (clean.isEmpty()) return false;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT collectionId FROM Collection WHERE normalizedName=?",
+                new String[]{normalizeName(clean)})) {
+            if (!cursor.moveToFirst()) return true;
+            return collectionId != null && cursor.getLong(0) == collectionId;
+        }
     }
 
     private List<MainActivity.RecipePreview> readRecipes(String sql) {
