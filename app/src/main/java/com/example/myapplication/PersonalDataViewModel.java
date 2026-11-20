@@ -58,9 +58,9 @@ public final class PersonalDataViewModel extends AndroidViewModel {
     boolean isCollectionNameAvailable(String name, Long collectionId) {
         return repository.isCollectionNameAvailable(name, collectionId);
     }
-    boolean saveCollectionForm(Long collectionId, List<MainActivity.RecipePreview> availableRecipes) {
+    Long saveCollectionForm(Long collectionId, List<MainActivity.RecipePreview> availableRecipes) {
         if (collectionNameDraft.trim().isEmpty() || !repository.isCollectionNameAvailable(collectionNameDraft, collectionId)) {
-            return false;
+            return null;
         }
         Map<String, MainActivity.RecipePreview> recipesById = new HashMap<>();
         for (MainActivity.RecipePreview recipe : availableRecipes) recipesById.put(recipe.id, recipe);
@@ -69,7 +69,7 @@ public final class PersonalDataViewModel extends AndroidViewModel {
             MainActivity.RecipePreview recipe = recipesById.get(id);
             if (recipe != null) selected.add(recipe);
         }
-        return repository.saveCollection(collectionNameDraft, selected, collectionId);
+        return repository.saveCollectionAndGetId(collectionNameDraft, selected, collectionId);
     }
     String getNote(String recipeId) { return repository.getNote(recipeId); }
     void saveNote(MainActivity.RecipePreview recipe, String note) { repository.saveNote(recipe, note); }

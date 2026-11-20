@@ -57,9 +57,11 @@ public class PersonalDataDbHelperTest {
     @Test
     public void collectionsNormalizeNamesAndReplaceRecipeMembershipOnEdit() {
         assertTrue(data.isCollectionNameAvailable("Bữa cơm nhà", null));
-        assertTrue(data.saveCollection("  Bữa\t\u00a0cơm   nhà  ", Arrays.asList(recipeA, recipeB), null));
+        Long createdId = data.saveCollectionAndGetId("  Bữa\t\u00a0cơm   nhà  ", Arrays.asList(recipeA, recipeB), null);
+        assertTrue(createdId != null);
 
         PersonalDataDbHelper.CollectionRow collection = data.getCollections().get(0);
+        assertEquals(createdId.longValue(), collection.id);
         assertEquals("Bữa cơm nhà", collection.name);
         assertEquals(2, collection.recipeCount);
         assertFalse(data.isCollectionNameAvailable("BUA COM NHA", null));

@@ -34,6 +34,9 @@ final class PersonalDataRepository {
     boolean saveCollection(String name, List<MainActivity.RecipePreview> recipes, Long id) {
         return database.saveCollection(name, recipes, id);
     }
+    Long saveCollectionAndGetId(String name, List<MainActivity.RecipePreview> recipes, Long id) {
+        return database.saveCollectionAndGetId(name, recipes, id);
+    }
     String getNote(String recipeId) { return database.getNote(recipeId); }
     void saveNote(MainActivity.RecipePreview recipe, String note) { database.saveNote(recipe, note); }
     List<PersonalDataDbHelper.PlannedRecipe> getMealPlanRecipes() { return database.getMealPlanRecipes(); }

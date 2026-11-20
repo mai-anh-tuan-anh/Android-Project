@@ -1018,16 +1018,15 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        boolean saved = personalDataViewModel.saveCollectionForm(currentId, DESIGN_RECIPES);
-        if (!saved) {
+        Long savedCollectionId = personalDataViewModel.saveCollectionForm(currentId, DESIGN_RECIPES);
+        if (savedCollectionId == null) {
             collectionError.setText("Tên này đã được sử dụng.");
             collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
             updateCollectionSaveButton(false);
             return;
         }
-        boolean editing = selectedCollectionId > 0;
-        screen = editing ? Screen.COLLECTION : Screen.LIBRARY;
-        if (!editing) selectedCollectionId = -1L;
+        selectedCollectionId = savedCollectionId;
+        screen = Screen.COLLECTION;
         render();
     }
 

@@ -226,8 +226,12 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     boolean saveCollection(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
+        return saveCollectionAndGetId(name, selected, collectionId) != null;
+    }
+
+    Long saveCollectionAndGetId(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
         String clean = normalizeCollectionDisplayName(name);
-        if (clean.isEmpty()) return false;
+        if (clean.isEmpty()) return null;
         SQLiteDatabase db = getWritableDatabase();
         String normalized = normalizeName(clean);
         db.beginTransaction();
@@ -236,7 +240,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             try (Cursor cursor = db.rawQuery("SELECT collectionId FROM Collection WHERE normalizedName=?", new String[]{normalized})) {
                 if (cursor.moveToFirst()) duplicateId = cursor.getLong(0);
             }
-            if (duplicateId != null && (collectionId == null || duplicateId.longValue() != collectionId.longValue())) return false;
+            if (duplicateId != null && (collectionId == null || duplicateId.longValue() != collectionId.longValue())) return null;
 
             if (collectionId == null) {
                 ContentValues value = new ContentValues();
@@ -252,7 +256,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             }
             for (MainActivity.RecipePreview recipe : selected) addCollectionRecipe(db, collectionId, recipe);
             db.setTransactionSuccessful();
-            return true;
+            return collectionId;
         } finally {
             db.endTransaction();
         }
