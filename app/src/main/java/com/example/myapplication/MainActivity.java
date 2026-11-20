@@ -745,19 +745,22 @@ public class MainActivity extends AppCompatActivity {
                     : (selected ? "Đang chọn" : recipe.duration + " · " + recipe.difficulty);
             labels.addView(text(subtitle, 13, MUTED, false));
             row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+            FrameLayout toggleTarget = new FrameLayout(this);
+            toggleTarget.setFocusable(true);
+            toggleTarget.setClickable(true);
+            toggleTarget.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
             TextView mark = text(selected ? "✓" : "+", 21, selected ? WHITE : GREEN, false);
             mark.setGravity(Gravity.CENTER);
             if (selected) mark.setBackground(roundRect(GREEN, GREEN, 8));
-            mark.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
-            row.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
+            toggleTarget.addView(mark, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+            row.addView(toggleTarget, new LinearLayout.LayoutParams(dp(48), dp(48)));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
             rowParams.bottomMargin = dp(10);
             planPickerRows.addView(row, rowParams);
-            row.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
+            row.setContentDescription("Xem ghi chú món " + recipe.title);
             row.setFocusable(true);
-            row.setOnClickListener(v -> {
-                togglePlanPickerRecipe(recipe);
-            });
+            row.setOnClickListener(v -> openRecipeNote(recipe));
+            toggleTarget.setOnClickListener(v -> togglePlanPickerRecipe(recipe));
         }
     }
 
