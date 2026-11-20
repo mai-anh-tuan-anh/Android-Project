@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Local personal data and the current meal plan (modules 5 and 6). */
@@ -74,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
     private Screen collectionReturnScreen = Screen.LIBRARY;
     private long selectedCollectionId = -1L;
     private String noteRecipeId = DESIGN_RECIPES.get(0).id;
+    private String favoritesSearchQuery = "";
     private EditText collectionNameInput;
     private TextView collectionError;
     private TextView collectionSaveButton;
@@ -277,12 +279,38 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Yêu thích");
-        addText(page, "Những công thức bạn đã lưu.", 14, MUTED, false, 0, 0, 0, 34);
-        ScrollView scroll = scrollContent();
+        addText(page, "Những công thức bạn đã lưu.", 14, MUTED, false, 0, 0, 0, 16);
+        List<RecipePreview> favorites = personalDataViewModel.getFavorites();
         LinearLayout content = vertical();
         content.setGravity(Gravity.CENTER_HORIZONTAL);
+        if (!favorites.isEmpty()) {
+            EditText search = editField(favoritesSearchQuery, 16, 49);
+            search.setInputType(InputType.TYPE_CLASS_TEXT);
+            search.setSingleLine(true);
+            search.setHint("Tìm món yêu thích");
+            search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+            search.setBackgroundColor(Color.TRANSPARENT);
+            search.setPadding(dp(48), dp(10), dp(12), dp(10));
+            FrameLayout searchBox = new FrameLayout(this);
+            searchBox.setBackground(roundRect(WHITE, BORDER, 16));
+            ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
+            searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
+            searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
+            searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
+            LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+            searchParams.bottomMargin = dp(18);
+            page.addView(searchBox, searchParams);
+            search.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    favoritesSearchQuery = s.toString();
+                    populateFavoriteResults(content, favorites);
+                }
+                @Override public void afterTextChanged(Editable s) { }
+            });
+        }
+        ScrollView scroll = scrollContent();
         scroll.addView(content);
-        List<RecipePreview> favorites = personalDataViewModel.getFavorites();
         if (favorites.isEmpty()) {
             LinearLayout empty = vertical();
             empty.setGravity(Gravity.CENTER);
@@ -309,11 +337,34 @@ public class MainActivity extends AppCompatActivity {
             buttonParams.setMargins(dp(24), dp(16), dp(24), 0);
             empty.addView(explore, buttonParams);
         } else {
-            addRecipeGrid(content, favorites, true, true);
-            addInfoBanner(content, "Chạm biểu tượng lưu để bỏ yêu thích.", 22);
+            populateFavoriteResults(content, favorites);
         }
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void populateFavoriteResults(LinearLayout content, List<RecipePreview> favorites) {
+        content.removeAllViews();
+        String query = normalizeRecipeSearch(favoritesSearchQuery);
+        List<RecipePreview> matches = new ArrayList<>();
+        for (RecipePreview recipe : favorites) {
+            if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) matches.add(recipe);
+        }
+        if (matches.isEmpty()) {
+            TextView noResults = text("Không tìm thấy món yêu thích phù hợp.", 14, MUTED, false);
+            noResults.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(96));
+            content.addView(noResults, params);
+            return;
+        }
+        addRecipeGrid(content, matches, true, true);
+        addInfoBanner(content, "Chạm biểu tượng lưu để bỏ yêu thích.", 22);
+    }
+
+    private static String normalizeRecipeSearch(String value) {
+        String decomposed = java.text.Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
+                java.text.Normalizer.Form.NFD);
+        return decomposed.replaceAll("\\p{M}+", "").replace('đ', 'd');
     }
 
     private void renderCollections() {
