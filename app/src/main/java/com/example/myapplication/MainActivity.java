@@ -17,6 +17,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.OnBackPressedCallback;
@@ -30,7 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Module 5: local favorites, collections, history and personal notes. */
+/** Local personal data and the current meal plan (modules 5 and 6). */
 public class MainActivity extends AppCompatActivity {
     private static final int CREAM = Color.rgb(250, 249, 246);
     private static final int GREEN = Color.rgb(50, 108, 79);
@@ -48,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
             new RecipePreview("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ"),
             new RecipePreview("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ")
     );
+    private static final List<RecipePreview> MEAL_PLAN_PREVIEWS = Arrays.asList(
+            DESIGN_RECIPES.get(0), DESIGN_RECIPES.get(1), DESIGN_RECIPES.get(3));
 
     private PersonalDataDbHelper data;
     private LinearLayout appRoot;
@@ -61,8 +64,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView collectionSaveButton;
     private boolean collectionValidationAttempted;
     private final List<String> selectedRecipeIds = new ArrayList<>();
+    private final List<String> selectedPlanRecipeIds = new ArrayList<>();
+    private LinearLayout planPickerRows;
+    private int planPickerServings = 2;
+    private boolean planPickerServingsChanged;
+    private String planSearchQuery = "";
 
-    enum Screen { LIBRARY, FAVORITES, COLLECTION, COLLECTION_FORM, NOTE }
+    enum Screen { LIBRARY, FAVORITES, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN, MEAL_PLAN_PICKER }
 
     static final class RecipePreview {
         final String id;
@@ -94,6 +102,8 @@ public class MainActivity extends AppCompatActivity {
                     screen = selectedCollectionId > 0 ? Screen.COLLECTION : Screen.LIBRARY;
                 } else if (screen == Screen.NOTE) {
                     screen = noteReturnScreen;
+                } else if (screen == Screen.MEAL_PLAN_PICKER) {
+                    screen = Screen.MEAL_PLAN;
                 } else {
                     screen = Screen.LIBRARY;
                 }
@@ -142,7 +152,9 @@ public class MainActivity extends AppCompatActivity {
         else if (screen == Screen.FAVORITES) renderFavorites();
         else if (screen == Screen.COLLECTION) renderCollection();
         else if (screen == Screen.COLLECTION_FORM) renderCollectionForm();
-        else renderNote();
+        else if (screen == Screen.NOTE) renderNote();
+        else if (screen == Screen.MEAL_PLAN) renderMealPlan();
+        else renderMealPlanPicker();
         setContentView(frame);
         ViewCompat.requestApplyInsets(frame);
     }
@@ -174,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < Math.min(2, history.size()); i++) addHistoryRow(content, history.get(i));
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation();
+        addBottomNavigation(3);
     }
 
     private void renderFavorites() {
@@ -218,6 +230,331 @@ public class MainActivity extends AppCompatActivity {
         }
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void renderMealPlan() {
+        LinearLayout page = vertical();
+        page.setPadding(dp(24), dp(8), dp(24), dp(16));
+        TextView heading = text("Nấu hôm nay", 28, TEXT, true);
+        page.addView(heading);
+
+        List<PersonalDataDbHelper.PlannedRecipe> planned = data.getMealPlanRecipes();
+        if (!planned.isEmpty()) {
+            TextView summary = text(planned.size() + " món cho bữa cơm nhà.", 15, MUTED, false);
+            LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
+            summaryParams.topMargin = dp(18);
+            summaryParams.bottomMargin = dp(22);
+            page.addView(summary, summaryParams);
+        }
+
+        ScrollView scroll = scrollContent();
+        if (planned.isEmpty()) scroll.setFillViewport(true);
+        LinearLayout content = vertical();
+        scroll.addView(content);
+        if (planned.isEmpty()) {
+            LinearLayout empty = vertical();
+            empty.setGravity(Gravity.CENTER_HORIZONTAL);
+            content.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, -2);
+            emptyParams.topMargin = dp(144);
+            content.addView(empty, emptyParams);
+            ImageView icon = iconView(R.drawable.ic_calendar_outline, GREEN);
+            icon.setPadding(dp(24), dp(24), dp(24), dp(24));
+            icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
+            empty.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
+            TextView title = text("Bạn chưa chọn món", 22, TEXT, true);
+            title.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+            titleParams.topMargin = dp(18);
+            titleParams.bottomMargin = dp(8);
+            empty.addView(title, titleParams);
+            TextView hint = text("Thêm món và đặt khẩu phần để chuẩn bị bữa ăn.", 14, MUTED, false);
+            hint.setGravity(Gravity.CENTER);
+            hint.setLineSpacing(dp(3), 1f);
+            LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+            hintParams.bottomMargin = dp(20);
+            empty.addView(hint, hintParams);
+            TextView choose = primaryButton("Chọn món", () -> openMealPlanPicker());
+            empty.addView(choose, new LinearLayout.LayoutParams(-1, dp(49)));
+        } else {
+            for (PersonalDataDbHelper.PlannedRecipe item : planned) addPlannedRecipeCard(content, item);
+            TextView addMore = text("＋     Thêm món khác", 16, GREEN, true);
+            addMore.setGravity(Gravity.CENTER);
+            addMore.setBackground(roundRect(WHITE, BORDER, 15));
+            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(52));
+            addParams.topMargin = dp(14);
+            addParams.bottomMargin = dp(14);
+            content.addView(addMore, addParams);
+            addMore.setOnClickListener(v -> openMealPlanPicker());
+        }
+
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        if (!planned.isEmpty()) {
+            FrameLayout shopping = new FrameLayout(this);
+            shopping.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
+            ImageView cart = iconView(R.drawable.ic_cart_outline, GREEN);
+            cart.setPadding(dp(14), dp(10), dp(10), dp(10));
+            shopping.addView(cart, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START | Gravity.CENTER_VERTICAL));
+            TextView shoppingLabel = text("Tạo danh sách mua sắm", 15, GREEN, true);
+            shoppingLabel.setGravity(Gravity.CENTER);
+            shopping.addView(shoppingLabel, new FrameLayout.LayoutParams(-1, -1));
+            LinearLayout.LayoutParams shoppingParams = new LinearLayout.LayoutParams(-1, dp(48));
+            shoppingParams.topMargin = dp(10);
+            page.addView(shopping, shoppingParams);
+            shopping.setOnClickListener(v -> Toast.makeText(this,
+                    "Màn Mua sắm sẽ được kết nối khi hoàn thành module 7.", Toast.LENGTH_SHORT).show());
+
+            TextView startCooking = primaryButton("Bắt đầu nấu", () -> Toast.makeText(this,
+                    "Màn Nấu từng bước sẽ được kết nối khi hoàn thành module 4.", Toast.LENGTH_SHORT).show());
+            LinearLayout.LayoutParams cookParams = new LinearLayout.LayoutParams(-1, dp(49));
+            cookParams.topMargin = dp(10);
+            page.addView(startCooking, cookParams);
+        }
+        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(1);
+    }
+
+    private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item) {
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(11), dp(11), dp(11), dp(11));
+        card.setBackground(roundRect(WHITE, BORDER, 20));
+        ImageView image = recipeImage(item.recipe);
+        card.addView(image, new LinearLayout.LayoutParams(dp(78), dp(78)));
+
+        LinearLayout details = vertical();
+        details.setPadding(dp(12), 0, 0, 0);
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(item.recipe.title, 18, TEXT, true);
+        title.setMaxLines(2);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView remove = text("×", 28, GREEN, false);
+        remove.setGravity(Gravity.CENTER);
+        remove.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
+        remove.setContentDescription("Bỏ " + item.recipe.title + " khỏi kế hoạch");
+        titleRow.addView(remove, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        details.addView(titleRow);
+        details.addView(text(item.recipe.duration + " · " + item.recipe.difficulty, 14, MUTED, false));
+
+        LinearLayout servings = new LinearLayout(this);
+        servings.setGravity(Gravity.CENTER_VERTICAL);
+        servings.setPadding(dp(4), 0, dp(4), 0);
+        servings.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
+        TextView minus = stepButton("−", "Giảm khẩu phần", () -> changeServings(item, -1));
+        servings.addView(minus, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        TextView count = text(String.valueOf(item.servings), 19, TEXT, true);
+        count.setGravity(Gravity.CENTER);
+        servings.addView(count, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        TextView plus = stepButton("＋", "Tăng khẩu phần", () -> changeServings(item, 1));
+        servings.addView(plus, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        TextView person = text("người", 14, MUTED, false);
+        LinearLayout.LayoutParams personParams = new LinearLayout.LayoutParams(-2, -2);
+        personParams.leftMargin = dp(5);
+        servings.addView(person, personParams);
+        LinearLayout.LayoutParams servingsParams = new LinearLayout.LayoutParams(-1, -2);
+        servingsParams.topMargin = dp(8);
+        details.addView(servings, servingsParams);
+
+        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(0, -2, 1);
+        detailsParams.leftMargin = dp(1);
+        card.addView(details, detailsParams);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.bottomMargin = dp(16);
+        parent.addView(card, cardParams);
+        remove.setOnClickListener(v -> {
+            data.removeMealPlanRecipe(item.recipe.id);
+            render();
+        });
+    }
+
+    private void changeServings(PersonalDataDbHelper.PlannedRecipe item, int delta) {
+        int servings = item.servings + delta;
+        if (servings < 1 || servings > 99) return;
+        data.setMealPlanRecipeServings(item.recipe.id, servings);
+        render();
+    }
+
+    private void renderMealPlanPicker() {
+        LinearLayout page = vertical();
+        page.setPadding(dp(24), dp(8), dp(24), dp(12));
+        addBackTitle(page, "Thêm món vào kế hoạch");
+
+        EditText search = editField(planSearchQuery, 16, 49);
+        search.setSingleLine(true);
+        search.setHint("Tìm món hoặc nguyên liệu");
+        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        search.setBackgroundColor(Color.TRANSPARENT);
+        search.setPadding(dp(48), dp(10), dp(12), dp(10));
+        FrameLayout searchBox = new FrameLayout(this);
+        searchBox.setBackground(roundRect(WHITE, BORDER, 16));
+        ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
+        searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
+        searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
+        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+        searchParams.topMargin = dp(14);
+        searchParams.bottomMargin = dp(18);
+        page.addView(searchBox, searchParams);
+        ScrollView scroll = scrollContent();
+        LinearLayout content = vertical();
+        scroll.addView(content);
+        planPickerRows = content;
+        populateMealPlanPickerRows();
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                planSearchQuery = s.toString();
+                populateMealPlanPickerRows();
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+
+        TextView selectedTitle = text("Khẩu phần món đã chọn", 20, TEXT, true);
+        LinearLayout.LayoutParams selectedTitleParams = new LinearLayout.LayoutParams(-1, -2);
+        selectedTitleParams.topMargin = dp(24);
+        selectedTitleParams.bottomMargin = dp(12);
+        content.addView(selectedTitle, selectedTitleParams);
+        LinearLayout stepper = new LinearLayout(this);
+        stepper.setGravity(Gravity.CENTER_VERTICAL);
+        stepper.setPadding(dp(10), 0, dp(10), 0);
+        stepper.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
+        TextView minus = stepButton("−", "Giảm khẩu phần món đã chọn", () -> {
+            if (planPickerServings > 1) {
+                planPickerServings--;
+                planPickerServingsChanged = true;
+                updatePickerServingCount();
+            }
+        });
+        stepper.addView(minus, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        TextView servingCount = text(String.valueOf(planPickerServings), 20, TEXT, true);
+        servingCount.setGravity(Gravity.CENTER);
+        servingCount.setTag("plan-serving-count");
+        stepper.addView(servingCount, new LinearLayout.LayoutParams(dp(70), dp(48)));
+        TextView plus = stepButton("＋", "Tăng khẩu phần món đã chọn", () -> {
+            if (planPickerServings < 99) {
+                planPickerServings++;
+                planPickerServingsChanged = true;
+                updatePickerServingCount();
+            }
+        });
+        stepper.addView(plus, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        content.addView(stepper, new LinearLayout.LayoutParams(dp(160), dp(48)));
+
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        TextView confirm = primaryButton("Thêm vào Nấu hôm nay", this::saveMealPlanSelection);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(-1, dp(52));
+        confirmParams.topMargin = dp(14);
+        page.addView(confirm, confirmParams);
+        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void populateMealPlanPickerRows() {
+        if (planPickerRows == null) return;
+        planPickerRows.removeAllViews();
+        List<RecipePreview> matches = new ArrayList<>();
+        String query = planSearchQuery.trim().toLowerCase(java.util.Locale.ROOT);
+        for (RecipePreview recipe : MEAL_PLAN_PREVIEWS) {
+            if (query.isEmpty() || recipe.title.toLowerCase(java.util.Locale.ROOT).contains(query)) matches.add(recipe);
+        }
+        if (matches.isEmpty()) {
+            TextView empty = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
+            empty.setGravity(Gravity.CENTER);
+            planPickerRows.addView(empty, new LinearLayout.LayoutParams(-1, dp(72)));
+            return;
+        }
+        for (RecipePreview recipe : matches) {
+            boolean planned = isRecipeInPlan(recipe.id);
+            boolean selected = selectedPlanRecipeIds.contains(recipe.id);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(7), dp(6), dp(14), dp(6));
+            row.setBackground(roundRect(WHITE, BORDER, 15));
+            ImageView image = recipeImage(recipe);
+            row.addView(image, new LinearLayout.LayoutParams(dp(52), dp(52)));
+            LinearLayout labels = vertical();
+            labels.setPadding(dp(12), 0, 0, 0);
+            labels.addView(text(recipe.title, 15, TEXT, true));
+            labels.addView(text(planned ? "Đã có trong kế hoạch" : recipe.duration + " · " + recipe.difficulty,
+                    13, MUTED, false));
+            row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+            TextView mark = text(planned ? "✓" : selected ? "✓" : "+", 21, planned || selected ? WHITE : GREEN, false);
+            mark.setGravity(Gravity.CENTER);
+            if (planned || selected) mark.setBackground(roundRect(GREEN, GREEN, 8));
+            mark.setContentDescription(planned ? "Đã có trong kế hoạch: " + recipe.title
+                    : (selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
+            row.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
+            rowParams.bottomMargin = dp(10);
+            planPickerRows.addView(row, rowParams);
+            if (!planned) {
+                row.setOnClickListener(v -> {
+                    if (selectedPlanRecipeIds.contains(recipe.id)) selectedPlanRecipeIds.remove(recipe.id);
+                    else selectedPlanRecipeIds.add(recipe.id);
+                    populateMealPlanPickerRows();
+                });
+            }
+        }
+    }
+
+    private void openMealPlanPicker() {
+        selectedPlanRecipeIds.clear();
+        for (PersonalDataDbHelper.PlannedRecipe planned : data.getMealPlanRecipes()) {
+            selectedPlanRecipeIds.add(planned.recipe.id);
+        }
+        planPickerServings = selectedPlanRecipeIds.isEmpty() ? 2 : data.getMealPlanRecipes().get(0).servings;
+        planPickerServingsChanged = false;
+        planSearchQuery = "";
+        screen = Screen.MEAL_PLAN_PICKER;
+        render();
+    }
+
+    private void saveMealPlanSelection() {
+        if (selectedPlanRecipeIds.isEmpty()) {
+            Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        for (String id : selectedPlanRecipeIds) {
+            RecipePreview recipe = recipeById(id);
+            boolean alreadyPlanned = isRecipeInPlan(id);
+            data.addMealPlanRecipe(recipe, planPickerServings);
+            if (!alreadyPlanned || planPickerServingsChanged) {
+                data.setMealPlanRecipeServings(id, planPickerServings);
+            }
+        }
+        selectedPlanRecipeIds.clear();
+        screen = Screen.MEAL_PLAN;
+        render();
+    }
+
+    private boolean isRecipeInPlan(String recipeId) {
+        for (PersonalDataDbHelper.PlannedRecipe item : data.getMealPlanRecipes()) {
+            if (item.recipe.id.equals(recipeId)) return true;
+        }
+        return false;
+    }
+
+    private void updatePickerServingCount() {
+        if (appRoot == null) return;
+        TextView count = appRoot.findViewWithTag("plan-serving-count");
+        if (count != null) count.setText(String.valueOf(planPickerServings));
+    }
+
+    private TextView stepButton(String label, String description, Runnable action) {
+        TextView button = text(label, 21, GREEN, false);
+        button.setGravity(Gravity.CENTER);
+        button.setContentDescription(description);
+        button.setFocusable(true);
+        button.setOnClickListener(v -> action.run());
+        return button;
+    }
+
+    private TextView primaryButton(String label, Runnable action) {
+        TextView button = text(label, 15, WHITE, true);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(roundRect(GREEN, GREEN, 14));
+        button.setOnClickListener(v -> action.run());
+        return button;
     }
 
     private void renderCollection() {
@@ -544,7 +881,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void addBottomNavigation() {
+    private void addBottomNavigation(int selectedTab) {
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER_VERTICAL);
         nav.setBackgroundColor(WHITE);
@@ -559,16 +896,19 @@ public class MainActivity extends AppCompatActivity {
             final int index = i;
             LinearLayout tab = vertical();
             tab.setGravity(Gravity.CENTER);
-            ImageView glyph = iconView(icons[i], i == 3 ? GREEN : MUTED);
-            if (i == 3) glyph.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
+            ImageView glyph = iconView(icons[i], i == selectedTab ? GREEN : MUTED);
+            if (i == selectedTab) glyph.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
             tab.addView(glyph, new LinearLayout.LayoutParams(dp(52), dp(30)));
-            TextView label = text(names[i], 10, i == 3 ? GREEN : MUTED, i == 3);
+            TextView label = text(names[i], 10, i == selectedTab ? GREEN : MUTED, i == selectedTab);
             label.setGravity(Gravity.CENTER);
             tab.addView(label);
             nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
             tab.setOnClickListener(v -> {
                 if (index == 3) {
                     screen = Screen.LIBRARY;
+                    render();
+                } else if (index == 1) {
+                    screen = Screen.MEAL_PLAN;
                     render();
                 }
             });
@@ -586,6 +926,14 @@ public class MainActivity extends AppCompatActivity {
         row.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
         back.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         TextView heading = text(title, 23, TEXT, true);
+        float screenWidthDp = getResources().getDisplayMetrics().widthPixels /
+                getResources().getDisplayMetrics().density;
+        float availableWidthDp = Math.max(160, screenWidthDp - 108);
+        float titleWidthDp = heading.getPaint().measureText(title) /
+                getResources().getDisplayMetrics().density;
+        if (titleWidthDp > availableWidthDp) {
+            heading.setTextSize(Math.max(17, 23 * availableWidthDp / titleWidthDp));
+        }
         heading.setPadding(dp(12), 0, 0, 0);
         row.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));

@@ -12,10 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Local storage for the user's personal recipe data (module 5). */
+/** Local storage for personal recipes and the current meal plan (modules 5 and 6). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
@@ -41,11 +41,21 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE RecipeViewHistory (recipeId TEXT PRIMARY KEY, title TEXT NOT NULL, " +
                 "imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, viewedAt INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE LocalMeta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+        createMealPlanTables(db);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Add forward-only migrations here; personal data must never be dropped on upgrade.
+        if (oldVersion < 2) createMealPlanTables(db);
+    }
+
+    private static void createMealPlanTables(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE MealPlan (planId INTEGER PRIMARY KEY CHECK(planId=1), title TEXT NOT NULL)");
+        db.execSQL("INSERT OR IGNORE INTO MealPlan(planId,title) VALUES(1,'Bữa cơm nhà')");
+        db.execSQL("CREATE TABLE MealPlanRecipe (planId INTEGER NOT NULL DEFAULT 1, recipeId TEXT NOT NULL, " +
+                "title TEXT NOT NULL, imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, " +
+                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 99), position INTEGER NOT NULL, " +
+                "PRIMARY KEY(planId,recipeId), FOREIGN KEY(planId) REFERENCES MealPlan(planId) ON DELETE CASCADE)");
     }
 
     @Override
@@ -244,6 +254,50 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         value.put("note", note);
         value.put("updatedAt", System.currentTimeMillis());
         getWritableDatabase().insertWithOnConflict("RecipeNote", null, value, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    List<PlannedRecipe> getMealPlanRecipes() {
+        List<PlannedRecipe> rows = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT recipeId,title,imageRes,duration,difficulty,servings FROM MealPlanRecipe " +
+                        "WHERE planId=1 ORDER BY position, rowid", null)) {
+            while (cursor.moveToNext()) {
+                MainActivity.RecipePreview recipe = new MainActivity.RecipePreview(
+                        cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4));
+                rows.add(new PlannedRecipe(recipe, cursor.getInt(5)));
+            }
+        }
+        return rows;
+    }
+
+    void addMealPlanRecipe(MainActivity.RecipePreview recipe, int servings) {
+        if (servings < 1 || servings > 99) throw new IllegalArgumentException("servings must be between 1 and 99");
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues value = recipeValues(recipe);
+        value.put("planId", 1);
+        value.put("servings", servings);
+        value.put("position", getMealPlanRecipes().size());
+        db.insertWithOnConflict("MealPlanRecipe", null, value, SQLiteDatabase.CONFLICT_IGNORE);
+    }
+
+    void setMealPlanRecipeServings(String recipeId, int servings) {
+        if (servings < 1 || servings > 99) throw new IllegalArgumentException("servings must be between 1 and 99");
+        ContentValues value = new ContentValues();
+        value.put("servings", servings);
+        getWritableDatabase().update("MealPlanRecipe", value, "planId=1 AND recipeId=?", new String[]{recipeId});
+    }
+
+    void removeMealPlanRecipe(String recipeId) {
+        getWritableDatabase().delete("MealPlanRecipe", "planId=1 AND recipeId=?", new String[]{recipeId});
+    }
+
+    static final class PlannedRecipe {
+        final MainActivity.RecipePreview recipe;
+        final int servings;
+        PlannedRecipe(MainActivity.RecipePreview recipe, int servings) {
+            this.recipe = recipe;
+            this.servings = servings;
+        }
     }
 
     private ContentValues noteValues(MainActivity.RecipePreview recipe) {
