@@ -405,18 +405,25 @@ public class MainActivity extends AppCompatActivity {
         planPickerRows = vertical();
         scroll.addView(planPickerRows);
         populateMealPlanPickerRows();
+        Runnable[] pendingSearch = new Runnable[1];
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { }
             @Override public void afterTextChanged(Editable s) {
-                if (BaseInputConnection.getComposingSpanStart((Spannable) s) < 0) {
-                    applyMealPlanSearch(s.toString());
-                }
+                if (BaseInputConnection.getComposingSpanStart((Spannable) s) >= 0) return;
+                if (pendingSearch[0] != null) search.removeCallbacks(pendingSearch[0]);
+                pendingSearch[0] = () -> {
+                    if (BaseInputConnection.getComposingSpanStart(search.getText()) < 0) {
+                        applyMealPlanSearch(search.getText().toString());
+                    }
+                };
+                search.postDelayed(pendingSearch[0], 1000L);
             }
         });
         search.setOnEditorActionListener((view, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE
                     || (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
+                if (pendingSearch[0] != null) search.removeCallbacks(pendingSearch[0]);
                 applyMealPlanSearch(search.getText().toString());
                 return false;
             }
