@@ -18,6 +18,11 @@ The user selected **Người 3**. Treat this as the active assignment for this p
 - Module 7: Mua sắm (shopping list and ingredient aggregation).
 - Coordinate shared use cases/database and handoffs with the other modules; do not assume schema/API contracts that have not been agreed.
 
+## Git publishing preference
+
+- Commit completed changes on the current feature branch when they are ready to keep.
+- Do not push commits to the remote unless the user explicitly asks to push. A request to implement, fix, or commit does not by itself authorize pushing.
+
 ## Project references
 
 - Project handoff: `BAN_GIAO_DU_AN_ANDROID.md`.
