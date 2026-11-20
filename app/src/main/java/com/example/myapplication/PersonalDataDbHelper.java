@@ -19,7 +19,11 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
-        super(context, DB_NAME, null, DB_VERSION);
+        this(context, DB_NAME);
+    }
+
+    PersonalDataDbHelper(Context context, String databaseName) {
+        super(context, databaseName, null, DB_VERSION);
         debugBuild = (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 

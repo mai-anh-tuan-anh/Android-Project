@@ -165,7 +165,8 @@ public class MainActivity extends AppCompatActivity {
 
         addText(content, "Bộ sưu tập", 19, TEXT, true, 0, 14, 0, 12);
         List<PersonalDataDbHelper.CollectionRow> collections = data.getCollections();
-        if (collections.isEmpty()) addEmptyCard(content, "Chưa có bộ sưu tập", "Tạo bộ sưu tập đầu tiên của bạn.");
+        if (collections.isEmpty()) addEmptyCard(content, "Chưa có bộ sưu tập",
+                "Tạo bộ sưu tập đầu tiên của bạn.", () -> openCollectionForm(null));
         else addCollectionRow(content, collections.get(0), 0);
 
         addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
@@ -230,6 +231,7 @@ public class MainActivity extends AppCompatActivity {
         ImageView edit = iconView(R.drawable.ic_edit_outline, GREEN);
         edit.setPadding(dp(14), dp(14), dp(14), dp(14));
         edit.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
+        edit.setContentDescription("Chỉnh sửa bộ sưu tập");
         titleLine.addView(edit, new LinearLayout.LayoutParams(dp(48), dp(48)));
         edit.setOnClickListener(v -> openCollectionForm(selectedCollectionId));
         page.addView(titleLine);
@@ -566,6 +568,7 @@ public class MainActivity extends AppCompatActivity {
         ImageView back = iconView(R.drawable.ic_arrow_back_outline, GREEN);
         back.setPadding(dp(12), dp(12), dp(12), dp(12));
         back.setBackground(roundRect(WHITE, WHITE, 15));
+        back.setContentDescription("Quay lại");
         row.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
         back.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         TextView heading = text(title, 23, TEXT, true);
@@ -683,11 +686,14 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(banner, params);
     }
 
-    private void addEmptyCard(LinearLayout parent, String title, String subtitle) {
+    private void addEmptyCard(LinearLayout parent, String title, String subtitle, Runnable action) {
         LinearLayout empty = vertical();
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(dp(20), dp(24), dp(20), dp(24));
         empty.setBackground(roundRect(WHITE, BORDER, 15));
+        empty.setFocusable(true);
+        empty.setContentDescription("Tạo bộ sưu tập đầu tiên");
+        empty.setOnClickListener(v -> action.run());
         empty.addView(text(title, 15, TEXT, true));
         empty.addView(text(subtitle, 13, MUTED, false));
         parent.addView(empty, new LinearLayout.LayoutParams(-1, -2));
