@@ -153,6 +153,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM CollectionRecipe WHERE collectionId=" + collectionId + " ORDER BY rowid");
     }
 
+    boolean isCollectionNameAvailable(String name, Long collectionId) {
+        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        if (clean.isEmpty()) return false;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT collectionId FROM Collection WHERE normalizedName=?",
+                new String[]{normalizeName(clean)})) {
+            if (!cursor.moveToFirst()) return true;
+            return collectionId != null && cursor.getLong(0) == collectionId;
+        }
+    }
+
     private List<MainActivity.RecipePreview> readRecipes(String sql) {
         List<MainActivity.RecipePreview> rows = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(sql, null)) {

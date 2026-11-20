@@ -4,9 +4,12 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
@@ -54,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
     private String noteRecipeId = DESIGN_RECIPES.get(0).id;
     private EditText collectionNameInput;
     private TextView collectionError;
+    private TextView collectionSaveButton;
+    private boolean collectionValidationAttempted;
     private final List<String> selectedRecipeIds = new ArrayList<>();
 
     enum Screen { LIBRARY, FAVORITES, COLLECTION, COLLECTION_FORM, NOTE }
@@ -257,7 +262,7 @@ public class MainActivity extends AppCompatActivity {
                 addText(content, "Bộ sưu tập khác", 19, TEXT, true, 0, 22, 0, 12);
                 hasOtherCollections = true;
             }
-            addCollectionRow(content, row, 0);
+            addRelatedCollectionRow(content, row);
         }
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -269,12 +274,15 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Tạo bộ sưu tập");
+        collectionValidationAttempted = false;
 
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         scroll.addView(content);
         addText(content, "Tên bộ sưu tập", 13, TEXT, true, 0, 20, 0, 10);
         collectionNameInput = editField(editingCollectionName, 16, 49);
+        collectionNameInput.setSingleLine(true);
+        collectionNameInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
         content.addView(collectionNameInput, new LinearLayout.LayoutParams(-1, dp(49)));
         collectionError = text("", 12, ERROR, false);
         content.addView(collectionError);
@@ -282,7 +290,15 @@ public class MainActivity extends AppCompatActivity {
         for (RecipePreview recipe : DESIGN_RECIPES) addSelectableRecipeRow(content, recipe);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addButton(page, "Lưu bộ sưu tập", true, this::saveCollectionForm, 18);
+        collectionSaveButton = addButton(page, "Lưu bộ sưu tập", true, this::saveCollectionForm, 18);
+        collectionNameInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateCollectionFormValidation();
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        updateCollectionFormValidation();
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
@@ -362,10 +378,15 @@ public class MainActivity extends AppCompatActivity {
         if (showFavorite) {
             ImageView star = iconView(R.drawable.ic_star_outline, GREEN);
             star.setBackground(roundRect(WHITE, WHITE, 18));
-            FrameLayout.LayoutParams starParams = new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.TOP | Gravity.END);
-            starParams.setMargins(0, dp(8), dp(8), 0);
-            imageFrame.addView(star, starParams);
-            star.setOnClickListener(v -> {
+            FrameLayout starTouchTarget = new FrameLayout(this);
+            starTouchTarget.setFocusable(true);
+            starTouchTarget.setContentDescription(data.isFavorite(recipe.id) ? "Bỏ yêu thích" : "Lưu yêu thích");
+            FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER);
+            starTouchTarget.addView(star, iconParams);
+            FrameLayout.LayoutParams touchParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
+            touchParams.setMargins(0, dp(2), dp(2), 0);
+            imageFrame.addView(starTouchTarget, touchParams);
+            starTouchTarget.setOnClickListener(v -> {
                 if (data.isFavorite(recipe.id)) data.removeFavorite(recipe.id); else data.addFavorite(recipe);
                 render();
             });
@@ -424,6 +445,35 @@ public class MainActivity extends AppCompatActivity {
         });
         parent.addView(item, new LinearLayout.LayoutParams(-1, dp(62)));
         if (top > 0) item.setTranslationY(dp(0));
+    }
+
+    private void addRelatedCollectionRow(LinearLayout parent, PersonalDataDbHelper.CollectionRow row) {
+        LinearLayout item = new LinearLayout(this);
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(7), dp(5), dp(12), dp(5));
+        item.setBackground(roundRect(WHITE, BORDER, 14));
+        List<RecipePreview> recipes = data.getCollectionRecipes(row.id);
+        if (recipes.isEmpty()) {
+            ImageView folder = iconView(R.drawable.ic_folder_outline, GREEN);
+            folder.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
+            item.addView(folder, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        } else {
+            item.addView(recipeImage(recipes.get(0)), new LinearLayout.LayoutParams(dp(52), dp(52)));
+        }
+        LinearLayout labels = vertical();
+        labels.setPadding(dp(12), 0, 0, 0);
+        labels.addView(text(row.name, 14, TEXT, true));
+        labels.addView(text(row.recipeCount + " món đã lưu", 12, MUTED, false));
+        item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+        item.addView(text("›", 23, GREEN, false));
+        item.setOnClickListener(v -> {
+            selectedCollectionId = row.id;
+            screen = Screen.COLLECTION;
+            render();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
+        params.bottomMargin = dp(9);
+        parent.addView(item, params);
     }
 
     private void addHistoryRow(LinearLayout parent, RecipePreview recipe) {
@@ -522,7 +572,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
     }
 
-    private void addButton(LinearLayout parent, String label, boolean primary, Runnable action, int top) {
+    private TextView addButton(LinearLayout parent, String label, boolean primary, Runnable action, int top) {
         TextView button = text(label, 15, primary ? WHITE : GREEN, true);
         button.setGravity(Gravity.CENTER);
         button.setBackground(roundRect(primary ? GREEN : WHITE, primary ? GREEN : BORDER, 14));
@@ -530,22 +580,64 @@ public class MainActivity extends AppCompatActivity {
         params.topMargin = dp(top);
         parent.addView(button, params);
         button.setOnClickListener(v -> action.run());
+        return button;
     }
 
     private void saveCollectionForm() {
         String name = collectionNameInput.getText().toString();
+        collectionValidationAttempted = true;
+        if (name.trim().isEmpty()) {
+            updateCollectionFormValidation();
+            return;
+        }
+        Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
+        if (!data.isCollectionNameAvailable(name, currentId)) {
+            collectionError.setText("Tên này đã được sử dụng.");
+            collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
+            updateCollectionSaveButton(false);
+            return;
+        }
         List<RecipePreview> selected = new ArrayList<>();
         for (String id : selectedRecipeIds) selected.add(recipeById(id));
-        boolean saved = data.saveCollection(name, selected, selectedCollectionId > 0 ? selectedCollectionId : null);
+        boolean saved = data.saveCollection(name, selected, currentId);
         if (!saved) {
-            collectionError.setText(name.trim().isEmpty() ? "Nhập tên bộ sưu tập." : "Tên này đã được sử dụng.");
+            collectionError.setText("Tên này đã được sử dụng.");
             collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
+            updateCollectionSaveButton(false);
             return;
         }
         boolean editing = selectedCollectionId > 0;
         screen = editing ? Screen.COLLECTION : Screen.LIBRARY;
         if (!editing) selectedCollectionId = -1L;
         render();
+    }
+
+    private void updateCollectionFormValidation() {
+        String name = collectionNameInput.getText().toString();
+        boolean nonEmpty = !name.trim().isEmpty();
+        Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
+        boolean available = nonEmpty && data.isCollectionNameAvailable(name, currentId);
+        if (collectionValidationAttempted) {
+            if (!nonEmpty) {
+                collectionError.setText("");
+                collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
+            } else if (!available) {
+                collectionError.setText("Tên này đã được sử dụng.");
+                collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
+            } else {
+                collectionError.setText("");
+                collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
+            }
+        }
+        updateCollectionSaveButton(collectionValidationAttempted ? available : nonEmpty);
+    }
+
+    private void updateCollectionSaveButton(boolean enabled) {
+        if (collectionSaveButton == null) return;
+        collectionSaveButton.setEnabled(enabled);
+        collectionSaveButton.setTextColor(enabled ? WHITE : MUTED);
+        collectionSaveButton.setBackground(roundRect(enabled ? GREEN : PALE_GREEN,
+                enabled ? GREEN : PALE_GREEN, 14));
     }
 
     private void openCollectionForm(Long collectionId) {
