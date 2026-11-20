@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private PersonalDataDbHelper data;
     private LinearLayout appRoot;
     private Screen screen = Screen.LIBRARY;
+    private Screen noteReturnScreen = Screen.LIBRARY;
     private long selectedCollectionId = -1L;
     private String editingCollectionName = "";
     private String noteRecipeId = DESIGN_RECIPES.get(0).id;
@@ -91,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
                 }
                 if (screen == Screen.COLLECTION_FORM) {
                     screen = selectedCollectionId > 0 ? Screen.COLLECTION : Screen.LIBRARY;
+                } else if (screen == Screen.NOTE) {
+                    screen = noteReturnScreen;
                 } else {
                     screen = Screen.LIBRARY;
                 }
@@ -347,6 +350,8 @@ public class MainActivity extends AppCompatActivity {
             android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
                     getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(noteInput.getWindowToken(), 0);
+            screen = noteReturnScreen;
+            render();
         }, 8);
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
@@ -401,9 +406,7 @@ public class MainActivity extends AppCompatActivity {
         meta.setPadding(dp(9), dp(6), dp(8), dp(11));
         card.addView(meta);
         if (removable) card.setOnClickListener(v -> {
-            noteRecipeId = recipe.id;
-            screen = Screen.NOTE;
-            render();
+            openRecipeNote(recipe);
         });
         return card;
     }
@@ -490,9 +493,7 @@ public class MainActivity extends AppCompatActivity {
         item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
         item.addView(text("›", 23, GREEN, false));
         item.setOnClickListener(v -> {
-            noteRecipeId = recipe.id;
-            screen = Screen.NOTE;
-            render();
+            openRecipeNote(recipe);
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
         params.bottomMargin = dp(9);
@@ -650,6 +651,13 @@ public class MainActivity extends AppCompatActivity {
             for (RecipePreview recipe : data.getCollectionRecipes(collectionId)) selectedRecipeIds.add(recipe.id);
         }
         screen = Screen.COLLECTION_FORM;
+        render();
+    }
+
+    private void openRecipeNote(RecipePreview recipe) {
+        noteReturnScreen = screen;
+        noteRecipeId = recipe.id;
+        screen = Screen.NOTE;
         render();
     }
 
