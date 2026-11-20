@@ -104,6 +104,15 @@ public class PersonalDataDbHelperTest {
     }
 
     @Test
+    public void viewedHistoryExpiresAfterThreeDaysOnClient() {
+        data.recordViewedRecipe(recipeA);
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{System.currentTimeMillis() - 3L * 24 * 60 * 60 * 1000 - 1, recipeA.id});
+
+        assertTrue(data.getHistory().isEmpty());
+    }
+
+    @Test
     public void mealPlanRejectsDuplicatesAndKeepsServingsWithinOneAndNineHundredNinetyNine() {
         data.addMealPlanRecipe(recipeA, 1);
         data.addMealPlanRecipe(recipeA, 5);

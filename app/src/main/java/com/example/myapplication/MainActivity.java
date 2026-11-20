@@ -228,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
             render();
         }, 30);
         List<RecipePreview> favoriteRows = personalDataViewModel.getFavorites();
-        addRecipeGrid(content, favoriteRows.subList(0, Math.min(2, favoriteRows.size())), true, false);
+        addRecipeGrid(content, favoriteRows.subList(0, Math.min(2, favoriteRows.size())), true, true);
 
         addText(content, "Bộ sưu tập", 19, TEXT, true, 0, 14, 0, 12);
         List<PersonalDataDbHelper.CollectionRow> collections = personalDataViewModel.getCollections();
@@ -753,17 +753,17 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getDisplayMetrics().density);
         int noteHeightDp = Math.max(160, Math.min(220, Math.round(screenHeightDp * 0.215f)));
         content.addView(noteInput, new LinearLayout.LayoutParams(-1, dp(noteHeightDp)));
-        addInfoBanner(content, "Ghi chú đã lưu", 24);
+        LinearLayout savedBanner = addInfoBanner(content, "Ghi chú đã lưu", 24);
+        savedBanner.setVisibility(View.GONE);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "Lưu ghi chú", true, () -> {
             personalDataViewModel.saveNote(recipe, noteInput.getText().toString());
+            savedBanner.setVisibility(View.VISIBLE);
             noteInput.clearFocus();
             android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
                     getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.hideSoftInputFromWindow(noteInput.getWindowToken(), 0);
-            screen = noteReturnScreen;
-            render();
         }, 8);
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
@@ -1085,7 +1085,7 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
-    private void addInfoBanner(LinearLayout parent, String label, int top) {
+    private LinearLayout addInfoBanner(LinearLayout parent, String label, int top) {
         LinearLayout banner = new LinearLayout(this);
         banner.setGravity(Gravity.CENTER_VERTICAL);
         banner.setPadding(dp(14), dp(10), dp(14), dp(10));
@@ -1099,6 +1099,7 @@ public class MainActivity extends AppCompatActivity {
         params.topMargin = dp(top);
         params.bottomMargin = dp(12);
         parent.addView(banner, params);
+        return banner;
     }
 
     private void addEmptyCard(LinearLayout parent, String title, String subtitle, Runnable action) {

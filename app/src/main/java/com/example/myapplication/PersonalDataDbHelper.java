@@ -18,6 +18,7 @@ import java.util.Set;
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
     private static final int DB_VERSION = 3;
+    private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
@@ -170,15 +171,22 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     List<MainActivity.RecipePreview> getHistory() {
+        deleteExpiredHistory(getWritableDatabase());
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM RecipeViewHistory " +
                 "ORDER BY viewedAt DESC, rowid DESC LIMIT 10");
     }
 
-    /** Upserts a recipe visit and retains only the 10 most recent IDs. */
+    private static void deleteExpiredHistory(SQLiteDatabase db) {
+        long cutoff = System.currentTimeMillis() - HISTORY_RETENTION_MS;
+        db.delete("RecipeViewHistory", "viewedAt<=?", new String[]{String.valueOf(cutoff)});
+    }
+
+    /** Keeps client-local recipe history for at most three days and ten recent IDs. */
     void recordViewedRecipe(MainActivity.RecipePreview recipe) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            deleteExpiredHistory(db);
             ContentValues value = recipeValues(recipe);
             value.put("viewedAt", System.currentTimeMillis());
             db.insertWithOnConflict("RecipeViewHistory", null, value, SQLiteDatabase.CONFLICT_REPLACE);
