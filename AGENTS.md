@@ -7,6 +7,7 @@
 - Treat the source project and supplied report/course documents as authoritative. Do not fabricate implementation details, test results, data, citations, or report content. Clearly distinguish confirmed requirements, proposed details, and unverified implementation status as the handoff does.
 - Preserve existing project content. Keep changes limited to the user's requested scope and do not overwrite supplied reference/report files unless explicitly asked.
 - Before work on a report, inspect its corresponding `.docx` and the supplied report requirements. Match the existing document structure and project facts; do not infer missing results.
+- Treat responsive behavior as a project-wide requirement: every screen must adapt to phone size, density, orientation, system bars, and IME/soft keyboard while preserving the supplied visual hierarchy, spacing rhythm, colors, and component style. Use scrollable content for constrained viewports, size bounds for flexible regions, and keep important actions reachable. Validate representative small/large viewports and keyboard-visible states; do not stretch a component to consume all remaining height unless the design explicitly calls for it.
 
 ## User's selected role
 
@@ -27,7 +28,7 @@ The user selected **Người 3**. Treat this as the active assignment for this p
 
 ## Current implementation boundary
 
-The Android code currently present is a starter scaffold (`MainActivity` with “Hello World!”), while the handoff defines a much broader design. Do not describe designed screens or proposed module behavior as implemented until the code provides evidence. Verify actual project files and status before each implementation/report task.
+`MainActivity` now contains the first module 5 implementation pass, with local personal-data storage in `PersonalDataDbHelper`. Module 6/7 and recipe-catalog integration remain unimplemented. The debug build seeds local preview fixtures copied from supplied design content; they are not production recipes or real user data, and release builds do not seed them. The repo's `gradle-daemon-jvm.properties` was removed because it made Gradle select an incomplete JRE. `assembleDebug` succeeds using Android Studio's full JBR 25.0.2. The note-seeding column mismatch was fixed. System bars/insets use AndroidX edge-to-edge APIs and back navigation uses `OnBackPressedDispatcher`. A black emulator display was cleared by rebooting the Android 16 emulator; cold launch then displayed `MainActivity` in about one second without a fatal exception or ANR. Validate on physical devices separately. Apply the responsive UI requirement to every module and screen, including system bars and keyboard; validate multiple viewport sizes. The note screen has a bounded responsive editor and scrollable body; other screens have not had full visual QA. Check current files/status before making implementation or report claims.
 
 ## Data decisions proposed for Người 3
 

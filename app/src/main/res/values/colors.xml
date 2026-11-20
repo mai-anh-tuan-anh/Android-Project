@@ -2,4 +2,11 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="bep_nha_green">#326C4F</color>
+    <color name="bep_nha_green_light">#E8F2E9</color>
+    <color name="bep_nha_orange">#F2A65A</color>
+    <color name="bep_nha_cream">#FAF9F6</color>
+    <color name="bep_nha_text">#25352D</color>
+    <color name="bep_nha_muted">#58665C</color>
+    <color name="bep_nha_error">#A93636</color>
 </resources>
