@@ -267,7 +267,7 @@ public class MainActivity extends AppCompatActivity {
 
         addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
         List<RecipePreview> history = personalDataViewModel.getHistory();
-        for (int i = 0; i < Math.min(2, history.size()); i++) addHistoryRow(content, history.get(i));
+        for (int i = 0; i < Math.min(10, history.size()); i++) addHistoryRow(content, history.get(i));
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(3);
