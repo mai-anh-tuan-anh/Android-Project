@@ -1095,7 +1095,9 @@ public class MainActivity extends AppCompatActivity {
         labels.addView(text(recipe.title, 14, TEXT, true));
         labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
         item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-        item.addView(favoriteToggleButton(recipe), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        LinearLayout.LayoutParams favoriteParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        favoriteParams.setMarginEnd(dp(8));
+        item.addView(favoriteToggleButton(recipe), favoriteParams);
         item.addView(text("›", 23, GREEN, false));
         item.setOnClickListener(v -> {
             openRecipeNote(recipe);
