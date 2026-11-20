@@ -23,6 +23,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.OnBackPressedCallback;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -31,11 +32,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.text.Normalizer;
-import java.util.Locale;
 
 /** Local personal data and the current meal plan (modules 5 and 6). */
 public class MainActivity extends AppCompatActivity {
@@ -64,22 +61,17 @@ public class MainActivity extends AppCompatActivity {
     private static final List<RecipePreview> MEAL_PLAN_PREVIEWS = Arrays.asList(
             DESIGN_RECIPES.get(0), DESIGN_RECIPES.get(1), DESIGN_RECIPES.get(3));
 
-    private PersonalDataDbHelper data;
+    private PersonalDataViewModel personalDataViewModel;
+    private MealPlanViewModel mealPlanViewModel;
     private LinearLayout appRoot;
     private Screen screen = Screen.LIBRARY;
     private Screen noteReturnScreen = Screen.LIBRARY;
     private long selectedCollectionId = -1L;
-    private String editingCollectionName = "";
     private String noteRecipeId = DESIGN_RECIPES.get(0).id;
     private EditText collectionNameInput;
     private TextView collectionError;
     private TextView collectionSaveButton;
-    private boolean collectionValidationAttempted;
-    private final List<String> selectedRecipeIds = new ArrayList<>();
-    private final List<String> selectedPlanRecipeIds = new ArrayList<>();
     private LinearLayout planPickerRows;
-    private int planPickerServings = 1;
-    private String planSearchQuery = "";
     private EditText planPickerSearchInput;
     private ScrollView planPickerScrollView;
     private ScrollView mealPlanScrollView;
@@ -126,8 +118,9 @@ public class MainActivity extends AppCompatActivity {
                 render();
             }
         });
-        data = new PersonalDataDbHelper(this);
-        data.seedDesignPreviewIfNeeded(DESIGN_RECIPES);
+        personalDataViewModel = new ViewModelProvider(this).get(PersonalDataViewModel.class);
+        mealPlanViewModel = new ViewModelProvider(this).get(MealPlanViewModel.class);
+        personalDataViewModel.seedDesignPreviewIfNeeded(DESIGN_RECIPES);
         restoreMealPlanState(savedInstanceState);
         render();
     }
@@ -140,10 +133,9 @@ public class MainActivity extends AppCompatActivity {
         screen = Screen.valueOf(savedScreen);
         if (screen == Screen.MEAL_PLAN_PICKER) {
             ArrayList<String> savedIds = state.getStringArrayList(STATE_PICKED_RECIPE_IDS);
-            selectedPlanRecipeIds.clear();
-            if (savedIds != null) selectedPlanRecipeIds.addAll(savedIds);
-            planPickerServings = Math.max(1, Math.min(99, state.getInt(STATE_PICKER_SERVINGS, 1)));
-            planSearchQuery = state.getString(STATE_SEARCH_QUERY, "");
+            mealPlanViewModel.restorePickerDraft(savedIds,
+                    state.getInt(STATE_PICKER_SERVINGS, MealPlanViewModel.MIN_SERVINGS),
+                    state.getString(STATE_SEARCH_QUERY, ""));
             restoredPickerScrollY = Math.max(0, state.getInt(STATE_PICKER_SCROLL_Y, 0));
         } else {
             restoredMealPlanScrollY = Math.max(0, state.getInt(STATE_PLAN_SCROLL_Y, 0));
@@ -155,10 +147,11 @@ public class MainActivity extends AppCompatActivity {
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
             outState.putString(STATE_SCREEN, screen.name());
             if (screen == Screen.MEAL_PLAN_PICKER) {
-                outState.putStringArrayList(STATE_PICKED_RECIPE_IDS, new ArrayList<>(selectedPlanRecipeIds));
-                outState.putInt(STATE_PICKER_SERVINGS, planPickerServings);
+                outState.putStringArrayList(STATE_PICKED_RECIPE_IDS,
+                        new ArrayList<>(mealPlanViewModel.getSelectedRecipeIds()));
+                outState.putInt(STATE_PICKER_SERVINGS, mealPlanViewModel.getPickerServings());
                 String query = planPickerSearchInput == null
-                        ? planSearchQuery : planPickerSearchInput.getText().toString();
+                        ? mealPlanViewModel.getSearchQuery() : planPickerSearchInput.getText().toString();
                 outState.putString(STATE_SEARCH_QUERY, query);
                 outState.putInt(STATE_PICKER_SCROLL_Y,
                         planPickerScrollView == null ? 0 : planPickerScrollView.getScrollY());
@@ -180,12 +173,6 @@ public class MainActivity extends AppCompatActivity {
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
         controller.setAppearanceLightStatusBars(true);
         controller.setAppearanceLightNavigationBars(true);
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (data != null) data.close();
-        super.onDestroy();
     }
 
     private void render() {
@@ -240,17 +227,17 @@ public class MainActivity extends AppCompatActivity {
             screen = Screen.FAVORITES;
             render();
         }, 30);
-        List<RecipePreview> favoriteRows = data.getFavorites();
+        List<RecipePreview> favoriteRows = personalDataViewModel.getFavorites();
         addRecipeGrid(content, favoriteRows.subList(0, Math.min(2, favoriteRows.size())), true, false);
 
         addText(content, "Bộ sưu tập", 19, TEXT, true, 0, 14, 0, 12);
-        List<PersonalDataDbHelper.CollectionRow> collections = data.getCollections();
+        List<PersonalDataDbHelper.CollectionRow> collections = personalDataViewModel.getCollections();
         if (collections.isEmpty()) addEmptyCard(content, "Chưa có bộ sưu tập",
                 "Tạo bộ sưu tập đầu tiên của bạn.", () -> openCollectionForm(null));
         else addCollectionRow(content, collections.get(0), 0);
 
         addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
-        List<RecipePreview> history = data.getHistory();
+        List<RecipePreview> history = personalDataViewModel.getHistory();
         for (int i = 0; i < Math.min(2, history.size()); i++) addHistoryRow(content, history.get(i));
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -266,7 +253,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout content = vertical();
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         scroll.addView(content);
-        List<RecipePreview> favorites = data.getFavorites();
+        List<RecipePreview> favorites = personalDataViewModel.getFavorites();
         if (favorites.isEmpty()) {
             LinearLayout empty = vertical();
             empty.setGravity(Gravity.CENTER);
@@ -306,7 +293,7 @@ public class MainActivity extends AppCompatActivity {
         TextView heading = text("Nấu hôm nay", 28, TEXT, true);
         page.addView(heading);
 
-        List<PersonalDataDbHelper.PlannedRecipe> planned = data.getMealPlanRecipes();
+        List<PersonalDataDbHelper.PlannedRecipe> planned = mealPlanViewModel.getMealPlanRecipes();
         if (!planned.isEmpty()) {
             TextView summary = text(planned.size() + " món cho bữa cơm nhà.", 15, MUTED, false);
             LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
@@ -432,15 +419,15 @@ public class MainActivity extends AppCompatActivity {
         cardParams.bottomMargin = dp(16);
         parent.addView(card, cardParams);
         remove.setOnClickListener(v -> {
-            data.removeMealPlanRecipe(item.recipe.id);
+            mealPlanViewModel.removeMealPlanRecipe(item.recipe.id);
             render();
         });
     }
 
     private void changeServings(PersonalDataDbHelper.PlannedRecipe item, int delta) {
         int servings = item.servings + delta;
-        if (servings < 1 || servings > 99) return;
-        data.setMealPlanRecipeServings(item.recipe.id, servings);
+        if (servings < MealPlanViewModel.MIN_SERVINGS || servings > MealPlanViewModel.MAX_SERVINGS) return;
+        mealPlanViewModel.setMealPlanRecipeServings(item.recipe.id, servings);
         render();
     }
 
@@ -449,7 +436,7 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Thêm món vào kế hoạch");
 
-        EditText search = editField(planSearchQuery, 16, 49);
+        EditText search = editField(mealPlanViewModel.getSearchQuery(), 16, 49);
         planPickerSearchInput = search;
         search.setInputType(InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
@@ -509,19 +496,21 @@ public class MainActivity extends AppCompatActivity {
         stepper.setPadding(dp(4), 0, dp(4), 0);
         stepper.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
         TextView minus = stepButton("−", "Giảm khẩu phần món đã chọn", () -> {
-            if (planPickerServings > 1) {
-                planPickerServings--;
+            int servings = mealPlanViewModel.getPickerServings();
+            if (servings > MealPlanViewModel.MIN_SERVINGS) {
+                mealPlanViewModel.setPickerServings(servings - 1);
                 updatePickerServingCount();
             }
         });
         stepper.addView(minus, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView servingCount = text(String.valueOf(planPickerServings), 20, TEXT, true);
+        TextView servingCount = text(String.valueOf(mealPlanViewModel.getPickerServings()), 20, TEXT, true);
         servingCount.setGravity(Gravity.CENTER);
         servingCount.setTag("plan-serving-count");
         stepper.addView(servingCount, new LinearLayout.LayoutParams(dp(48), dp(48)));
         TextView plus = stepButton("＋", "Tăng khẩu phần món đã chọn", () -> {
-            if (planPickerServings < 99) {
-                planPickerServings++;
+            int servings = mealPlanViewModel.getPickerServings();
+            if (servings < MealPlanViewModel.MAX_SERVINGS) {
+                mealPlanViewModel.setPickerServings(servings + 1);
                 updatePickerServingCount();
             }
         });
@@ -538,11 +527,7 @@ public class MainActivity extends AppCompatActivity {
     private void populateMealPlanPickerRows() {
         if (planPickerRows == null) return;
         planPickerRows.removeAllViews();
-        List<RecipePreview> matches = new ArrayList<>();
-        String query = normalizeSearchText(planSearchQuery);
-        for (RecipePreview recipe : MEAL_PLAN_PREVIEWS) {
-            if (query.isEmpty() || normalizeSearchText(recipe.title).contains(query)) matches.add(recipe);
-        }
+        List<RecipePreview> matches = mealPlanViewModel.filterRecipes(MEAL_PLAN_PREVIEWS);
         if (matches.isEmpty()) {
             TextView empty = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
             empty.setGravity(Gravity.CENTER);
@@ -550,8 +535,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         for (RecipePreview recipe : matches) {
-            boolean planned = isRecipeInPlan(recipe.id);
-            boolean selected = selectedPlanRecipeIds.contains(recipe.id);
+            boolean planned = mealPlanViewModel.isRecipeInPlan(recipe.id);
+            boolean selected = mealPlanViewModel.isSelected(recipe.id);
             LinearLayout row = new LinearLayout(this);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(dp(7), dp(6), dp(14), dp(6));
@@ -583,75 +568,35 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applyMealPlanSearch(String query) {
-        planSearchQuery = query;
+        mealPlanViewModel.setSearchQuery(query);
         populateMealPlanPickerRows();
     }
 
-    private String normalizeSearchText(String value) {
-        String decomposed = Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
-                Normalizer.Form.NFD);
-        return decomposed.replaceAll("\\p{M}+", "").replace('đ', 'd');
-    }
-
     private void openMealPlanPicker() {
-        selectedPlanRecipeIds.clear();
-        for (PersonalDataDbHelper.PlannedRecipe planned : data.getMealPlanRecipes()) {
-            selectedPlanRecipeIds.add(planned.recipe.id);
-        }
-        planPickerServings = 1;
-        planSearchQuery = "";
+        mealPlanViewModel.beginPicker();
         restoredPickerScrollY = 0;
         screen = Screen.MEAL_PLAN_PICKER;
         render();
     }
 
     private void togglePlanPickerRecipe(RecipePreview recipe) {
-        if (selectedPlanRecipeIds.contains(recipe.id)) {
-            selectedPlanRecipeIds.remove(recipe.id);
-        } else {
-            selectedPlanRecipeIds.add(recipe.id);
-        }
+        mealPlanViewModel.toggleRecipe(recipe.id);
         populateMealPlanPickerRows();
     }
 
     private void saveMealPlanSelection() {
-        List<PersonalDataDbHelper.PlannedRecipe> currentPlan = data.getMealPlanRecipes();
-        if (selectedPlanRecipeIds.isEmpty() && currentPlan.isEmpty()) {
+        if (!mealPlanViewModel.saveSelection(DESIGN_RECIPES)) {
             Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
             return;
         }
-        Map<String, PersonalDataDbHelper.PlannedRecipe> currentById = new HashMap<>();
-        for (PersonalDataDbHelper.PlannedRecipe current : currentPlan) {
-            currentById.put(current.recipe.id, current);
-        }
-        List<PersonalDataDbHelper.PlannedRecipe> replacement = new ArrayList<>();
-        for (String id : selectedPlanRecipeIds) {
-            PersonalDataDbHelper.PlannedRecipe previous = currentById.get(id);
-            RecipePreview recipe = previous == null ? recipeById(id) : previous.recipe;
-            int servings = servingsForMealPlanSelection(previous);
-            replacement.add(new PersonalDataDbHelper.PlannedRecipe(recipe, servings));
-        }
-        data.replaceMealPlanRecipes(replacement);
-        selectedPlanRecipeIds.clear();
         screen = Screen.MEAL_PLAN;
         render();
-    }
-
-    private int servingsForMealPlanSelection(PersonalDataDbHelper.PlannedRecipe existingRecipe) {
-        return existingRecipe == null ? planPickerServings : existingRecipe.servings;
-    }
-
-    private boolean isRecipeInPlan(String recipeId) {
-        for (PersonalDataDbHelper.PlannedRecipe item : data.getMealPlanRecipes()) {
-            if (item.recipe.id.equals(recipeId)) return true;
-        }
-        return false;
     }
 
     private void updatePickerServingCount() {
         if (appRoot == null) return;
         TextView count = appRoot.findViewWithTag("plan-serving-count");
-        if (count != null) count.setText(String.valueOf(planPickerServings));
+        if (count != null) count.setText(String.valueOf(mealPlanViewModel.getPickerServings()));
     }
 
     private TextView stepButton(String label, String description, Runnable action) {
@@ -698,7 +643,7 @@ public class MainActivity extends AppCompatActivity {
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         scroll.addView(content);
-        List<RecipePreview> collectionRecipes = data.getCollectionRecipes(selectedCollectionId);
+        List<RecipePreview> collectionRecipes = personalDataViewModel.getCollectionRecipes(selectedCollectionId);
         if (collectionRecipes.isEmpty()) {
             LinearLayout empty = vertical();
             empty.setGravity(Gravity.CENTER);
@@ -724,7 +669,7 @@ public class MainActivity extends AppCompatActivity {
             content.addView(empty, new LinearLayout.LayoutParams(-1, -1));
             add.setOnClickListener(v -> openCollectionForm(selectedCollectionId));
         } else addRecipeGrid(content, collectionRecipes, true, true);
-        List<PersonalDataDbHelper.CollectionRow> otherCollections = data.getCollections();
+        List<PersonalDataDbHelper.CollectionRow> otherCollections = personalDataViewModel.getCollections();
         boolean hasOtherCollections = false;
         for (PersonalDataDbHelper.CollectionRow row : otherCollections) {
             if (row.id == selectedCollectionId) continue;
@@ -744,13 +689,12 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Tạo bộ sưu tập");
-        collectionValidationAttempted = false;
 
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         scroll.addView(content);
         addText(content, "Tên bộ sưu tập", 13, TEXT, true, 0, 20, 0, 10);
-        collectionNameInput = editField(editingCollectionName, 16, 49);
+        collectionNameInput = editField(personalDataViewModel.getCollectionNameDraft(), 16, 49);
         collectionNameInput.setSingleLine(true);
         collectionNameInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
         content.addView(collectionNameInput, new LinearLayout.LayoutParams(-1, dp(49)));
@@ -764,6 +708,7 @@ public class MainActivity extends AppCompatActivity {
         collectionNameInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                personalDataViewModel.setCollectionNameDraft(s.toString());
                 updateCollectionFormValidation();
             }
             @Override public void afterTextChanged(Editable s) { }
@@ -800,7 +745,7 @@ public class MainActivity extends AppCompatActivity {
         content.addView(recipeRow, recipeParams);
 
         addText(content, "Ghi chú sau khi nấu", 13, TEXT, true, 0, 48, 0, 16);
-        EditText noteInput = editField(data.getNote(recipe.id), 16, -1);
+        EditText noteInput = editField(personalDataViewModel.getNote(recipe.id), 16, -1);
         noteInput.setGravity(Gravity.TOP | Gravity.START);
         noteInput.setPadding(dp(16), dp(14), dp(16), dp(14));
         noteInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -812,7 +757,7 @@ public class MainActivity extends AppCompatActivity {
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "Lưu ghi chú", true, () -> {
-            data.saveNote(recipe, noteInput.getText().toString());
+            personalDataViewModel.saveNote(recipe, noteInput.getText().toString());
             noteInput.clearFocus();
             android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
                     getSystemService(INPUT_METHOD_SERVICE);
@@ -848,7 +793,7 @@ public class MainActivity extends AppCompatActivity {
         ImageView image = recipeImage(recipe);
         imageFrame.addView(image, new FrameLayout.LayoutParams(-1, dp(96)));
         if (showFavorite) {
-            boolean favorite = data.isFavorite(recipe.id);
+            boolean favorite = personalDataViewModel.isFavorite(recipe.id);
             ImageView star = iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
             star.setBackground(roundRect(WHITE, WHITE, 18));
             FrameLayout starTouchTarget = new FrameLayout(this);
@@ -860,7 +805,8 @@ public class MainActivity extends AppCompatActivity {
             touchParams.setMargins(0, dp(2), dp(2), 0);
             imageFrame.addView(starTouchTarget, touchParams);
             starTouchTarget.setOnClickListener(v -> {
-                if (data.isFavorite(recipe.id)) data.removeFavorite(recipe.id); else data.addFavorite(recipe);
+                if (personalDataViewModel.isFavorite(recipe.id)) personalDataViewModel.removeFavorite(recipe.id);
+                else personalDataViewModel.addFavorite(recipe);
                 render();
             });
         }
@@ -923,7 +869,7 @@ public class MainActivity extends AppCompatActivity {
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(7), dp(5), dp(12), dp(5));
         item.setBackground(roundRect(WHITE, BORDER, 14));
-        List<RecipePreview> recipes = data.getCollectionRecipes(row.id);
+        List<RecipePreview> recipes = personalDataViewModel.getCollectionRecipes(row.id);
         if (recipes.isEmpty()) {
             ImageView folder = iconView(R.drawable.ic_folder_outline, GREEN);
             folder.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
@@ -969,7 +915,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addSelectableRecipeRow(LinearLayout parent, RecipePreview recipe) {
-        boolean selected = selectedRecipeIds.contains(recipe.id);
+        boolean selected = personalDataViewModel.isCollectionRecipeSelected(recipe.id);
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(7), dp(6), dp(14), dp(6));
@@ -989,8 +935,7 @@ public class MainActivity extends AppCompatActivity {
         params.bottomMargin = dp(9);
         parent.addView(row, params);
         row.setOnClickListener(v -> {
-            if (selectedRecipeIds.contains(recipe.id)) selectedRecipeIds.remove(recipe.id);
-            else selectedRecipeIds.add(recipe.id);
+            personalDataViewModel.toggleCollectionRecipe(recipe.id);
             render();
         });
     }
@@ -1066,21 +1011,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveCollectionForm() {
         String name = collectionNameInput.getText().toString();
-        collectionValidationAttempted = true;
+        personalDataViewModel.setCollectionNameDraft(name);
+        personalDataViewModel.markCollectionSubmitAttempted();
         if (name.trim().isEmpty()) {
             updateCollectionFormValidation();
             return;
         }
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        if (!data.isCollectionNameAvailable(name, currentId)) {
-            collectionError.setText("Tên này đã được sử dụng.");
-            collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
-            updateCollectionSaveButton(false);
-            return;
-        }
-        List<RecipePreview> selected = new ArrayList<>();
-        for (String id : selectedRecipeIds) selected.add(recipeById(id));
-        boolean saved = data.saveCollection(name, selected, currentId);
+        boolean saved = personalDataViewModel.saveCollectionForm(currentId, DESIGN_RECIPES);
         if (!saved) {
             collectionError.setText("Tên này đã được sử dụng.");
             collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
@@ -1095,10 +1033,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateCollectionFormValidation() {
         String name = collectionNameInput.getText().toString();
+        personalDataViewModel.setCollectionNameDraft(name);
         boolean nonEmpty = !name.trim().isEmpty();
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        boolean available = nonEmpty && data.isCollectionNameAvailable(name, currentId);
-        if (collectionValidationAttempted) {
+        boolean available = nonEmpty && personalDataViewModel.isCollectionNameAvailable(name, currentId);
+        if (personalDataViewModel.wasCollectionSubmitAttempted()) {
             if (!nonEmpty) {
                 collectionError.setText("");
                 collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
@@ -1110,7 +1049,7 @@ public class MainActivity extends AppCompatActivity {
                 collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
             }
         }
-        updateCollectionSaveButton(collectionValidationAttempted ? available : nonEmpty);
+        updateCollectionSaveButton(personalDataViewModel.wasCollectionSubmitAttempted() ? available : nonEmpty);
     }
 
     private void updateCollectionSaveButton(boolean enabled) {
@@ -1123,13 +1062,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void openCollectionForm(Long collectionId) {
         selectedCollectionId = collectionId == null ? -1L : collectionId;
-        editingCollectionName = "";
-        selectedRecipeIds.clear();
+        String name = "";
+        List<RecipePreview> recipes = new ArrayList<>();
         if (collectionId != null) {
             PersonalDataDbHelper.CollectionRow row = findCollection(collectionId);
-            if (row != null) editingCollectionName = row.name;
-            for (RecipePreview recipe : data.getCollectionRecipes(collectionId)) selectedRecipeIds.add(recipe.id);
+            if (row != null) name = row.name;
+            recipes.addAll(personalDataViewModel.getCollectionRecipes(collectionId));
         }
+        personalDataViewModel.beginCollectionForm(name, recipes);
         screen = Screen.COLLECTION_FORM;
         render();
     }
@@ -1142,7 +1082,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private PersonalDataDbHelper.CollectionRow findCollection(long id) {
-        for (PersonalDataDbHelper.CollectionRow row : data.getCollections()) if (row.id == id) return row;
+        for (PersonalDataDbHelper.CollectionRow row : personalDataViewModel.getCollections()) if (row.id == id) return row;
         return null;
     }
 

@@ -17,7 +17,7 @@ import java.util.Set;
 /** Local storage for personal recipes and the current meal plan (modules 5 and 6). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 2;
+    private static final int DB_VERSION = 3;
     private final boolean debugBuild;
 
     PersonalDataDbHelper(Context context) {
@@ -49,15 +49,28 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) createMealPlanTables(db);
+        if (oldVersion < 3) migrateMealPlanServingRange(db);
     }
 
     private static void createMealPlanTables(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE MealPlan (planId INTEGER PRIMARY KEY CHECK(planId=1), title TEXT NOT NULL)");
         db.execSQL("INSERT OR IGNORE INTO MealPlan(planId,title) VALUES(1,'Bữa cơm nhà')");
+        createMealPlanRecipeTable(db);
+    }
+
+    private static void createMealPlanRecipeTable(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE MealPlanRecipe (planId INTEGER NOT NULL DEFAULT 1, recipeId TEXT NOT NULL, " +
                 "title TEXT NOT NULL, imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, " +
-                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 99), position INTEGER NOT NULL, " +
+                "servings INTEGER NOT NULL CHECK(servings BETWEEN 1 AND 999), position INTEGER NOT NULL, " +
                 "PRIMARY KEY(planId,recipeId), FOREIGN KEY(planId) REFERENCES MealPlan(planId) ON DELETE CASCADE)");
+    }
+
+    private static void migrateMealPlanServingRange(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE MealPlanRecipe RENAME TO MealPlanRecipe_v2");
+        createMealPlanRecipeTable(db);
+        db.execSQL("INSERT INTO MealPlanRecipe(planId,recipeId,title,imageRes,duration,difficulty,servings,position) " +
+                "SELECT planId,recipeId,title,imageRes,duration,difficulty,servings,position FROM MealPlanRecipe_v2");
+        db.execSQL("DROP TABLE MealPlanRecipe_v2");
     }
 
     @Override
@@ -193,7 +206,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     boolean isCollectionNameAvailable(String name, Long collectionId) {
-        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        String clean = normalizeCollectionDisplayName(name);
         if (clean.isEmpty()) return false;
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT collectionId FROM Collection WHERE normalizedName=?",
@@ -213,7 +226,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     boolean saveCollection(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
-        String clean = name == null ? "" : name.trim().replaceAll("\\s+", " ");
+        String clean = normalizeCollectionDisplayName(name);
         if (clean.isEmpty()) return false;
         SQLiteDatabase db = getWritableDatabase();
         String normalized = normalizeName(clean);
@@ -324,8 +337,8 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     private static void validateServings(int servings) {
-        if (servings < 1 || servings > 99) {
-            throw new IllegalArgumentException("servings must be between 1 and 99");
+        if (servings < 1 || servings > 999) {
+            throw new IllegalArgumentException("servings must be between 1 and 999");
         }
     }
 
@@ -350,6 +363,24 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         String clean = value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
         String decomposed = Normalizer.normalize(clean, Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "");
+    }
+
+    private static String normalizeCollectionDisplayName(String value) {
+        if (value == null || value.isEmpty()) return "";
+        StringBuilder normalized = new StringBuilder();
+        boolean pendingSpace = false;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)) {
+                pendingSpace = normalized.length() > 0;
+            } else {
+                if (pendingSpace) normalized.append(' ');
+                normalized.appendCodePoint(codePoint);
+                pendingSpace = false;
+            }
+        }
+        return normalized.toString();
     }
 
     static final class CollectionRow {
