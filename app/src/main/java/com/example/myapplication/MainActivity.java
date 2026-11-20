@@ -537,15 +537,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item) {
+        boolean compact = getResources().getConfiguration().screenWidthDp < 360
+                || getResources().getConfiguration().fontScale >= 1.15f;
         LinearLayout card = new LinearLayout(this);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(11), dp(11), dp(11), dp(11));
+        card.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        card.setGravity(compact ? Gravity.CENTER_HORIZONTAL : Gravity.CENTER_VERTICAL);
+        int cardPadding = compact ? 8 : 11;
+        card.setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding));
         card.setBackground(roundRect(WHITE, BORDER, 20));
+
+        LinearLayout contentRow = card;
+        if (compact) {
+            contentRow = new LinearLayout(this);
+            contentRow.setGravity(Gravity.CENTER_VERTICAL);
+            card.addView(contentRow, new LinearLayout.LayoutParams(-1, -2));
+        }
         ImageView image = recipeImage(item.recipe);
-        card.addView(image, new LinearLayout.LayoutParams(dp(78), dp(78)));
+        int imageSize = compact ? 64 : 78;
+        contentRow.addView(image, new LinearLayout.LayoutParams(dp(imageSize), dp(imageSize)));
 
         LinearLayout details = vertical();
-        details.setPadding(dp(12), 0, 0, 0);
+        details.setPadding(dp(compact ? 8 : 12), 0, 0, 0);
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = text(item.recipe.title, 18, TEXT, true);
@@ -558,6 +570,9 @@ public class MainActivity extends AppCompatActivity {
         titleRow.addView(remove, new LinearLayout.LayoutParams(dp(44), dp(44)));
         details.addView(titleRow);
         details.addView(text(item.recipe.duration + " · " + item.recipe.difficulty, 14, MUTED, false));
+        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(0, -2, 1);
+        if (!compact) detailsParams.leftMargin = dp(1);
+        contentRow.addView(details, detailsParams);
 
         LinearLayout servings = new LinearLayout(this);
         servings.setGravity(Gravity.CENTER_VERTICAL);
@@ -571,16 +586,18 @@ public class MainActivity extends AppCompatActivity {
         TextView plus = stepButton("＋", "Tăng khẩu phần", () -> changeServings(item, 1));
         servings.addView(plus, new LinearLayout.LayoutParams(dp(40), dp(42)));
         TextView person = text("người", 14, MUTED, false);
+        person.setSingleLine(true);
         LinearLayout.LayoutParams personParams = new LinearLayout.LayoutParams(-2, -2);
         personParams.leftMargin = dp(5);
         servings.addView(person, personParams);
         LinearLayout.LayoutParams servingsParams = new LinearLayout.LayoutParams(-1, -2);
-        servingsParams.topMargin = dp(8);
-        details.addView(servings, servingsParams);
-
-        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(0, -2, 1);
-        detailsParams.leftMargin = dp(1);
-        card.addView(details, detailsParams);
+        if (compact) {
+            servingsParams.topMargin = dp(8);
+            card.addView(servings, servingsParams);
+        } else {
+            servingsParams.topMargin = dp(8);
+            details.addView(servings, servingsParams);
+        }
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.bottomMargin = dp(16);
         parent.addView(card, cardParams);
@@ -659,7 +676,10 @@ public class MainActivity extends AppCompatActivity {
                     || (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
                 if (pendingSearch[0] != null) search.removeCallbacks(pendingSearch[0]);
                 applyMealPlanSearch(search.getText().toString());
-                return false;
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
+                return true;
             }
             return false;
         });
