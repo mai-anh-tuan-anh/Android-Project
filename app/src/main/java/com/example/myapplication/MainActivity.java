@@ -6,10 +6,12 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.Spannable;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.BaseInputConnection;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
@@ -383,7 +385,7 @@ public class MainActivity extends AppCompatActivity {
         addBackTitle(page, "Thêm món vào kế hoạch");
 
         EditText search = editField(planSearchQuery, 16, 49);
-        search.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        search.setInputType(InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
         search.setHint("Tìm món hoặc nguyên liệu");
         search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
@@ -405,11 +407,20 @@ public class MainActivity extends AppCompatActivity {
         populateMealPlanPickerRows();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                planSearchQuery = s.toString();
-                populateMealPlanPickerRows();
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { }
+            @Override public void afterTextChanged(Editable s) {
+                if (BaseInputConnection.getComposingSpanStart((Spannable) s) < 0) {
+                    applyMealPlanSearch(s.toString());
+                }
             }
-            @Override public void afterTextChanged(Editable s) { }
+        });
+        search.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE
+                    || (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
+                applyMealPlanSearch(search.getText().toString());
+                return false;
+            }
+            return false;
         });
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -478,26 +489,32 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout labels = vertical();
             labels.setPadding(dp(12), 0, 0, 0);
             labels.addView(text(recipe.title, 15, TEXT, true));
-            labels.addView(text(planned ? "Đã có trong kế hoạch" : recipe.duration + " · " + recipe.difficulty,
-                    13, MUTED, false));
+            String subtitle = planned
+                    ? (selected ? "Đã có trong kế hoạch" : "Sẽ bỏ khỏi kế hoạch")
+                    : (selected ? "Đang chọn" : recipe.duration + " · " + recipe.difficulty);
+            labels.addView(text(subtitle, 13, MUTED, false));
             row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-            TextView mark = text(planned ? "✓" : selected ? "✓" : "+", 21, planned || selected ? WHITE : GREEN, false);
+            TextView mark = text(selected ? "✓" : "+", 21, selected ? WHITE : GREEN, false);
             mark.setGravity(Gravity.CENTER);
-            if (planned || selected) mark.setBackground(roundRect(GREEN, GREEN, 8));
-            mark.setContentDescription(planned ? "Đã có trong kế hoạch: " + recipe.title
-                    : (selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
+            if (selected) mark.setBackground(roundRect(GREEN, GREEN, 8));
+            mark.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
             row.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
             rowParams.bottomMargin = dp(10);
             planPickerRows.addView(row, rowParams);
-            if (!planned) {
-                row.setOnClickListener(v -> {
-                    if (selectedPlanRecipeIds.contains(recipe.id)) selectedPlanRecipeIds.remove(recipe.id);
-                    else selectedPlanRecipeIds.add(recipe.id);
-                    populateMealPlanPickerRows();
-                });
-            }
+            row.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
+            row.setFocusable(true);
+            row.setOnClickListener(v -> {
+                if (selectedPlanRecipeIds.contains(recipe.id)) selectedPlanRecipeIds.remove(recipe.id);
+                else selectedPlanRecipeIds.add(recipe.id);
+                populateMealPlanPickerRows();
+            });
         }
+    }
+
+    private void applyMealPlanSearch(String query) {
+        planSearchQuery = query;
+        populateMealPlanPickerRows();
     }
 
     private String normalizeSearchText(String value) {
@@ -519,9 +536,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveMealPlanSelection() {
-        if (selectedPlanRecipeIds.isEmpty()) {
+        List<PersonalDataDbHelper.PlannedRecipe> currentPlan = data.getMealPlanRecipes();
+        if (selectedPlanRecipeIds.isEmpty() && currentPlan.isEmpty()) {
             Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
             return;
+        }
+        for (PersonalDataDbHelper.PlannedRecipe current : currentPlan) {
+            if (!selectedPlanRecipeIds.contains(current.recipe.id)) {
+                data.removeMealPlanRecipe(current.recipe.id);
+            }
         }
         for (String id : selectedPlanRecipeIds) {
             RecipePreview recipe = recipeById(id);
