@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
@@ -94,6 +95,54 @@ public class PersonalDataDbHelperTest {
         assertEquals(10, history.size());
         assertEquals("recipe-0", history.get(0).id);
         assertFalse(containsRecipe(history, "recipe-1"));
+    }
+
+    @Test
+    public void mealPlanRejectsDuplicatesAndKeepsServingsWithinOneAndNinetyNine() {
+        data.addMealPlanRecipe(recipeA, 1);
+        data.addMealPlanRecipe(recipeA, 5);
+
+        List<PersonalDataDbHelper.PlannedRecipe> plan = data.getMealPlanRecipes();
+        assertEquals(1, plan.size());
+        assertEquals(1, plan.get(0).servings);
+
+        data.setMealPlanRecipeServings(recipeA.id, 99);
+        assertEquals(99, data.getMealPlanRecipes().get(0).servings);
+        assertIllegalArgument(() -> data.setMealPlanRecipeServings(recipeA.id, 0));
+        assertIllegalArgument(() -> data.setMealPlanRecipeServings(recipeA.id, 100));
+        assertEquals(99, data.getMealPlanRecipes().get(0).servings);
+    }
+
+    @Test
+    public void mealPlanReplacementIsAtomicAndSupportsDeselection() {
+        data.addMealPlanRecipe(recipeA, 2);
+
+        assertIllegalArgument(() -> data.replaceMealPlanRecipes(Arrays.asList(
+                new PersonalDataDbHelper.PlannedRecipe(recipeB, 3),
+                new PersonalDataDbHelper.PlannedRecipe(recipeA, 100))));
+        List<PersonalDataDbHelper.PlannedRecipe> afterRollback = data.getMealPlanRecipes();
+        assertEquals(1, afterRollback.size());
+        assertEquals(recipeA.id, afterRollback.get(0).recipe.id);
+        assertEquals(2, afterRollback.get(0).servings);
+
+        data.replaceMealPlanRecipes(Collections.singletonList(
+                new PersonalDataDbHelper.PlannedRecipe(recipeB, 4)));
+        List<PersonalDataDbHelper.PlannedRecipe> replaced = data.getMealPlanRecipes();
+        assertEquals(1, replaced.size());
+        assertEquals(recipeB.id, replaced.get(0).recipe.id);
+        assertEquals(4, replaced.get(0).servings);
+
+        data.replaceMealPlanRecipes(Collections.emptyList());
+        assertTrue(data.getMealPlanRecipes().isEmpty());
+    }
+
+    private static void assertIllegalArgument(Runnable operation) {
+        try {
+            operation.run();
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException expected) {
+            // Expected validation failure.
+        }
     }
 
     private static boolean containsRecipe(List<MainActivity.RecipePreview> recipes, String recipeId) {

@@ -31,12 +31,21 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.text.Normalizer;
 import java.util.Locale;
 
 /** Local personal data and the current meal plan (modules 5 and 6). */
 public class MainActivity extends AppCompatActivity {
+    private static final String STATE_SCREEN = "module6.screen";
+    private static final String STATE_PICKED_RECIPE_IDS = "module6.pickedRecipeIds";
+    private static final String STATE_PICKER_SERVINGS = "module6.pickerServings";
+    private static final String STATE_PICKER_SERVINGS_CHANGED = "module6.pickerServingsChanged";
+    private static final String STATE_SEARCH_QUERY = "module6.searchQuery";
+    private static final String STATE_PICKER_SCROLL_Y = "module6.pickerScrollY";
+    private static final String STATE_PLAN_SCROLL_Y = "module6.planScrollY";
     private static final int CREAM = Color.rgb(250, 249, 246);
     private static final int GREEN = Color.rgb(50, 108, 79);
     private static final int PALE_GREEN = Color.rgb(232, 242, 233);
@@ -73,6 +82,11 @@ public class MainActivity extends AppCompatActivity {
     private int planPickerServings = 2;
     private boolean planPickerServingsChanged;
     private String planSearchQuery = "";
+    private EditText planPickerSearchInput;
+    private ScrollView planPickerScrollView;
+    private ScrollView mealPlanScrollView;
+    private int restoredPickerScrollY;
+    private int restoredMealPlanScrollY;
 
     enum Screen { LIBRARY, FAVORITES, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN, MEAL_PLAN_PICKER }
 
@@ -116,7 +130,48 @@ public class MainActivity extends AppCompatActivity {
         });
         data = new PersonalDataDbHelper(this);
         data.seedDesignPreviewIfNeeded(DESIGN_RECIPES);
+        restoreMealPlanState(savedInstanceState);
         render();
+    }
+
+    private void restoreMealPlanState(Bundle state) {
+        if (state == null) return;
+        String savedScreen = state.getString(STATE_SCREEN);
+        if (!Screen.MEAL_PLAN.name().equals(savedScreen)
+                && !Screen.MEAL_PLAN_PICKER.name().equals(savedScreen)) return;
+        screen = Screen.valueOf(savedScreen);
+        if (screen == Screen.MEAL_PLAN_PICKER) {
+            ArrayList<String> savedIds = state.getStringArrayList(STATE_PICKED_RECIPE_IDS);
+            selectedPlanRecipeIds.clear();
+            if (savedIds != null) selectedPlanRecipeIds.addAll(savedIds);
+            planPickerServings = Math.max(1, Math.min(99, state.getInt(STATE_PICKER_SERVINGS, 2)));
+            planPickerServingsChanged = state.getBoolean(STATE_PICKER_SERVINGS_CHANGED, false);
+            planSearchQuery = state.getString(STATE_SEARCH_QUERY, "");
+            restoredPickerScrollY = Math.max(0, state.getInt(STATE_PICKER_SCROLL_Y, 0));
+        } else {
+            restoredMealPlanScrollY = Math.max(0, state.getInt(STATE_PLAN_SCROLL_Y, 0));
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
+            outState.putString(STATE_SCREEN, screen.name());
+            if (screen == Screen.MEAL_PLAN_PICKER) {
+                outState.putStringArrayList(STATE_PICKED_RECIPE_IDS, new ArrayList<>(selectedPlanRecipeIds));
+                outState.putInt(STATE_PICKER_SERVINGS, planPickerServings);
+                outState.putBoolean(STATE_PICKER_SERVINGS_CHANGED, planPickerServingsChanged);
+                String query = planPickerSearchInput == null
+                        ? planSearchQuery : planPickerSearchInput.getText().toString();
+                outState.putString(STATE_SEARCH_QUERY, query);
+                outState.putInt(STATE_PICKER_SCROLL_Y,
+                        planPickerScrollView == null ? 0 : planPickerScrollView.getScrollY());
+            } else {
+                outState.putInt(STATE_PLAN_SCROLL_Y,
+                        mealPlanScrollView == null ? 0 : mealPlanScrollView.getScrollY());
+            }
+        }
+        super.onSaveInstanceState(outState);
     }
 
     private void configureSystemBars() {
@@ -138,6 +193,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void render() {
+        planPickerSearchInput = null;
+        planPickerScrollView = null;
+        mealPlanScrollView = null;
         FrameLayout frame = new FrameLayout(this);
         appRoot = new LinearLayout(this);
         appRoot.setOrientation(LinearLayout.VERTICAL);
@@ -161,6 +219,16 @@ public class MainActivity extends AppCompatActivity {
         else renderMealPlanPicker();
         setContentView(frame);
         ViewCompat.requestApplyInsets(frame);
+        if (screen == Screen.MEAL_PLAN && mealPlanScrollView != null && restoredMealPlanScrollY > 0) {
+            int scrollY = restoredMealPlanScrollY;
+            mealPlanScrollView.post(() -> mealPlanScrollView.scrollTo(0, scrollY));
+            restoredMealPlanScrollY = 0;
+        } else if (screen == Screen.MEAL_PLAN_PICKER && planPickerScrollView != null
+                && restoredPickerScrollY > 0) {
+            int scrollY = restoredPickerScrollY;
+            planPickerScrollView.post(() -> planPickerScrollView.scrollTo(0, scrollY));
+            restoredPickerScrollY = 0;
+        }
     }
 
     private void renderLibrary() {
@@ -252,6 +320,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         ScrollView scroll = scrollContent();
+        mealPlanScrollView = scroll;
         if (planned.isEmpty()) scroll.setFillViewport(true);
         LinearLayout content = vertical();
         scroll.addView(content);
@@ -385,6 +454,7 @@ public class MainActivity extends AppCompatActivity {
         addBackTitle(page, "Thêm món vào kế hoạch");
 
         EditText search = editField(planSearchQuery, 16, 49);
+        planPickerSearchInput = search;
         search.setInputType(InputType.TYPE_CLASS_TEXT);
         search.setSingleLine(true);
         search.setHint("Tìm món hoặc nguyên liệu");
@@ -402,6 +472,7 @@ public class MainActivity extends AppCompatActivity {
         searchParams.bottomMargin = dp(18);
         page.addView(searchBox, searchParams);
         ScrollView scroll = scrollContent();
+        planPickerScrollView = scroll;
         planPickerRows = vertical();
         scroll.addView(planPickerRows);
         populateMealPlanPickerRows();
@@ -538,6 +609,7 @@ public class MainActivity extends AppCompatActivity {
         planPickerServings = selectedPlanRecipeIds.isEmpty() ? 2 : data.getMealPlanRecipes().get(0).servings;
         planPickerServingsChanged = false;
         planSearchQuery = "";
+        restoredPickerScrollY = 0;
         screen = Screen.MEAL_PLAN_PICKER;
         render();
     }
@@ -548,19 +620,19 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
             return;
         }
+        Map<String, PersonalDataDbHelper.PlannedRecipe> currentById = new HashMap<>();
         for (PersonalDataDbHelper.PlannedRecipe current : currentPlan) {
-            if (!selectedPlanRecipeIds.contains(current.recipe.id)) {
-                data.removeMealPlanRecipe(current.recipe.id);
-            }
+            currentById.put(current.recipe.id, current);
         }
+        List<PersonalDataDbHelper.PlannedRecipe> replacement = new ArrayList<>();
         for (String id : selectedPlanRecipeIds) {
-            RecipePreview recipe = recipeById(id);
-            boolean alreadyPlanned = isRecipeInPlan(id);
-            data.addMealPlanRecipe(recipe, planPickerServings);
-            if (!alreadyPlanned || planPickerServingsChanged) {
-                data.setMealPlanRecipeServings(id, planPickerServings);
-            }
+            PersonalDataDbHelper.PlannedRecipe previous = currentById.get(id);
+            RecipePreview recipe = previous == null ? recipeById(id) : previous.recipe;
+            int servings = previous != null && !planPickerServingsChanged
+                    ? previous.servings : planPickerServings;
+            replacement.add(new PersonalDataDbHelper.PlannedRecipe(recipe, servings));
         }
+        data.replaceMealPlanRecipes(replacement);
         selectedPlanRecipeIds.clear();
         screen = Screen.MEAL_PLAN;
         render();

@@ -9,8 +9,10 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** Local storage for personal recipes and the current meal plan (modules 5 and 6). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
@@ -271,7 +273,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     void addMealPlanRecipe(MainActivity.RecipePreview recipe, int servings) {
-        if (servings < 1 || servings > 99) throw new IllegalArgumentException("servings must be between 1 and 99");
+        validateServings(servings);
         SQLiteDatabase db = getWritableDatabase();
         ContentValues value = recipeValues(recipe);
         value.put("planId", 1);
@@ -281,7 +283,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     void setMealPlanRecipeServings(String recipeId, int servings) {
-        if (servings < 1 || servings > 99) throw new IllegalArgumentException("servings must be between 1 and 99");
+        validateServings(servings);
         ContentValues value = new ContentValues();
         value.put("servings", servings);
         getWritableDatabase().update("MealPlanRecipe", value, "planId=1 AND recipeId=?", new String[]{recipeId});
@@ -289,6 +291,42 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
 
     void removeMealPlanRecipe(String recipeId) {
         getWritableDatabase().delete("MealPlanRecipe", "planId=1 AND recipeId=?", new String[]{recipeId});
+    }
+
+    /** Replaces the current plan atomically so a failed save cannot leave a partial selection. */
+    void replaceMealPlanRecipes(List<PlannedRecipe> recipes) {
+        if (recipes == null) throw new IllegalArgumentException("recipes cannot be null");
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("MealPlanRecipe", "planId=1", null);
+            Set<String> recipeIds = new HashSet<>();
+            int position = 0;
+            for (PlannedRecipe planned : recipes) {
+                if (planned == null || planned.recipe == null || planned.recipe.id == null
+                        || planned.recipe.id.trim().isEmpty()) {
+                    throw new IllegalArgumentException("recipe must have a stable ID");
+                }
+                validateServings(planned.servings);
+                if (!recipeIds.add(planned.recipe.id)) {
+                    throw new IllegalArgumentException("recipe IDs must be unique in a meal plan");
+                }
+                ContentValues value = recipeValues(planned.recipe);
+                value.put("planId", 1);
+                value.put("servings", planned.servings);
+                value.put("position", position++);
+                db.insertOrThrow("MealPlanRecipe", null, value);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private static void validateServings(int servings) {
+        if (servings < 1 || servings > 99) {
+            throw new IllegalArgumentException("servings must be between 1 and 99");
+        }
     }
 
     static final class PlannedRecipe {
