@@ -209,6 +209,11 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return rows;
     }
 
+    boolean deleteCollection(long collectionId) {
+        return getWritableDatabase().delete("Collection", "collectionId=?",
+                new String[]{String.valueOf(collectionId)}) > 0;
+    }
+
     List<MainActivity.RecipePreview> getCollectionRecipes(long collectionId) {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM CollectionRecipe WHERE collectionId=" + collectionId + " ORDER BY rowid");
     }

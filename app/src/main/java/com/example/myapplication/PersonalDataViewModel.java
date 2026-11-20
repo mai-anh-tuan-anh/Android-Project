@@ -32,6 +32,7 @@ public final class PersonalDataViewModel extends AndroidViewModel {
     List<MainActivity.RecipePreview> getHistory() { return repository.getHistory(); }
     void recordViewedRecipe(MainActivity.RecipePreview recipe) { repository.recordViewedRecipe(recipe); }
     List<PersonalDataDbHelper.CollectionRow> getCollections() { return repository.getCollections(); }
+    boolean deleteCollection(long collectionId) { return repository.deleteCollection(collectionId); }
     List<MainActivity.RecipePreview> getCollectionRecipes(long id) { return repository.getCollectionRecipes(id); }
     boolean saveCollection(String name, List<MainActivity.RecipePreview> recipes, Long id) {
         return repository.saveCollection(name, recipes, id);

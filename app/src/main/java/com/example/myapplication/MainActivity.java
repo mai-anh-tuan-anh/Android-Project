@@ -631,6 +631,14 @@ public class MainActivity extends AppCompatActivity {
         titleLine.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = text(selected.name, 19, TEXT, true);
         titleLine.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+        ImageView delete = iconView(R.drawable.ic_delete_outline, ERROR);
+        delete.setPadding(dp(14), dp(14), dp(14), dp(14));
+        delete.setBackground(roundRect(WHITE, BORDER, 16));
+        delete.setContentDescription("Xóa bộ sưu tập");
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        deleteParams.setMarginEnd(dp(8));
+        titleLine.addView(delete, deleteParams);
+        delete.setOnClickListener(v -> confirmDeleteCollection(selected));
         ImageView edit = iconView(R.drawable.ic_edit_outline, GREEN);
         edit.setPadding(dp(14), dp(14), dp(14), dp(14));
         edit.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
@@ -1074,10 +1082,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openRecipeNote(RecipePreview recipe) {
+        personalDataViewModel.recordViewedRecipe(recipe);
         noteReturnScreen = screen;
         noteRecipeId = recipe.id;
         screen = Screen.NOTE;
         render();
+    }
+
+    private void confirmDeleteCollection(PersonalDataDbHelper.CollectionRow collection) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Xóa bộ sưu tập?")
+                .setMessage("Bộ sưu tập “" + collection.name + "” và danh sách món trong đó sẽ bị xóa. Yêu thích và ghi chú của các món vẫn được giữ.")
+                .setNegativeButton("Hủy", null)
+                .setPositiveButton("Xóa", (dialog, which) -> {
+                    personalDataViewModel.deleteCollection(collection.id);
+                    selectedCollectionId = -1L;
+                    screen = Screen.LIBRARY;
+                    render();
+                })
+                .show();
     }
 
     private PersonalDataDbHelper.CollectionRow findCollection(long id) {

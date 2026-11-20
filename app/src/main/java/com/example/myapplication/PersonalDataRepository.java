@@ -29,6 +29,7 @@ final class PersonalDataRepository {
     List<MainActivity.RecipePreview> getHistory() { return database.getHistory(); }
     void recordViewedRecipe(MainActivity.RecipePreview recipe) { database.recordViewedRecipe(recipe); }
     List<PersonalDataDbHelper.CollectionRow> getCollections() { return database.getCollections(); }
+    boolean deleteCollection(long collectionId) { return database.deleteCollection(collectionId); }
     List<MainActivity.RecipePreview> getCollectionRecipes(long id) { return database.getCollectionRecipes(id); }
     boolean isCollectionNameAvailable(String name, Long id) { return database.isCollectionNameAvailable(name, id); }
     boolean saveCollection(String name, List<MainActivity.RecipePreview> recipes, Long id) {

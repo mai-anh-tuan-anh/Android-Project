@@ -80,6 +80,21 @@ public class PersonalDataDbHelperTest {
     }
 
     @Test
+    public void deletingCollectionKeepsFavoriteAndRecipeNote() {
+        Long collectionId = data.saveCollectionAndGetId("Món cuối tuần", Collections.singletonList(recipeA), null);
+        assertTrue(collectionId != null);
+        data.addFavorite(recipeA);
+        data.saveNote(recipeA, "Nêm thêm tiêu");
+
+        assertTrue(data.deleteCollection(collectionId));
+
+        assertTrue(data.getCollections().isEmpty());
+        assertTrue(data.getCollectionRecipes(collectionId).isEmpty());
+        assertTrue(data.isFavorite(recipeA.id));
+        assertEquals("Nêm thêm tiêu", data.getNote(recipeA.id));
+    }
+
+    @Test
     public void notesCanBeCreatedAndUpdated() {
         assertEquals("", data.getNote(recipeA.id));
 
@@ -101,6 +116,23 @@ public class PersonalDataDbHelperTest {
         assertEquals(10, history.size());
         assertEquals("recipe-0", history.get(0).id);
         assertFalse(containsRecipe(history, "recipe-1"));
+    }
+
+    @Test
+    public void revisitingTwoDayOldRecipeMovesItToTheTopWithoutDuplicate() {
+        data.recordViewedRecipe(recipeA);
+        data.recordViewedRecipe(recipeB);
+        long now = System.currentTimeMillis();
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{now - 2L * 24 * 60 * 60 * 1000, recipeA.id});
+        data.getWritableDatabase().execSQL("UPDATE RecipeViewHistory SET viewedAt=? WHERE recipeId=?",
+                new Object[]{now - 24L * 60 * 60 * 1000, recipeB.id});
+
+        data.recordViewedRecipe(recipeA);
+
+        List<MainActivity.RecipePreview> history = data.getHistory();
+        assertEquals(2, history.size());
+        assertEquals(recipeA.id, history.get(0).id);
     }
 
     @Test

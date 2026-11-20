@@ -38,6 +38,7 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
 - Khóa `Favorite` là `recipeId`; lưu lặp lại là idempotent. Bộ sưu tập và ghi chú cũng liên kết bằng `recipeId`, không nhân bản dữ liệu công thức.
+- Lịch sử xem là dữ liệu cục bộ, mỗi `recipeId` chỉ có một dòng; xem lại cập nhật thời điểm và đưa món lên đầu, sắp xếp thời điểm mới nhất trước, đồng thời xóa dòng quá 3 ngày. Xóa bộ sưu tập cần xác nhận; xóa bộ sưu tập và các liên kết của nó nhưng giữ `Favorite` và `RecipeNote` độc lập.
 - Khi tích hợp kho công thức thật, form tạo/sửa bộ sưu tập của module 5 lấy món từ toàn bộ kho khả dụng, không chỉ món yêu thích; hỗ trợ tìm kiếm và chỉ tải phần tiếp theo khi người dùng cuộn đến (lazy loading). Các lựa chọn đã tích phải giữ nguyên khi tìm kiếm hoặc tải thêm, dựa trên `recipeId` ổn định. Đây là mục tiêu tích hợp; bản preview hiện tại vẫn dùng 5 fixture.
 - Khi món bị gỡ khỏi kho công khai, ẩn khỏi danh mục công khai nhưng không xóa dữ liệu cá nhân đang tham chiếu. Giữ tên/ảnh snapshot tối thiểu để màn hình cá nhân hiển thị mục đã gỡ; ghi chú vẫn đọc được. Không tự xóa dòng mua sắm hoặc kế hoạch của người dùng khi đồng bộ.
 
