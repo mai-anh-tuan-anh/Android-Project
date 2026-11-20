@@ -30,6 +30,8 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.text.Normalizer;
+import java.util.Locale;
 
 /** Local personal data and the current meal plan (modules 5 and 6). */
 public class MainActivity extends AppCompatActivity {
@@ -381,6 +383,7 @@ public class MainActivity extends AppCompatActivity {
         addBackTitle(page, "Thêm món vào kế hoạch");
 
         EditText search = editField(planSearchQuery, 16, 49);
+        search.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         search.setSingleLine(true);
         search.setHint("Tìm món hoặc nguyên liệu");
         search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
@@ -397,9 +400,8 @@ public class MainActivity extends AppCompatActivity {
         searchParams.bottomMargin = dp(18);
         page.addView(searchBox, searchParams);
         ScrollView scroll = scrollContent();
-        LinearLayout content = vertical();
-        scroll.addView(content);
-        planPickerRows = content;
+        planPickerRows = vertical();
+        scroll.addView(planPickerRows);
         populateMealPlanPickerRows();
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
@@ -410,14 +412,16 @@ public class MainActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) { }
         });
 
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
         TextView selectedTitle = text("Khẩu phần món đã chọn", 20, TEXT, true);
         LinearLayout.LayoutParams selectedTitleParams = new LinearLayout.LayoutParams(-1, -2);
-        selectedTitleParams.topMargin = dp(24);
-        selectedTitleParams.bottomMargin = dp(12);
-        content.addView(selectedTitle, selectedTitleParams);
+        selectedTitleParams.topMargin = dp(14);
+        selectedTitleParams.bottomMargin = dp(8);
+        page.addView(selectedTitle, selectedTitleParams);
         LinearLayout stepper = new LinearLayout(this);
         stepper.setGravity(Gravity.CENTER_VERTICAL);
-        stepper.setPadding(dp(10), 0, dp(10), 0);
+        stepper.setPadding(dp(4), 0, dp(4), 0);
         stepper.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
         TextView minus = stepButton("−", "Giảm khẩu phần món đã chọn", () -> {
             if (planPickerServings > 1) {
@@ -426,11 +430,11 @@ public class MainActivity extends AppCompatActivity {
                 updatePickerServingCount();
             }
         });
-        stepper.addView(minus, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        stepper.addView(minus, new LinearLayout.LayoutParams(dp(48), dp(48)));
         TextView servingCount = text(String.valueOf(planPickerServings), 20, TEXT, true);
         servingCount.setGravity(Gravity.CENTER);
         servingCount.setTag("plan-serving-count");
-        stepper.addView(servingCount, new LinearLayout.LayoutParams(dp(70), dp(48)));
+        stepper.addView(servingCount, new LinearLayout.LayoutParams(dp(48), dp(48)));
         TextView plus = stepButton("＋", "Tăng khẩu phần món đã chọn", () -> {
             if (planPickerServings < 99) {
                 planPickerServings++;
@@ -438,10 +442,9 @@ public class MainActivity extends AppCompatActivity {
                 updatePickerServingCount();
             }
         });
-        stepper.addView(plus, new LinearLayout.LayoutParams(dp(54), dp(48)));
-        content.addView(stepper, new LinearLayout.LayoutParams(dp(160), dp(48)));
+        stepper.addView(plus, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        page.addView(stepper, new LinearLayout.LayoutParams(-2, dp(48)));
 
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         TextView confirm = primaryButton("Thêm vào Nấu hôm nay", this::saveMealPlanSelection);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(-1, dp(52));
         confirmParams.topMargin = dp(14);
@@ -453,9 +456,9 @@ public class MainActivity extends AppCompatActivity {
         if (planPickerRows == null) return;
         planPickerRows.removeAllViews();
         List<RecipePreview> matches = new ArrayList<>();
-        String query = planSearchQuery.trim().toLowerCase(java.util.Locale.ROOT);
+        String query = normalizeSearchText(planSearchQuery);
         for (RecipePreview recipe : MEAL_PLAN_PREVIEWS) {
-            if (query.isEmpty() || recipe.title.toLowerCase(java.util.Locale.ROOT).contains(query)) matches.add(recipe);
+            if (query.isEmpty() || normalizeSearchText(recipe.title).contains(query)) matches.add(recipe);
         }
         if (matches.isEmpty()) {
             TextView empty = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
@@ -495,6 +498,12 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         }
+    }
+
+    private String normalizeSearchText(String value) {
+        String decomposed = Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
+                Normalizer.Form.NFD);
+        return decomposed.replaceAll("\\p{M}+", "").replace('đ', 'd');
     }
 
     private void openMealPlanPicker() {
