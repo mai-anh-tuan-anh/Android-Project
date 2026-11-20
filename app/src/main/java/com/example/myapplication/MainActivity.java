@@ -76,10 +76,15 @@ public class MainActivity extends AppCompatActivity {
     private long selectedCollectionId = -1L;
     private String noteRecipeId = DESIGN_RECIPES.get(0).id;
     private String favoritesSearchQuery = "";
+    private String collectionDetailSearchQuery = "";
+    private long collectionDetailSearchOwnerId = -1L;
+    private String collectionFormSearchQuery = "";
     private EditText collectionNameInput;
     private TextView collectionError;
     private TextView collectionSaveButton;
     private LinearLayout planPickerRows;
+    private LinearLayout collectionRecipeResults;
+    private LinearLayout collectionFormRecipeRows;
     private TextView planPickerSourceButton;
     private EditText planPickerSearchInput;
     private ScrollView planPickerScrollView;
@@ -365,6 +370,66 @@ public class MainActivity extends AppCompatActivity {
         String decomposed = java.text.Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
                 java.text.Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "").replace('đ', 'd');
+    }
+
+    private FrameLayout createRecipeSearchBox(String value, String hint, TextWatcher watcher) {
+        EditText search = editField(value, 16, 49);
+        search.setInputType(InputType.TYPE_CLASS_TEXT);
+        search.setSingleLine(true);
+        search.setHint(hint);
+        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        search.setBackgroundColor(Color.TRANSPARENT);
+        search.setPadding(dp(48), dp(10), dp(12), dp(10));
+        FrameLayout searchBox = new FrameLayout(this);
+        searchBox.setBackground(roundRect(WHITE, BORDER, 16));
+        ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
+        searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
+        searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
+        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
+        search.addTextChangedListener(watcher);
+        return searchBox;
+    }
+
+    private LinearLayout.LayoutParams searchLayoutParams(int top, int bottom) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(49));
+        params.topMargin = dp(top);
+        params.bottomMargin = dp(bottom);
+        return params;
+    }
+
+    private void populateCollectionRecipeResults(LinearLayout results, List<RecipePreview> recipes) {
+        if (results == null) return;
+        results.removeAllViews();
+        String query = normalizeRecipeSearch(collectionDetailSearchQuery);
+        List<RecipePreview> matches = new ArrayList<>();
+        for (RecipePreview recipe : recipes) {
+            if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) matches.add(recipe);
+        }
+        if (matches.isEmpty()) {
+            TextView noResults = text("Không tìm thấy món trong bộ sưu tập.", 14, MUTED, false);
+            noResults.setGravity(Gravity.CENTER);
+            results.addView(noResults, new LinearLayout.LayoutParams(-1, dp(80)));
+            return;
+        }
+        addRecipeGrid(results, matches, true, true);
+    }
+
+    private void populateCollectionFormRecipeRows(LinearLayout rows) {
+        if (rows == null) return;
+        rows.removeAllViews();
+        String query = normalizeRecipeSearch(collectionFormSearchQuery);
+        int matches = 0;
+        for (RecipePreview recipe : DESIGN_RECIPES) {
+            if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) {
+                addSelectableRecipeRow(rows, recipe);
+                matches++;
+            }
+        }
+        if (matches == 0) {
+            TextView noResults = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
+            noResults.setGravity(Gravity.CENTER);
+            rows.addView(noResults, new LinearLayout.LayoutParams(-1, dp(72)));
+        }
     }
 
     private void renderCollections() {
@@ -819,6 +884,10 @@ public class MainActivity extends AppCompatActivity {
             render();
             return;
         }
+        if (collectionDetailSearchOwnerId != selected.id) {
+            collectionDetailSearchOwnerId = selected.id;
+            collectionDetailSearchQuery = "";
+        }
 
         LinearLayout titleLine = new LinearLayout(this);
         titleLine.setGravity(Gravity.CENTER_VERTICAL);
@@ -863,7 +932,20 @@ public class MainActivity extends AppCompatActivity {
             empty.addView(add, new LinearLayout.LayoutParams(-1, dp(49)));
             content.addView(empty, new LinearLayout.LayoutParams(-1, -1));
             add.setOnClickListener(v -> openCollectionForm(selectedCollectionId));
-        } else addRecipeGrid(content, collectionRecipes, true, true);
+        } else {
+            content.addView(createRecipeSearchBox(collectionDetailSearchQuery, "Tìm món trong bộ sưu tập",
+                    new TextWatcher() {
+                        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+                        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                            collectionDetailSearchQuery = s.toString();
+                            populateCollectionRecipeResults(collectionRecipeResults, collectionRecipes);
+                        }
+                        @Override public void afterTextChanged(Editable s) { }
+                    }), searchLayoutParams(0, 14));
+            collectionRecipeResults = vertical();
+            content.addView(collectionRecipeResults);
+            populateCollectionRecipeResults(collectionRecipeResults, collectionRecipes);
+        }
         List<PersonalDataDbHelper.CollectionRow> otherCollections = personalDataViewModel.getCollections();
         boolean hasOtherCollections = false;
         for (PersonalDataDbHelper.CollectionRow row : otherCollections) {
@@ -896,7 +978,18 @@ public class MainActivity extends AppCompatActivity {
         collectionError = text("", 12, ERROR, false);
         content.addView(collectionError);
         addText(content, "Chọn món để thêm", 19, TEXT, true, 0, 34, 0, 18);
-        for (RecipePreview recipe : DESIGN_RECIPES) addSelectableRecipeRow(content, recipe);
+        content.addView(createRecipeSearchBox(collectionFormSearchQuery, "Tìm món để thêm",
+                new TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        collectionFormSearchQuery = s.toString();
+                        populateCollectionFormRecipeRows(collectionFormRecipeRows);
+                    }
+                    @Override public void afterTextChanged(Editable s) { }
+                }), searchLayoutParams(0, 14));
+        collectionFormRecipeRows = vertical();
+        content.addView(collectionFormRecipeRows);
+        populateCollectionFormRecipeRows(collectionFormRecipeRows);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         collectionSaveButton = addButton(page, "Lưu bộ sưu tập", true, this::saveCollectionForm, 18);
@@ -1330,6 +1423,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openCollectionForm(Long collectionId) {
         if (collectionId == null && screen != Screen.COLLECTION) collectionReturnScreen = screen;
+        collectionFormSearchQuery = "";
         selectedCollectionId = collectionId == null ? -1L : collectionId;
         String name = "";
         List<RecipePreview> recipes = new ArrayList<>();
