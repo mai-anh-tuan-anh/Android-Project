@@ -4,7 +4,7 @@ import android.app.Application;
 
 import java.util.List;
 
-/** Repository boundary for local personal data shared by modules 5 and 6. */
+/** Repository boundary for local personal data shared by modules 5–7. */
 final class PersonalDataRepository {
     private static PersonalDataRepository instance;
     private final PersonalDataDbHelper database;
@@ -46,4 +46,10 @@ final class PersonalDataRepository {
     void replaceMealPlanRecipes(List<PersonalDataDbHelper.PlannedRecipe> recipes) {
         database.replaceMealPlanRecipes(recipes);
     }
+    List<PersonalDataDbHelper.ShoppingItem> getShoppingItems() { return database.getShoppingItems(); }
+    void saveShoppingItem(String id, String name, String amount, String unit, String status) {
+        database.saveShoppingItem(id, name, amount, unit, status);
+    }
+    void setShoppingItemStatus(String id, String status) { database.setShoppingItemStatus(id, status); }
+    void deleteShoppingItem(String id) { database.deleteShoppingItem(id); }
 }

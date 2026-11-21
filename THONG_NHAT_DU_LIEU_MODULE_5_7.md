@@ -36,6 +36,8 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 - Khi người dùng sửa lượng của mục tổng hợp, lưu phần điều chỉnh của người dùng riêng với tổng tính từ công thức. Lần cập nhật sau áp dụng lại phần điều chỉnh trên tổng mới; không cho lưu tổng lượng âm. Nếu toàn bộ nguồn công thức bị bỏ, giữ đóng góp thủ công và phần điều chỉnh như mục do người dùng quản lý.
 - Nếu người dùng chọn **Giữ danh sách cũ**, không tính lại các mục. Nếu chọn **Cập nhật**, dùng quy tắc trên. Thêm cùng một nguồn công thức lần nữa là thao tác upsert, không tạo thêm đóng góp trùng.
 
+**Tình trạng code Module 7 (21/11/2026):** đã có một danh sách mua sắm cục bộ trong SQLite, thêm/sửa/xóa mục nhập tay, đổi ba trạng thái và chuẩn hóa đơn vị ban đầu theo danh mục người dùng cung cấp. Kho công thức chưa có dữ liệu `RecipeIngredient`, nên nút từ Nấu hôm nay mới mở màn Mua sắm; chưa tạo dòng công thức, chưa tính đóng góp/điều chỉnh và chưa mở xác nhận cập nhật màn 22. Không lấy nguyên liệu minh họa trong ảnh làm dữ liệu công thức giả. Hoàn tất phần này sau khi module công thức cung cấp `recipeId`, `recipeIngredientId`, `ingredientId`, lượng, `unitId`, ghi chú định tính và `baseServings`.
+
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
 - Khóa `Favorite` là `recipeId`; lưu lặp lại là idempotent. Bộ sưu tập và ghi chú cũng liên kết bằng `recipeId`, không nhân bản dữ liệu công thức.

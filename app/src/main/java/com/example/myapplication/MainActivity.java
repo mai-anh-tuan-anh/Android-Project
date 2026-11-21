@@ -15,6 +15,7 @@ import android.view.inputmethod.BaseInputConnection;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Local personal data and the current meal plan (modules 5 and 6). */
+/** Local personal data, the current meal plan, and shopping (modules 5–7). */
 public class MainActivity extends AppCompatActivity {
     private static final String STATE_SCREEN = "module6.screen";
     private static final String STATE_PICKED_RECIPE_IDS = "module6.pickedRecipeIds";
@@ -48,6 +49,15 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_PICKER_COLLECTION_ID = "module6.pickerCollectionId";
     private static final String STATE_PICKER_SCROLL_Y = "module6.pickerScrollY";
     private static final String STATE_PLAN_SCROLL_Y = "module6.planScrollY";
+    private static final String STATE_SHOPPING_SCREEN = "module7.screen";
+    private static final String STATE_SHOPPING_ITEM_ID = "module7.itemId";
+    private static final String STATE_SHOPPING_NAME = "module7.name";
+    private static final String STATE_SHOPPING_AMOUNT = "module7.amount";
+    private static final String STATE_SHOPPING_UNIT = "module7.unit";
+    private static final String STATE_SHOPPING_UNIT_ID = "module7.unitId";
+    private static final String STATE_SHOPPING_STATUS = "module7.status";
+    private static final String STATE_SHOPPING_FILTER = "module7.filter";
+    private static final String STATE_SHOPPING_RETURN_SCREEN = "module7.returnScreen";
     private static final int CREAM = Color.rgb(250, 249, 246);
     private static final int GREEN = Color.rgb(50, 108, 79);
     private static final int PALE_GREEN = Color.rgb(232, 242, 233);
@@ -69,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
 
     private PersonalDataViewModel personalDataViewModel;
     private MealPlanViewModel mealPlanViewModel;
+    private ShoppingViewModel shoppingViewModel;
     private LinearLayout appRoot;
     private Screen screen = Screen.LIBRARY;
     private Screen noteReturnScreen = Screen.LIBRARY;
@@ -91,8 +102,20 @@ public class MainActivity extends AppCompatActivity {
     private ScrollView mealPlanScrollView;
     private int restoredPickerScrollY;
     private int restoredMealPlanScrollY;
+    private Screen shoppingReturnScreen = Screen.MEAL_PLAN;
+    private String editingShoppingItemId;
+    private String shoppingFormStatus = ShoppingViewModel.NEED_TO_BUY;
+    private EditText shoppingNameInput;
+    private EditText shoppingAmountInput;
+    private EditText shoppingUnitInput;
+    private String shoppingDraftName = "";
+    private String shoppingDraftAmount = "";
+    private String shoppingDraftUnit = "";
+    private String shoppingDraftUnitId = "";
+    private String shoppingStatusFilter;
 
-    enum Screen { LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN, MEAL_PLAN_PICKER }
+    enum Screen { LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN,
+        MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM }
 
     static final class RecipePreview {
         final String id;
@@ -128,6 +151,10 @@ public class MainActivity extends AppCompatActivity {
                     screen = noteReturnScreen;
                 } else if (screen == Screen.MEAL_PLAN_PICKER) {
                     screen = Screen.MEAL_PLAN;
+                } else if (screen == Screen.SHOPPING_ITEM_FORM) {
+                    screen = Screen.SHOPPING;
+                } else if (screen == Screen.SHOPPING) {
+                    screen = shoppingReturnScreen;
                 } else {
                     screen = Screen.LIBRARY;
                 }
@@ -136,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
         });
         personalDataViewModel = new ViewModelProvider(this).get(PersonalDataViewModel.class);
         mealPlanViewModel = new ViewModelProvider(this).get(MealPlanViewModel.class);
+        shoppingViewModel = new ViewModelProvider(this).get(ShoppingViewModel.class);
         personalDataViewModel.seedDesignPreviewIfNeeded(DESIGN_RECIPES);
         restoreMealPlanState(savedInstanceState);
         render();
@@ -144,6 +172,25 @@ public class MainActivity extends AppCompatActivity {
     private void restoreMealPlanState(Bundle state) {
         if (state == null) return;
         String savedScreen = state.getString(STATE_SCREEN);
+        String savedShoppingScreen = state.getString(STATE_SHOPPING_SCREEN);
+        if (Screen.SHOPPING.name().equals(savedShoppingScreen)
+                || Screen.SHOPPING_ITEM_FORM.name().equals(savedShoppingScreen)) {
+            screen = Screen.valueOf(savedShoppingScreen);
+            editingShoppingItemId = state.getString(STATE_SHOPPING_ITEM_ID);
+            shoppingDraftName = state.getString(STATE_SHOPPING_NAME, "");
+            shoppingDraftAmount = state.getString(STATE_SHOPPING_AMOUNT, "");
+            shoppingDraftUnit = state.getString(STATE_SHOPPING_UNIT, "");
+            shoppingDraftUnitId = state.getString(STATE_SHOPPING_UNIT_ID, "");
+            shoppingFormStatus = state.getString(STATE_SHOPPING_STATUS, ShoppingViewModel.NEED_TO_BUY);
+            shoppingStatusFilter = state.getString(STATE_SHOPPING_FILTER);
+            try {
+                shoppingReturnScreen = Screen.valueOf(state.getString(STATE_SHOPPING_RETURN_SCREEN,
+                        Screen.MEAL_PLAN.name()));
+            } catch (IllegalArgumentException invalidScreen) {
+                shoppingReturnScreen = Screen.MEAL_PLAN;
+            }
+            return;
+        }
         if (!Screen.MEAL_PLAN.name().equals(savedScreen)
                 && !Screen.MEAL_PLAN_PICKER.name().equals(savedScreen)) return;
         screen = Screen.valueOf(savedScreen);
@@ -188,6 +235,20 @@ public class MainActivity extends AppCompatActivity {
                         mealPlanScrollView == null ? 0 : mealPlanScrollView.getScrollY());
             }
         }
+        if (screen == Screen.SHOPPING || screen == Screen.SHOPPING_ITEM_FORM) {
+            outState.putString(STATE_SHOPPING_SCREEN, screen.name());
+            outState.putString(STATE_SHOPPING_ITEM_ID, editingShoppingItemId);
+            outState.putString(STATE_SHOPPING_NAME, shoppingNameInput == null
+                    ? shoppingDraftName : shoppingNameInput.getText().toString());
+            outState.putString(STATE_SHOPPING_AMOUNT, shoppingAmountInput == null
+                    ? shoppingDraftAmount : shoppingAmountInput.getText().toString());
+            outState.putString(STATE_SHOPPING_UNIT, shoppingUnitInput == null
+                    ? shoppingDraftUnit : shoppingUnitInput.getText().toString());
+            outState.putString(STATE_SHOPPING_UNIT_ID, shoppingDraftUnitId);
+            outState.putString(STATE_SHOPPING_STATUS, shoppingFormStatus);
+            outState.putString(STATE_SHOPPING_FILTER, shoppingStatusFilter);
+            outState.putString(STATE_SHOPPING_RETURN_SCREEN, shoppingReturnScreen.name());
+        }
         super.onSaveInstanceState(outState);
     }
 
@@ -229,7 +290,9 @@ public class MainActivity extends AppCompatActivity {
         else if (screen == Screen.COLLECTION_FORM) renderCollectionForm();
         else if (screen == Screen.NOTE) renderNote();
         else if (screen == Screen.MEAL_PLAN) renderMealPlan();
-        else renderMealPlanPicker();
+        else if (screen == Screen.MEAL_PLAN_PICKER) renderMealPlanPicker();
+        else if (screen == Screen.SHOPPING) renderShoppingList();
+        else renderShoppingItemForm();
         setContentView(frame);
         ViewCompat.requestApplyInsets(frame);
         if (screen == Screen.MEAL_PLAN && mealPlanScrollView != null && restoredMealPlanScrollY > 0) {
@@ -523,8 +586,7 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout.LayoutParams shoppingParams = new LinearLayout.LayoutParams(-1, dp(48));
             shoppingParams.topMargin = dp(10);
             page.addView(shopping, shoppingParams);
-            shopping.setOnClickListener(v -> Toast.makeText(this,
-                    "Màn Mua sắm sẽ được kết nối khi hoàn thành module 7.", Toast.LENGTH_SHORT).show());
+            shopping.setOnClickListener(v -> openShoppingList(Screen.MEAL_PLAN));
 
             TextView startCooking = primaryButton("Bắt đầu nấu", () -> Toast.makeText(this,
                     "Màn Nấu từng bước sẽ được kết nối khi hoàn thành module 4.", Toast.LENGTH_SHORT).show());
@@ -534,6 +596,328 @@ public class MainActivity extends AppCompatActivity {
         }
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(1);
+    }
+
+    private void renderShoppingList() {
+        LinearLayout page = vertical();
+        page.setPadding(dp(24), dp(20), dp(24), dp(16));
+        addText(page, "Danh sách mua sắm", 23, TEXT, true, 0, 0, 0, 0);
+
+        List<PersonalDataDbHelper.ShoppingItem> items = shoppingViewModel.getItems();
+        if (items.isEmpty()) {
+            ScrollView emptyScroll = scrollContent();
+            emptyScroll.setFillViewport(true);
+            LinearLayout empty = vertical();
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(24), 0, dp(24), 0);
+            emptyScroll.addView(empty, new ScrollView.LayoutParams(-1, -1));
+            ImageView icon = iconView(R.drawable.ic_cart_outline, GREEN);
+            icon.setPadding(dp(24), dp(24), dp(24), dp(24));
+            icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
+            empty.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
+            TextView title = text("Danh sách đang trống", 22, TEXT, true);
+            title.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+            titleParams.topMargin = dp(18);
+            titleParams.bottomMargin = dp(8);
+            empty.addView(title, titleParams);
+            TextView hint = text("Chưa có dữ liệu nguyên liệu công thức. Bạn có thể thêm thủ công.",
+                    14, MUTED, false);
+            hint.setGravity(Gravity.CENTER);
+            hint.setLineSpacing(dp(3), 1f);
+            empty.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+            TextView add = primaryButton("Thêm nguyên liệu", () -> openShoppingItemForm(null));
+            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(49));
+            addParams.topMargin = dp(44);
+            empty.addView(add, addParams);
+            page.addView(emptyScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+            appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+            addBottomNavigation(2);
+            return;
+        }
+
+        TextView summary = text("Danh sách nguyên liệu lưu trên thiết bị.", 14, MUTED, false);
+        summary.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
+        summaryParams.topMargin = dp(14);
+        page.addView(summary, summaryParams);
+
+        int purchasedCount = 0;
+        int needCount = 0;
+        int availableCount = 0;
+        for (PersonalDataDbHelper.ShoppingItem item : items) {
+            if (ShoppingViewModel.PURCHASED.equals(item.status)) purchasedCount++;
+            else if (ShoppingViewModel.AVAILABLE.equals(item.status)) availableCount++;
+            else needCount++;
+        }
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(Math.max(1, items.size()));
+        progress.setProgress(purchasedCount);
+        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(GREEN));
+        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(BORDER));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
+        progressParams.topMargin = dp(24);
+        page.addView(progress, progressParams);
+        addText(page, purchasedCount + "/" + items.size() + " nguyên liệu đã mua", 14, MUTED,
+                false, 0, 8, 0, 0);
+
+        LinearLayout statusRow = new LinearLayout(this);
+        statusRow.setGravity(Gravity.CENTER_VERTICAL);
+        statusRow.setOrientation(LinearLayout.HORIZONTAL);
+        addShoppingFilterChip(statusRow, "Cần mua", ShoppingViewModel.NEED_TO_BUY, needCount);
+        addShoppingFilterChip(statusRow, "Đã có", ShoppingViewModel.AVAILABLE, availableCount);
+        addShoppingFilterChip(statusRow, "Đã mua", ShoppingViewModel.PURCHASED, purchasedCount);
+        HorizontalScrollView statusScroll = new HorizontalScrollView(this);
+        statusScroll.setHorizontalScrollBarEnabled(false);
+        statusScroll.addView(statusRow, new HorizontalScrollView.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, dp(44));
+        statusParams.topMargin = dp(24);
+        statusParams.bottomMargin = dp(20);
+        page.addView(statusScroll, statusParams);
+
+        ScrollView scroll = scrollContent();
+        LinearLayout content = vertical();
+        content.setPadding(0, 0, 0, dp(12));
+        scroll.addView(content);
+        addText(content, "Nguyên liệu", 20, TEXT, true, 0, 0, 0, 0);
+        for (PersonalDataDbHelper.ShoppingItem item : items) {
+            if (shoppingStatusFilter == null || shoppingStatusFilter.equals(item.status)) {
+                addShoppingItemRow(content, item);
+            }
+        }
+        if (shoppingStatusFilter != null && filteredShoppingCount(items) == 0) {
+            TextView noItems = text("Không có nguyên liệu ở trạng thái này.", 14, MUTED, false);
+            noItems.setPadding(0, dp(18), 0, 0);
+            content.addView(noItems);
+        }
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(49));
+        actionsParams.topMargin = dp(10);
+        page.addView(actions, actionsParams);
+        TextView add = text("＋   Thêm nguyên liệu", 15, WHITE, true);
+        add.setGravity(Gravity.CENTER);
+        add.setBackground(roundRect(GREEN, GREEN, 14));
+        actions.addView(add, new LinearLayout.LayoutParams(0, -1, 1.6f));
+        add.setOnClickListener(v -> openShoppingItemForm(null));
+        TextView edit = text("Chỉnh sửa", 15, GREEN, true);
+        edit.setGravity(Gravity.CENTER);
+        edit.setBackground(roundRect(WHITE, BORDER, 14));
+        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(0, -1, 1);
+        editParams.leftMargin = dp(12);
+        actions.addView(edit, editParams);
+        edit.setOnClickListener(v -> showShoppingItemEditor(items));
+        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(2);
+    }
+
+    private void addShoppingFilterChip(LinearLayout parent, String label, String status, int count) {
+        boolean selected = status.equals(shoppingStatusFilter);
+        TextView chip = text(label + " · " + count, 14, selected ? GREEN : MUTED, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(13), 0, dp(13), 0);
+        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE,
+                selected ? PALE_GREEN : BORDER, 22));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(42));
+        params.rightMargin = dp(8);
+        parent.addView(chip, params);
+        chip.setOnClickListener(v -> {
+            shoppingStatusFilter = status.equals(shoppingStatusFilter) ? null : status;
+            render();
+        });
+    }
+
+    private int filteredShoppingCount(List<PersonalDataDbHelper.ShoppingItem> items) {
+        int count = 0;
+        for (PersonalDataDbHelper.ShoppingItem item : items) {
+            if (shoppingStatusFilter != null && shoppingStatusFilter.equals(item.status)) count++;
+        }
+        return count;
+    }
+
+    private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item) {
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(12), dp(12));
+        card.setBackground(roundRect(WHITE, BORDER, 16));
+        LinearLayout details = vertical();
+        details.addView(text(item.name, 16, TEXT, true));
+        String state = shoppingStatusLabel(item.status);
+        TextView amount = text(item.amount + " " + KitchenUnitCatalog.label(item.unit) + " · " + state,
+                14, MUTED, false);
+        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, -2);
+        amountParams.topMargin = dp(5);
+        details.addView(amount, amountParams);
+        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView check = text(ShoppingViewModel.NEED_TO_BUY.equals(item.status) ? "" : "✓", 22,
+                ShoppingViewModel.NEED_TO_BUY.equals(item.status) ? GREEN : WHITE, true);
+        check.setGravity(Gravity.CENTER);
+        check.setBackground(roundRect(ShoppingViewModel.NEED_TO_BUY.equals(item.status)
+                ? WHITE : GREEN, GREEN, 9));
+        check.setContentDescription("Đổi trạng thái: " + state);
+        card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.topMargin = dp(12);
+        parent.addView(card, cardParams);
+        card.setOnClickListener(v -> openShoppingItemForm(item.id));
+        check.setOnClickListener(v -> {
+            shoppingViewModel.setStatus(item.id, shoppingViewModel.nextStatus(item.status));
+            render();
+        });
+        card.setOnLongClickListener(v -> {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Xóa nguyên liệu?")
+                    .setMessage("Xóa “" + item.name + "” khỏi danh sách mua sắm?")
+                    .setNegativeButton("Hủy", null)
+                    .setPositiveButton("Xóa", (dialog, which) -> {
+                        shoppingViewModel.deleteItem(item.id);
+                        render();
+                    }).show();
+            return true;
+        });
+    }
+
+    private String shoppingStatusLabel(String status) {
+        if (ShoppingViewModel.AVAILABLE.equals(status)) return "Đã có";
+        if (ShoppingViewModel.PURCHASED.equals(status)) return "Đã mua";
+        return "Cần mua";
+    }
+
+    private void openShoppingItemForm(String itemId) {
+        editingShoppingItemId = itemId;
+        PersonalDataDbHelper.ShoppingItem item = shoppingViewModel.findItem(itemId);
+        shoppingDraftName = item == null ? "" : item.name;
+        shoppingDraftAmount = item == null ? "" : item.amount;
+        shoppingDraftUnit = item == null ? "" : KitchenUnitCatalog.label(item.unit);
+        shoppingDraftUnitId = item == null ? "" : item.unit;
+        shoppingFormStatus = item == null ? ShoppingViewModel.NEED_TO_BUY : item.status;
+        screen = Screen.SHOPPING_ITEM_FORM;
+        render();
+    }
+
+    private void renderShoppingItemForm() {
+        LinearLayout page = vertical();
+        page.setPadding(dp(24), dp(20), dp(24), dp(16));
+        addBackTitle(page, editingShoppingItemId == null ? "Thêm nguyên liệu" : "Sửa nguyên liệu");
+        ScrollView scroll = scrollContent();
+        LinearLayout fields = vertical();
+        fields.setPadding(0, dp(20), 0, dp(20));
+        scroll.addView(fields);
+
+        addText(fields, "Tên nguyên liệu", 15, TEXT, true, 0, 0, 0, 0);
+        shoppingNameInput = editField(shoppingDraftName, 16, 56);
+        shoppingNameInput.setSingleLine(true);
+        shoppingNameInput.setHint("Ví dụ: Cà chua");
+        addFieldView(fields, shoppingNameInput, 10, 22);
+
+        addText(fields, "Số lượng", 15, TEXT, true, 0, 0, 0, 0);
+        shoppingAmountInput = editField(shoppingDraftAmount, 16, 56);
+        shoppingAmountInput.setSingleLine(true);
+        shoppingAmountInput.setHint("Ví dụ: 2 hoặc vừa đủ");
+        addFieldView(fields, shoppingAmountInput, 10, 22);
+
+        addText(fields, "Đơn vị", 15, TEXT, true, 0, 0, 0, 0);
+        shoppingUnitInput = editField(shoppingDraftUnit, 16, 56);
+        shoppingUnitInput.setSingleLine(true);
+        shoppingUnitInput.setHint("Ví dụ: quả, g, ml, muỗng cà phê");
+        addFieldView(fields, shoppingUnitInput, 10, 26);
+
+        addText(fields, "Trạng thái", 20, TEXT, true, 0, 4, 0, 12);
+        LinearLayout statuses = new LinearLayout(this);
+        statuses.setOrientation(LinearLayout.HORIZONTAL);
+        statuses.setGravity(Gravity.CENTER_VERTICAL);
+        addShoppingFormStatus(statuses, "Cần mua", ShoppingViewModel.NEED_TO_BUY);
+        addShoppingFormStatus(statuses, "Đã có", ShoppingViewModel.AVAILABLE);
+        addShoppingFormStatus(statuses, "Đã mua", ShoppingViewModel.PURCHASED);
+        fields.addView(statuses);
+
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addButton(page, "Lưu nguyên liệu", true, this::saveShoppingForm, 10);
+        if (editingShoppingItemId != null) {
+            TextView remove = text("Xóa nguyên liệu", 14, ERROR, true);
+            remove.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(-1, dp(42));
+            removeParams.topMargin = dp(6);
+            page.addView(remove, removeParams);
+            remove.setOnClickListener(v -> confirmDeleteShoppingItem(editingShoppingItemId));
+        }
+        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void addFieldView(LinearLayout parent, View field, int top, int bottom) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(top);
+        params.bottomMargin = dp(bottom);
+        parent.addView(field, params);
+    }
+
+    private void addShoppingFormStatus(LinearLayout parent, String label, String status) {
+        boolean selected = status.equals(shoppingFormStatus);
+        TextView chip = text(label, 14, selected ? GREEN : MUTED, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(12), 0, dp(12), 0);
+        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, BORDER, 24));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(44));
+        params.rightMargin = dp(8);
+        parent.addView(chip, params);
+        chip.setOnClickListener(v -> {
+            shoppingDraftName = shoppingNameInput.getText().toString();
+            shoppingDraftAmount = shoppingAmountInput.getText().toString();
+            shoppingDraftUnit = shoppingUnitInput.getText().toString();
+            shoppingFormStatus = status;
+            render();
+        });
+    }
+
+    private void saveShoppingForm() {
+        shoppingDraftName = shoppingNameInput.getText().toString();
+        shoppingDraftAmount = shoppingAmountInput.getText().toString();
+        shoppingDraftUnit = shoppingUnitInput.getText().toString();
+        String canonicalUnit = shoppingDraftUnit.equals(shoppingUnitInput.getText().toString())
+                && !shoppingDraftUnitId.isEmpty()
+                ? shoppingDraftUnitId : KitchenUnitCatalog.canonicalId(shoppingDraftUnit);
+        if (!shoppingViewModel.saveItem(editingShoppingItemId, shoppingDraftName, shoppingDraftAmount,
+                canonicalUnit, shoppingFormStatus)) {
+            Toast.makeText(this, "Vui lòng nhập tên, số lượng hợp lệ và đơn vị.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        shoppingStatusFilter = null;
+        screen = Screen.SHOPPING;
+        render();
+    }
+
+    private void confirmDeleteShoppingItem(String itemId) {
+        PersonalDataDbHelper.ShoppingItem item = shoppingViewModel.findItem(itemId);
+        if (item == null) return;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Xóa nguyên liệu?")
+                .setMessage("Xóa “" + item.name + "” khỏi danh sách mua sắm?")
+                .setNegativeButton("Hủy", null)
+                .setPositiveButton("Xóa", (dialog, which) -> {
+                    shoppingViewModel.deleteItem(itemId);
+                    screen = Screen.SHOPPING;
+                    render();
+                }).show();
+    }
+
+    private void showShoppingItemEditor(List<PersonalDataDbHelper.ShoppingItem> items) {
+        if (items.isEmpty()) return;
+        String[] names = new String[items.size()];
+        for (int i = 0; i < items.size(); i++) names[i] = items.get(i).name;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Chọn nguyên liệu cần sửa")
+                .setItems(names, (dialog, which) -> openShoppingItemForm(items.get(which).id))
+                .setNegativeButton("Đóng", null)
+                .show();
+    }
+
+    private void openShoppingList(Screen returnScreen) {
+        shoppingReturnScreen = returnScreen == Screen.SHOPPING ? Screen.MEAL_PLAN : returnScreen;
+        shoppingStatusFilter = null;
+        screen = Screen.SHOPPING;
+        render();
     }
 
     private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item) {
@@ -1354,6 +1738,8 @@ public class MainActivity extends AppCompatActivity {
                 } else if (index == 1) {
                     screen = Screen.MEAL_PLAN;
                     render();
+                } else if (index == 2) {
+                    openShoppingList(screen);
                 }
             });
         }

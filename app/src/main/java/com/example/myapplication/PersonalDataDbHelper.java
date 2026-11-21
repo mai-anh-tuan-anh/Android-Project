@@ -14,10 +14,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Local storage for personal recipes and the current meal plan (modules 5 and 6). */
+/** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 3;
+    private static final int DB_VERSION = 4;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
@@ -45,12 +45,25 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
                 "imageRes TEXT NOT NULL, duration TEXT NOT NULL, difficulty TEXT NOT NULL, viewedAt INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE LocalMeta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
         createMealPlanTables(db);
+        createShoppingTables(db);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) createMealPlanTables(db);
         if (oldVersion < 3) migrateMealPlanServingRange(db);
+        if (oldVersion < 4) createShoppingTables(db);
+    }
+
+    private static void createShoppingTables(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE ShoppingList (listId INTEGER PRIMARY KEY CHECK(listId=1), " +
+                "updatedAt INTEGER NOT NULL)");
+        db.execSQL("INSERT OR IGNORE INTO ShoppingList(listId,updatedAt) VALUES(1,0)");
+        db.execSQL("CREATE TABLE ShoppingListItem (itemId TEXT PRIMARY KEY, listId INTEGER NOT NULL DEFAULT 1, " +
+                "ingredientId TEXT, name TEXT NOT NULL, amount TEXT NOT NULL, unit TEXT NOT NULL, " +
+                "status TEXT NOT NULL CHECK(status IN ('NEED_TO_BUY','AVAILABLE','PURCHASED')), " +
+                "position INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
+                "FOREIGN KEY(listId) REFERENCES ShoppingList(listId) ON DELETE CASCADE)");
     }
 
     private static void createMealPlanTables(SQLiteDatabase db) {
@@ -353,6 +366,76 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
+    List<ShoppingItem> getShoppingItems() {
+        List<ShoppingItem> items = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT itemId,name,amount,unit,status FROM ShoppingListItem WHERE listId=1 ORDER BY position,rowid", null)) {
+            while (cursor.moveToNext()) {
+                items.add(new ShoppingItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), cursor.getString(4)));
+            }
+        }
+        return items;
+    }
+
+    void saveShoppingItem(String itemId, String name, String amount, String unit, String status) {
+        if (name == null || name.trim().isEmpty() || amount == null || amount.trim().isEmpty()
+                || unit == null || unit.trim().isEmpty()) {
+            throw new IllegalArgumentException("shopping item fields cannot be empty");
+        }
+        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status) && !"PURCHASED".equals(status)) {
+            throw new IllegalArgumentException("invalid shopping item status");
+        }
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("itemId", itemId == null ? java.util.UUID.randomUUID().toString() : itemId);
+        values.put("listId", 1);
+        values.putNull("ingredientId");
+        values.put("name", name.trim().replaceAll("\\s+", " "));
+        values.put("amount", amount.trim());
+        values.put("unit", unit.trim().replaceAll("\\s+", " "));
+        values.put("status", status);
+        values.put("updatedAt", System.currentTimeMillis());
+        if (itemId == null) {
+            try (Cursor cursor = db.rawQuery("SELECT COALESCE(MAX(position),-1)+1 FROM ShoppingListItem WHERE listId=1", null)) {
+                values.put("position", cursor.moveToFirst() ? cursor.getInt(0) : 0);
+            }
+        }
+        else {
+            try (Cursor cursor = db.rawQuery("SELECT position FROM ShoppingListItem WHERE itemId=? AND listId=1",
+                    new String[]{itemId})) {
+                if (!cursor.moveToFirst()) return;
+                values.put("position", cursor.getInt(0));
+            }
+        }
+        db.insertWithOnConflict("ShoppingListItem", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        updateShoppingListTimestamp(db);
+    }
+
+    private static void updateShoppingListTimestamp(SQLiteDatabase db) {
+        ContentValues list = new ContentValues();
+        list.put("updatedAt", System.currentTimeMillis());
+        db.update("ShoppingList", list, "listId=1", null);
+    }
+
+    void setShoppingItemStatus(String itemId, String status) {
+        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status) && !"PURCHASED".equals(status)) {
+            throw new IllegalArgumentException("invalid shopping item status");
+        }
+        ContentValues values = new ContentValues();
+        values.put("status", status);
+        values.put("updatedAt", System.currentTimeMillis());
+        SQLiteDatabase db = getWritableDatabase();
+        db.update("ShoppingListItem", values, "itemId=? AND listId=1", new String[]{itemId});
+        updateShoppingListTimestamp(db);
+    }
+
+    void deleteShoppingItem(String itemId) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("ShoppingListItem", "itemId=? AND listId=1", new String[]{itemId});
+        updateShoppingListTimestamp(db);
+    }
+
     private static void validateServings(int servings) {
         if (servings < 1 || servings > 999) {
             throw new IllegalArgumentException("servings must be between 1 and 999");
@@ -365,6 +448,21 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         PlannedRecipe(MainActivity.RecipePreview recipe, int servings) {
             this.recipe = recipe;
             this.servings = servings;
+        }
+    }
+
+    static final class ShoppingItem {
+        final String id;
+        final String name;
+        final String amount;
+        final String unit;
+        final String status;
+        ShoppingItem(String id, String name, String amount, String unit, String status) {
+            this.id = id;
+            this.name = name;
+            this.amount = amount;
+            this.unit = unit;
+            this.status = status;
         }
     }
 
