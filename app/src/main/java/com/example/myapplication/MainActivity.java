@@ -68,7 +68,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_SHOPPING_UNIT = "module7.unit";
     private static final String STATE_SHOPPING_UNIT_ID = "module7.unitId";
     private static final String STATE_SHOPPING_CATEGORY = "module7.category";
-    private static final String STATE_SHOPPING_STATUS = "module7.status";
     private static final String STATE_SHOPPING_FILTER = "module7.filter";
     private static final String STATE_SHOPPING_RETURN_SCREEN = "module7.returnScreen";
     private static final String STATE_PANTRY_SCREEN = "pantry.screen";
@@ -147,7 +146,6 @@ public class MainActivity extends AppCompatActivity {
     private int restoredMealPlanScrollY;
     private Screen shoppingReturnScreen = Screen.MEAL_PLAN;
     private String editingShoppingItemId;
-    private String shoppingFormStatus = ShoppingViewModel.NEED_TO_BUY;
     private EditText shoppingNameInput;
     private EditText shoppingAmountInput;
     private EditText shoppingUnitInput;
@@ -310,7 +308,6 @@ public class MainActivity extends AppCompatActivity {
             shoppingDraftUnit = state.getString(STATE_SHOPPING_UNIT, "");
             shoppingDraftUnitId = state.getString(STATE_SHOPPING_UNIT_ID, "");
             shoppingDraftCategory = state.getString(STATE_SHOPPING_CATEGORY, ShoppingCategoryCatalog.OTHER);
-            shoppingFormStatus = state.getString(STATE_SHOPPING_STATUS, ShoppingViewModel.NEED_TO_BUY);
             String restoredShoppingFilter = state.getString(STATE_SHOPPING_FILTER);
             shoppingStatusFilter = ShoppingViewModel.AVAILABLE.equals(restoredShoppingFilter)
                     ? ShoppingViewModel.AVAILABLE : ShoppingViewModel.NEED_TO_BUY;
@@ -423,7 +420,6 @@ public class MainActivity extends AppCompatActivity {
                     ? shoppingDraftUnit : shoppingUnitInput.getText().toString());
             outState.putString(STATE_SHOPPING_UNIT_ID, shoppingDraftUnitId);
             outState.putString(STATE_SHOPPING_CATEGORY, shoppingDraftCategory);
-            outState.putString(STATE_SHOPPING_STATUS, shoppingFormStatus);
             outState.putString(STATE_SHOPPING_FILTER, shoppingStatusFilter);
             outState.putString(STATE_SHOPPING_RETURN_SCREEN, shoppingReturnScreen.name());
         }
@@ -1084,7 +1080,6 @@ public class MainActivity extends AppCompatActivity {
         shoppingDraftUnit = item == null ? "" : KitchenUnitCatalog.label(item.unit);
         shoppingDraftUnitId = item == null ? "" : item.unit;
         shoppingDraftCategory = item == null ? ShoppingCategoryCatalog.OTHER : item.category;
-        shoppingFormStatus = item == null ? ShoppingViewModel.NEED_TO_BUY : item.status;
         screen = Screen.SHOPPING_ITEM_FORM;
         render();
     }
@@ -1120,20 +1115,6 @@ public class MainActivity extends AppCompatActivity {
         shoppingCategoryInput = selectionField(shoppingDraftCategory + "     ▾", 16, 56);
         addFieldView(fields, shoppingCategoryInput, 10, 26);
         shoppingCategoryInput.setOnClickListener(v -> showShoppingCategoryPicker());
-
-        addText(fields, "Trạng thái", 20, TEXT, true, 0, 4, 0, 12);
-        LinearLayout statuses = new LinearLayout(this);
-        statuses.setOrientation(LinearLayout.HORIZONTAL);
-        statuses.setGravity(Gravity.CENTER_VERTICAL);
-        addShoppingFormStatus(statuses, "Cần mua", ShoppingViewModel.NEED_TO_BUY);
-        addShoppingFormStatus(statuses, "Đã có", ShoppingViewModel.AVAILABLE);
-        fields.addView(statuses);
-        TextView statusHint = text("Đã có nghĩa là nguyên liệu hiện đang có sẵn ở nhà.",
-                13, MUTED, false);
-        statusHint.setLineSpacing(dp(3), 1f);
-        LinearLayout.LayoutParams statusHintParams = new LinearLayout.LayoutParams(-1, -2);
-        statusHintParams.topMargin = dp(8);
-        fields.addView(statusHint, statusHintParams);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "Lưu nguyên liệu", true, this::saveShoppingForm, 10);
@@ -1180,24 +1161,6 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void addShoppingFormStatus(LinearLayout parent, String label, String status) {
-        boolean selected = status.equals(shoppingFormStatus);
-        TextView chip = text(label, 14, selected ? GREEN : MUTED, true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(12), 0, dp(12), 0);
-        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, BORDER, 24));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(44));
-        params.rightMargin = dp(8);
-        parent.addView(chip, params);
-        chip.setOnClickListener(v -> {
-            shoppingDraftName = shoppingNameInput.getText().toString();
-            shoppingDraftAmount = shoppingAmountInput.getText().toString();
-            shoppingDraftUnit = shoppingUnitInput.getText().toString();
-            shoppingFormStatus = status;
-            render();
-        });
-    }
-
     private void saveShoppingForm() {
         shoppingDraftName = shoppingNameInput.getText().toString();
         shoppingDraftAmount = shoppingAmountInput.getText().toString();
@@ -1205,12 +1168,20 @@ public class MainActivity extends AppCompatActivity {
         String canonicalUnit = shoppingDraftUnit.equals(shoppingUnitInput.getText().toString())
                 && !shoppingDraftUnitId.isEmpty()
                 ? shoppingDraftUnitId : KitchenUnitCatalog.canonicalId(shoppingDraftUnit);
+        String status;
+        if (editingShoppingItemId == null) {
+            status = shoppingViewModel.initialStatusForPantry(null, shoppingDraftName,
+                    shoppingDraftAmount, canonicalUnit);
+        } else {
+            PersonalDataDbHelper.ShoppingItem existing = shoppingViewModel.findItem(editingShoppingItemId);
+            status = existing == null ? ShoppingViewModel.NEED_TO_BUY : existing.status;
+        }
         if (!shoppingViewModel.saveItem(editingShoppingItemId, shoppingDraftName, shoppingDraftAmount,
-                canonicalUnit, shoppingDraftCategory, shoppingFormStatus)) {
+                canonicalUnit, shoppingDraftCategory, status)) {
             Toast.makeText(this, "Vui lòng nhập tên, số lượng hợp lệ và đơn vị.", Toast.LENGTH_SHORT).show();
             return;
         }
-        shoppingStatusFilter = shoppingFormStatus;
+        shoppingStatusFilter = status;
         screen = Screen.SHOPPING;
         render();
     }

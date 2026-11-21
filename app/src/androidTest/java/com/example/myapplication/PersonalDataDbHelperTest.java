@@ -224,6 +224,34 @@ public class PersonalDataDbHelperTest {
     }
 
     @Test
+    public void newShoppingItemUsesOnlySufficientUnexpiredPantryQuantity() {
+        long now = System.currentTimeMillis();
+        Calendar expiringSoon = Calendar.getInstance();
+        expiringSoon.setTimeInMillis(now);
+        expiringSoon.add(Calendar.DAY_OF_YEAR, 2);
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
+        List<PersonalDataDbHelper.PantryItem> pantry = Arrays.asList(
+                pantryItem("cam-a", null, "  CAM ", "1", "QUA", format.format(expiringSoon.getTime())),
+                pantryItem("cam-b", null, "cam", "1", "QUA", null),
+                pantryItem("cam-expired", null, "cam", "20", "QUA", "2000-01-01"),
+                pantryItem("cam-unknown", null, "cam", null, "QUA", null),
+                pantryItem("cam-unit", null, "cam", "50", "G", null));
+
+        assertEquals(ShoppingViewModel.AVAILABLE,
+                ShoppingViewModel.initialStatusForPantry(null, "Cám", "2", "quả", pantry, now));
+        assertEquals(ShoppingViewModel.NEED_TO_BUY,
+                ShoppingViewModel.initialStatusForPantry(null, "Cam", "2.01", "quả", pantry, now));
+        assertEquals(ShoppingViewModel.NEED_TO_BUY,
+                ShoppingViewModel.initialStatusForPantry(null, "Cam", "vừa đủ", "quả", pantry, now));
+        assertEquals(ShoppingViewModel.AVAILABLE,
+                ShoppingViewModel.initialStatusForPantry("ingredient-cam", "Tên khác", "1", "QUA",
+                        Collections.singletonList(pantryItem("cam-id", "ingredient-cam", "Cam", "1", "QUA", null)), now));
+        assertEquals(ShoppingViewModel.NEED_TO_BUY,
+                ShoppingViewModel.initialStatusForPantry("other-id", "Cam", "1", "QUA",
+                        Collections.singletonList(pantryItem("cam-id", "ingredient-cam", "Cam", "50", "QUA", null)), now));
+    }
+
+    @Test
     public void pantryKeepsUnknownQuantityAndPurchaseDateWithoutManualStatus() {
         assertTrue(data.savePantryItem(null, "Muối", "", "", "Gia vị", null, "Tủ bếp",
                 "2026-11-20"));
@@ -334,6 +362,12 @@ public class PersonalDataDbHelperTest {
         } catch (IllegalArgumentException expected) {
             // Expected validation failure.
         }
+    }
+
+    private static PersonalDataDbHelper.PantryItem pantryItem(String id, String ingredientId, String name,
+                                                               String amount, String unit, String expiryDate) {
+        return new PersonalDataDbHelper.PantryItem(id, ingredientId, name, amount, unit, "Khác",
+                expiryDate, "", null, 1L);
     }
 
     private static boolean containsRecipe(List<MainActivity.RecipePreview> recipes, String recipeId) {
