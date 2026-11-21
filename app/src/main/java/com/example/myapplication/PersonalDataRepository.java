@@ -52,6 +52,7 @@ final class PersonalDataRepository {
     }
     void setShoppingItemStatus(String id, String status) { database.setShoppingItemStatus(id, status); }
     void deleteShoppingItem(String id) { database.deleteShoppingItem(id); }
+    void clearShoppingItems() { database.clearShoppingItems(); }
     String getShoppingPlanSnapshot() { return database.getShoppingPlanSnapshot(); }
     void saveShoppingPlanSnapshot(String snapshot) { database.saveShoppingPlanSnapshot(snapshot); }
 }

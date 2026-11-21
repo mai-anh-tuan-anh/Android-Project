@@ -64,6 +64,8 @@ public final class ShoppingViewModel extends AndroidViewModel {
         if (id != null) repository.deleteShoppingItem(id);
     }
 
+    void clearItems() { repository.clearShoppingItems(); }
+
     PlanUpdate checkForPlanChanges() {
         List<PersonalDataDbHelper.PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
         String currentSnapshot = serializePlan(currentPlan);
@@ -180,12 +182,6 @@ public final class ShoppingViewModel extends AndroidViewModel {
             if (currentServings == 0) return "Đã bỏ · " + previousServings + " người";
             return previousServings + " người → " + currentServings + " người";
         }
-    }
-
-    String nextStatus(String currentStatus) {
-        if (NEED_TO_BUY.equals(currentStatus)) return AVAILABLE;
-        if (AVAILABLE.equals(currentStatus)) return PURCHASED;
-        return NEED_TO_BUY;
     }
 
     private boolean isValidStatus(String status) {

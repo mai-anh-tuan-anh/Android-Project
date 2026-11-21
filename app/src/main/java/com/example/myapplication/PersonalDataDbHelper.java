@@ -444,6 +444,12 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         updateShoppingListTimestamp(db);
     }
 
+    void clearShoppingItems() {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("ShoppingListItem", "listId=1", null);
+        updateShoppingListTimestamp(db);
+    }
+
     String getShoppingPlanSnapshot() {
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT planSnapshot FROM ShoppingList WHERE listId=1", null)) {

@@ -712,13 +712,13 @@ public class MainActivity extends AppCompatActivity {
         add.setBackground(roundRect(GREEN, GREEN, 14));
         actions.addView(add, new LinearLayout.LayoutParams(0, -1, 1.6f));
         add.setOnClickListener(v -> openShoppingItemForm(null));
-        TextView edit = text("Chỉnh sửa", 15, GREEN, true);
-        edit.setGravity(Gravity.CENTER);
-        edit.setBackground(roundRect(WHITE, BORDER, 14));
-        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(0, -1, 1);
-        editParams.leftMargin = dp(12);
-        actions.addView(edit, editParams);
-        edit.setOnClickListener(v -> showShoppingItemEditor(items));
+        TextView clear = text("Xóa toàn bộ", 15, ERROR, true);
+        clear.setGravity(Gravity.CENTER);
+        clear.setBackground(roundRect(WHITE, BORDER, 14));
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(0, -1, 1);
+        clearParams.leftMargin = dp(12);
+        actions.addView(clear, clearParams);
+        clear.setOnClickListener(v -> confirmClearShoppingList(items.size()));
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(2);
     }
@@ -767,16 +767,13 @@ public class MainActivity extends AppCompatActivity {
         check.setGravity(Gravity.CENTER);
         check.setBackground(roundRect(ShoppingViewModel.NEED_TO_BUY.equals(item.status)
                 ? WHITE : GREEN, GREEN, 9));
-        check.setContentDescription("Đổi trạng thái: " + state);
+        check.setContentDescription("Chọn trạng thái. Hiện tại: " + state);
         card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.topMargin = dp(12);
         parent.addView(card, cardParams);
         card.setOnClickListener(v -> openShoppingItemForm(item.id));
-        check.setOnClickListener(v -> {
-            shoppingViewModel.setStatus(item.id, shoppingViewModel.nextStatus(item.status));
-            render();
-        });
+        check.setOnClickListener(v -> showShoppingStatusPicker(item));
         card.setOnLongClickListener(v -> {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Xóa nguyên liệu?")
@@ -794,6 +791,40 @@ public class MainActivity extends AppCompatActivity {
         if (ShoppingViewModel.AVAILABLE.equals(status)) return "Đã có";
         if (ShoppingViewModel.PURCHASED.equals(status)) return "Đã mua";
         return "Cần mua";
+    }
+
+    private void showShoppingStatusPicker(PersonalDataDbHelper.ShoppingItem item) {
+        String[] labels = {"Cần mua", "Đã có — đang có sẵn ở nhà", "Đã mua — đã mua trong lần đi chợ này"};
+        String[] statuses = {ShoppingViewModel.NEED_TO_BUY, ShoppingViewModel.AVAILABLE,
+                ShoppingViewModel.PURCHASED};
+        int selected = 0;
+        for (int i = 0; i < statuses.length; i++) {
+            if (statuses[i].equals(item.status)) selected = i;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Trạng thái nguyên liệu")
+                .setMessage("Đã có: nguyên liệu hiện có ở nhà, không cần mua.\nĐã mua: đã mua nguyên liệu trong lần đi chợ này.")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    shoppingViewModel.setStatus(item.id, statuses[which]);
+                    dialog.dismiss();
+                    render();
+                })
+                .setNegativeButton("Đóng", null)
+                .show();
+    }
+
+    private void confirmClearShoppingList(int itemCount) {
+        if (itemCount <= 0) return;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Xóa toàn bộ danh sách?")
+                .setMessage("Toàn bộ " + itemCount + " nguyên liệu sẽ bị xóa khỏi danh sách mua sắm. Không thể hoàn tác thao tác này.")
+                .setNegativeButton("Giữ danh sách", null)
+                .setPositiveButton("Xóa toàn bộ", (dialog, which) -> {
+                    shoppingViewModel.clearItems();
+                    shoppingStatusFilter = null;
+                    render();
+                })
+                .show();
     }
 
     private void openShoppingItemForm(String itemId) {
@@ -852,6 +883,12 @@ public class MainActivity extends AppCompatActivity {
         addShoppingFormStatus(statuses, "Đã có", ShoppingViewModel.AVAILABLE);
         addShoppingFormStatus(statuses, "Đã mua", ShoppingViewModel.PURCHASED);
         fields.addView(statuses);
+        TextView statusHint = text("Đã có nghĩa là đang có sẵn ở nhà. Đã mua nghĩa là bạn đã mua trong lần đi chợ này.",
+                13, MUTED, false);
+        statusHint.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams statusHintParams = new LinearLayout.LayoutParams(-1, -2);
+        statusHintParams.topMargin = dp(8);
+        fields.addView(statusHint, statusHintParams);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "Lưu nguyên liệu", true, this::saveShoppingForm, 10);
@@ -934,17 +971,6 @@ public class MainActivity extends AppCompatActivity {
                     screen = Screen.SHOPPING;
                     render();
                 }).show();
-    }
-
-    private void showShoppingItemEditor(List<PersonalDataDbHelper.ShoppingItem> items) {
-        if (items.isEmpty()) return;
-        String[] names = new String[items.size()];
-        for (int i = 0; i < items.size(); i++) names[i] = items.get(i).name;
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Chọn nguyên liệu cần sửa")
-                .setItems(names, (dialog, which) -> openShoppingItemForm(items.get(which).id))
-                .setNegativeButton("Đóng", null)
-                .show();
     }
 
     private void showShoppingPlanUpdate(ShoppingViewModel.PlanUpdate update) {
