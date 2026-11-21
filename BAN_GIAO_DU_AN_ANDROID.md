@@ -220,6 +220,73 @@ Lịch sử được cung cấp chưa có lỗi Android Studio/Gradle, lỗi l�
 - Báo cáo sẽ viết sau khi chức năng và kết quả kiểm thử đủ căn cứ. File `Yeu cau bai tap nhom Mobile App 11.2025 (1).docx` là khung yêu cầu, hiện chưa được điền. Không tự điền kết quả, tỷ lệ đóng góp hoặc thông tin nhóm chưa có bằng chứng; tỷ lệ phải dựa trên việc thật và tổng đúng 100%.
 - Kịch bản demo chưa chốt. Đề xuất bám flow Bếp nhà đã thiết kế: mở công thức → đổi khẩu phần → thêm món vào Nấu hôm nay → tạo/cập nhật mua sắm → bắt đầu/tiếp tục nấu → hoàn tất; kèm một tình huống offline/retry. Trước bảo vệ, thay dữ liệu minh họa bằng dữ liệu demo đã xác minh và phân công người trình bày theo module.
 
+## L. Đề xuất mở rộng offline (21/11/2026)
+
+> **Trạng thái: đề xuất để nhóm xem xét, chưa thuộc thiết kế/chín module đã chốt và chưa phải yêu cầu triển khai.** Người dùng yêu cầu khảo sát tính năng ứng dụng nấu ăn và ghi lại ba ưu tiên offline để nhóm có thể thống nhất sau. Không thay thế hoặc sửa ngầm prototype 28 màn hiện tại. Đặc tả luồng và giao diện đề xuất nằm trong [Đề xuất luồng và UI cho ba ưu tiên offline](ui-ux-bep-nha/DE_XUAT_TINH_NANG_OFFLINE.md). Chỉ đưa vào phạm vi code sau khi nhóm thống nhất chủ sở hữu, schema và điểm tích hợp.
+
+### L.1. Phân công đề xuất và phối hợp
+
+Phân công hiện hành ở mục F vẫn giữ nguyên. Phần dưới chỉ chỉ định người dẫn dắt từng đề xuất và việc phối hợp tương ứng; không chuyển quyền sở hữu các module 1–9.
+
+| Đề xuất | Người dẫn dắt | Phần việc phối hợp |
+| --- | --- | --- |
+| Tủ nguyên liệu và hạn sử dụng | **Người 3** — dữ liệu tồn kho cục bộ, thêm/sửa/xóa, giao diện quản lý và kết nối danh sách mua sắm Module 7 | **Người 1** — dùng nguyên liệu trong Module 8 để so khớp món; **Người 2** — cung cấp danh mục công thức/nguyên liệu cục bộ, mã và đơn vị chuẩn. Người điều phối SQLite do nhóm chỉ định review schema/migration. |
+| Gợi ý “Tối nay nấu gì?” offline | **Người 1** — mở rộng luồng và kết quả Module 8 | **Người 3** — cung cấp đầu vào kho nguyên liệu, món yêu thích/lịch sử phù hợp và liên kết kế hoạch; **Người 2** — bảo đảm công thức khả dụng offline và có trường cần để xếp hạng. |
+| Nhật ký lần nấu | **Người 3** — mở rộng Kho món cá nhân Module 5 và lưu dữ liệu phiên nấu cục bộ | **Người 2** — cung cấp bước nấu/khẩu phần và điểm chuyển từ Module 4; phối hợp với người điều phối schema vì thêm dữ liệu SQLite. |
+
+### L.2. Quy tắc chung
+
+- Cả ba đề xuất xử lý từ dữ liệu đã có trên thiết bị; không yêu cầu đăng nhập, server, AI đám mây hay kết nối mạng để đọc/ghi dữ liệu cá nhân.
+- Nội dung công thức chỉ dùng món đã tải và lưu cục bộ. Nếu món chưa có trên máy, báo rõ là cần cập nhật/tải khi có mạng; không tạo công thức, lượng hoặc bước nấu thay thế.
+- Dùng `recipeId`, `ingredientId`, `unitId` và quy tắc `BigDecimal`/đơn vị đã nêu ở mục K. Không quy đổi chéo khối lượng/thể tích nếu thiếu dữ liệu khối lượng riêng; không tự trừ tồn kho.
+- Các màn mới là thiết kế bổ sung có đề xuất. Không thêm mục điều hướng đáy thứ năm; mở từ các màn hiện hữu 20, 23, 17 hoặc luồng hoàn thành nấu. Duy trì nền kem, bề mặt trắng, xanh chính, kiểu thẻ, chip, ô tìm kiếm và nhịp 8/16/24/32 dp trong `ui-ux-bep-nha/THIET_KE.md`.
+- Mọi màn cuộn được, giữ CTA trong vùng thao tác an toàn; khi IME mở, nội dung và nút lưu phải cuộn tới được. Thiết kế 393 × 852 dp là mốc đối chiếu, không phải kích thước cố định; phải responsive trên thiết bị Android khác.
+
+### L.3. Ưu tiên 1 — Tủ nguyên liệu và hạn sử dụng
+
+**Mục tiêu đề xuất:** lưu những nguyên liệu hiện có trong nhà và ngày hết hạn tùy chọn. Dùng chúng làm đầu vào cho Module 8 và giúp Module 7 cho biết nguyên liệu cần mua, đã có bao nhiêu. Đây không phải tính năng tự động theo dõi chính xác lượng thực tế.
+
+**Luồng:** từ `Có gì nấu nấy` (màn 23) chọn **Chọn từ tủ nguyên liệu** hoặc **Quản lý tủ nguyên liệu** → xem/tìm/lọc tồn kho → thêm hoặc sửa nguyên liệu → lưu cục bộ → quay lại danh sách món phù hợp. Có thể mở cùng màn quản lý từ Module 7; khi một nguyên liệu của danh sách được ghi nhận là đã có, người dùng có thể thêm/cập nhật lượng trong tủ bằng thao tác rõ ràng. Không âm thầm sửa mục mua sắm hay tồn kho.
+
+**Màn đề xuất 29 — Tủ nguyên liệu:** tiêu đề và nút thêm; ô tìm kiếm; chip `Tất cả`, `Sắp hết hạn`, `Đã hết`; thẻ theo nhóm nguyên liệu, mỗi thẻ có tên, lượng/đơn vị, ngày hết hạn nếu có và nút sửa. Nhãn sắp hết hạn dùng màu nhấn nhẹ trong bảng màu hiện tại; ngày không biết thì không tự suy ra. Trạng thái rỗng dùng lời nhắc ngắn và CTA `Thêm nguyên liệu`.
+
+**Màn đề xuất 30 — Thêm/Sửa nguyên liệu:** chọn nguyên liệu từ danh mục chuẩn, nhập lượng và đơn vị, ngày hết hạn không bắt buộc, nơi cất không bắt buộc; CTA dính đáy `Lưu nguyên liệu`. Nếu người dùng nhập nguyên liệu tự do chưa ánh xạ `ingredientId`, vẫn lưu được nhưng không dùng để khớp tự động với công thức cho tới khi có ánh xạ rõ ràng.
+
+**Quy tắc dữ liệu đề xuất:** bảng cục bộ `PantryItem` có ID bản ghi, `ingredientId` tùy chọn, tên snapshot, lượng decimal tùy chọn, `unitId` tùy chọn, ngày hết hạn tùy chọn, vị trí cất tùy chọn, thời điểm cập nhật. Lưu số decimal chính xác; lượng không biết khác với số 0. Không tự giảm số lượng sau khi nấu. Phiên bản đầu có thể hiển thị trạng thái hết hạn/sắp hết hạn trong app; ngưỡng ngày, thông báo nhắc ngoài app và xử lý nguyên liệu trùng cần nhóm xác nhận trước khi code.
+
+**Tích hợp Module 7:** khi tính danh sách mua sắm, phần có trong tủ chỉ được bù trừ khi có cùng `ingredientId` và đơn vị tương thích theo hợp đồng. Đề xuất hiển thị rõ `Đã có trong tủ: X` và `Cần mua: Y`, cho người dùng xác nhận; không đổi trạng thái `Cần mua`/`Đã có` đã chốt nếu phép tính không đủ dữ liệu.
+
+### L.4. Ưu tiên 2 — Gợi ý “Tối nay nấu gì?” offline
+
+**Mục tiêu đề xuất:** giảm việc lướt công thức không biết chọn món nào. Tạo gợi ý từ công thức lưu cục bộ, có thể dùng nguyên liệu trong tủ, yêu thích và món đã xem/nấu gần đây. Đây là mở rộng Module 8, không phải một mục điều hướng mới.
+
+**Luồng:** màn 23 `Có gì nấu nấy` có liên kết phụ `Không biết chọn món?` → một bảng chọn nhanh cho giới hạn thời gian (tùy chọn), độ khó (tùy chọn) và có dùng nguyên liệu trong tủ hay không → `Gợi ý món` → màn 24 `Món gợi ý` hiển thị tối đa ba lựa chọn ban đầu, lý do gợi ý, nguyên liệu có/thiếu, thời gian/độ khó và CTA `Xem chi tiết`. `Gợi ý món khác` tạo lượt gợi ý tiếp theo mà không lặp món đã hiện trong cùng lượt chọn. Nếu không có nguyên liệu trong tủ, vẫn có thể gợi ý từ kho công thức cục bộ và tùy chọn cá nhân đã lưu.
+
+**Xếp hạng đề xuất:** giữ thứ tự Module 8 đã thống nhất: ít nguyên liệu thiếu trước, độ khó dễ→khó, thời gian ít→nhiều, sau đó tên món không dấu và `recipeId` để ổn định. Yêu thích/lịch sử dùng làm điều kiện lọc hoặc lời giải thích/đa dạng lượt gợi ý; không âm thầm đổi thứ tự nghiệp vụ hiện hành. Quy tắc “ưu tiên món chưa nấu gần đây” chỉ được thêm sau khi nhóm duyệt để tránh xung đột với thứ tự đã chốt.
+
+**Giao diện:** tái sử dụng ô tìm kiếm, chip nguyên liệu và thẻ món màn 23; không yêu cầu chọn nguyên liệu thủ công trước khi gọi gợi ý. Màn 24 giữ ảnh/thẻ món và nội dung `Đã có`/`Còn thiếu`; thêm dòng giải thích như `Phù hợp vì bạn đã có 4/5 nguyên liệu`, cùng nút `Gợi ý món khác`. Trạng thái không có kết quả dùng hình/trạng thái hiện hành `Không có món phù hợp`.
+
+### L.5. Ưu tiên 3 — Nhật ký lần nấu trong Kho món cá nhân
+
+**Mục tiêu đề xuất:** ghi lại mỗi lần người dùng thực sự nấu một món, tách biệt ghi chú chung của công thức. Một công thức có thể có nhiều lần nấu; sửa nhật ký không sửa công thức gốc hoặc ghi chú chung.
+
+**Luồng:** sau khi hoàn thành ở Module 4, người dùng chọn `Ghi lại lần nấu`; hoặc vào `Ghi chú cá nhân` (màn 17) → `Nhật ký nấu` → `Ghi lại lần nấu`. Form lưu ngày/giờ, khẩu phần thực tế, thời gian thực tế tùy chọn, đánh giá cá nhân tùy chọn, thay đổi đã làm và ảnh tùy chọn vào máy. Sau khi lưu, trở lại nhật ký của đúng món; người dùng có thể mở/xóa từng bản ghi sau xác nhận. Không bắt buộc tạo tài khoản hoặc chia sẻ ảnh.
+
+**Giao diện:** màn 17 tiếp tục có phần công thức/cách nấu theo yêu cầu tích hợp đang chờ ở K.5; sau khối ghi chú chung, thêm thẻ `Nhật ký nấu` với số lần đã nấu, hai bản ghi gần nhất và `Xem nhật ký`. Màn đề xuất 32 hiển thị danh sách theo thời gian mới nhất trước, mỗi thẻ có ngày, khẩu phần, thời gian nếu có, đánh giá và ảnh thu nhỏ. Màn đề xuất 33 là form ghi nhận, chia thành các cụm ngắn; CTA dính đáy `Lưu lần nấu`. Không thay nút `Lưu ghi chú` hoặc nội dung ghi chú chung hiện có.
+
+**Dữ liệu cục bộ đề xuất:** `CookingLog` liên kết `recipeId`, ngày giờ, khẩu phần thực tế, thời lượng thực tế tùy chọn, điểm đánh giá tùy chọn, ghi chú thay đổi, đường dẫn ảnh cục bộ. Ảnh đặt trong vùng lưu trữ riêng của app và có xử lý khi xóa bản ghi. Cấu trúc chụp snapshot phiên bản công thức, giới hạn ảnh, thang đánh giá và việc nhật ký nhận sự kiện tự động từ Module 4 cần Người 2 và nhóm xác nhận.
+
+### L.6. Điều kiện trước khi đưa vào triển khai
+
+1. Nhóm xác nhận ba đề xuất có nằm trong phạm vi bài nộp hay chỉ là hướng phát triển; chúng không làm thay đổi chín module hiện hành trước quyết định đó.
+2. Người 2 cung cấp và người điều phối schema duyệt dữ liệu công thức/nguyên liệu lưu cục bộ; Người 3 và Người 1 chốt cách dùng chung `ingredientId` giữa pantry, gợi ý và mua sắm.
+3. Chốt ngưỡng “sắp hết hạn”, nhắc hạn, hành vi bù trừ lượng mua sắm, đơn vị không tương thích, quy tắc ghi ảnh và retention dữ liệu nhật ký trước khi lập trình.
+4. Các thay đổi chạm SQLite, navigation hoặc điểm hoàn thành Module 4 phải được báo và review liên module theo mục K.6; cập nhật prototype/ảnh chỉ sau khi thiết kế đề xuất được nhóm duyệt.
+
+### L.7. Nguồn tham khảo tính năng
+
+Các luồng được tham khảo ở mức ý tưởng sản phẩm, không sao chép giao diện hoặc giả định các tính năng đó chạy offline: [Cookpad](https://apps.apple.com/us/app/cookpad-recipe-meal-planner/id585332633) về chọn món theo nguyên liệu và thực đơn/danh sách mua sắm; [Kitchen Stories](https://pages.kitchenstories.com/en/app) về hướng dẫn nấu theo bước và cookbook; [Tasty](https://play.google.com/store/apps/details?id=com.buzzfeed.tasty) về hướng dẫn bước ngắn; [Good Food](https://www.bbcgoodfood.com/get-bbc-good-food-app) về Cook Mode và danh sách mua sắm; [Cooky – What to Cook](https://play.google.com/store/apps/details?hl=vi&id=com.cookyai.app) về giảm mệt mỏi khi chọn món và dùng nguyên liệu có sẵn. Đây là nguồn tham khảo, không phải đặc tả thay cho thiết kế Bếp nhà.
+
 ## Nguồn trong workspace
 
 - [Hướng dẫn dự án nhóm Mobile App D22](<1.Huong dan du an nhom Mobile App D22.doc>)
