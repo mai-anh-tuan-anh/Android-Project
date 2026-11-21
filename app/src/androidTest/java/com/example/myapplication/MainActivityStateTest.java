@@ -29,6 +29,7 @@ public class MainActivityStateTest {
                     selected.addAll(Arrays.asList("sample-ga-chien-nuoc-mam", "sample-com-rang-dua-bo"));
                     setField(viewModel, "pickerServings", 4);
                     setField(viewModel, "searchQuery", "com");
+                    viewModel.setPickerSource(MealPlanViewModel.PickerSource.COLLECTION, 24L);
                     Method render = MainActivity.class.getDeclaredMethod("render");
                     render.setAccessible(true);
                     render.invoke(activity);
@@ -48,6 +49,8 @@ public class MainActivityStateTest {
                             getField(viewModel, "selectedRecipeIds"));
                     assertEquals(4, getField(viewModel, "pickerServings"));
                     assertEquals("com", getField(viewModel, "searchQuery"));
+                    assertEquals(MealPlanViewModel.PickerSource.COLLECTION, viewModel.getPickerSource());
+                    assertEquals(24L, viewModel.getPickerCollectionId());
                     assertEquals("com", ((android.widget.EditText) getField(activity,
                             "planPickerSearchInput")).getText().toString());
                 } catch (ReflectiveOperationException e) {
@@ -82,10 +85,34 @@ public class MainActivityStateTest {
         }
     }
 
+    @Test
+    public void changingPickerSourceKeepsExistingSelections() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                MealPlanViewModel viewModel = (MealPlanViewModel) getFieldUnchecked(activity, "mealPlanViewModel");
+                viewModel.toggleRecipe("favorite-recipe");
+                viewModel.setPickerSource(MealPlanViewModel.PickerSource.FAVORITES, -1L);
+                viewModel.setPickerSource(MealPlanViewModel.PickerSource.COLLECTION, 42L);
+
+                assertEquals(Arrays.asList("favorite-recipe"), viewModel.getSelectedRecipeIds());
+                assertEquals(MealPlanViewModel.PickerSource.COLLECTION, viewModel.getPickerSource());
+                assertEquals(42L, viewModel.getPickerCollectionId());
+            });
+        }
+    }
+
     private static Object getField(Object target, String name) throws ReflectiveOperationException {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         return field.get(target);
+    }
+
+    private static Object getFieldUnchecked(Object target, String name) {
+        try {
+            return getField(target, name);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static void setField(Object target, String name, Object value)

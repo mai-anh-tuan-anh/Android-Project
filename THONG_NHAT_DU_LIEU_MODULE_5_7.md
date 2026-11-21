@@ -28,6 +28,7 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 ## 4. Kế hoạch và danh sách mua sắm
 
 - Kế hoạch lưu cục bộ gồm `recipeId` duy nhất, khẩu phần đã chọn và thứ tự hiển thị. Danh sách mua sắm được tạo từ các món và khẩu phần trong kế hoạch; không tạo lại bằng cách cộng dồn vào kết quả cũ.
+- Module 6 cho phép lọc nguồn chọn món theo danh sách hiện có, món yêu thích hoặc một bộ sưu tập cụ thể. Tìm kiếm lọc trong nguồn đang chọn; đổi nguồn không làm mất các `recipeId` đã tích hay khẩu phần của món đã có trong kế hoạch.
 - Mỗi danh sách mua sắm có các mục tổng hợp và các đóng góp nguồn theo món/dòng nguyên liệu. Khóa gộp đề xuất: `ingredientId + đại lượng + unitId chuẩn + loại lượng`; nhờ vậy có thể tính lại khi đổi khẩu phần hoặc bỏ món mà không làm mất nguồn còn lại.
 - Nút cập nhật danh sách (luồng màn 22) tính lại các đóng góp từ công thức theo kế hoạch hiện tại và giữ nguyên mục thêm tay. Thực hiện trong một giao dịch cục bộ để không lưu trạng thái nửa chừng.
 - Mục được gộp giữ trạng thái `Cần mua`, `Đã có` hoặc `Đã mua`. Khi cập nhật, giữ trạng thái nếu lượng không tăng; nếu lượng cần tăng thì chuyển về `Cần mua` để tránh hiểu nhầm là đã đủ. Mục không còn nguồn công thức sẽ bị loại nếu chỉ do công thức tạo; mục thêm tay vẫn giữ.
@@ -38,7 +39,7 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
 - Khóa `Favorite` là `recipeId`; lưu lặp lại là idempotent. Bộ sưu tập và ghi chú cũng liên kết bằng `recipeId`, không nhân bản dữ liệu công thức.
-- Lịch sử xem là dữ liệu cục bộ, mỗi `recipeId` chỉ có một dòng; xem lại cập nhật thời điểm và đưa món lên đầu, sắp xếp thời điểm mới nhất trước, đồng thời xóa dòng quá 3 ngày. Xóa bộ sưu tập cần xác nhận; xóa bộ sưu tập và các liên kết của nó nhưng giữ `Favorite` và `RecipeNote` độc lập.
+- Lịch sử xem là dữ liệu cục bộ, giữ tối đa 10 `recipeId` khác nhau; mỗi `recipeId` chỉ có một dòng. Xem lại cập nhật thời điểm và đưa món lên đầu, sắp xếp mới nhất trước, đồng thời xóa dòng quá 3 ngày. Xóa bộ sưu tập cần xác nhận; xóa bộ sưu tập và các liên kết của nó nhưng giữ `Favorite` và `RecipeNote` độc lập.
 - Khi tích hợp kho công thức thật, form tạo/sửa bộ sưu tập của module 5 lấy món từ toàn bộ kho khả dụng, không chỉ món yêu thích; hỗ trợ tìm kiếm và chỉ tải phần tiếp theo khi người dùng cuộn đến (lazy loading). Các lựa chọn đã tích phải giữ nguyên khi tìm kiếm hoặc tải thêm, dựa trên `recipeId` ổn định. Đây là mục tiêu tích hợp; bản preview hiện tại vẫn dùng 5 fixture.
 - Khi món bị gỡ khỏi kho công khai, ẩn khỏi danh mục công khai nhưng không xóa dữ liệu cá nhân đang tham chiếu. Giữ tên/ảnh snapshot tối thiểu để màn hình cá nhân hiển thị mục đã gỡ; ghi chú vẫn đọc được. Không tự xóa dòng mua sắm hoặc kế hoạch của người dùng khi đồng bộ.
 
