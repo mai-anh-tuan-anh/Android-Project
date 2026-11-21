@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivityStateTest {
@@ -173,6 +174,38 @@ public class MainActivityStateTest {
                 }
             });
         }
+    }
+
+    @Test
+    public void shoppingItemFormDoesNotAskUserToChooseStatus() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    Method openShoppingForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
+                    openShoppingForm.setAccessible(true);
+                    openShoppingForm.invoke(activity, new Object[]{null});
+                    View root = activity.getWindow().getDecorView();
+                    assertFalse(containsText(root, "Trạng thái"));
+                    assertFalse(containsText(root, "Cần mua"));
+                    assertFalse(containsText(root, "Đã có"));
+                    if (!containsText(root, "Lưu nguyên liệu")) {
+                        throw new AssertionError("Shopping item save action is missing");
+                    }
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    private static boolean containsText(View view, String expected) {
+        if (view instanceof TextView && expected.contentEquals(((TextView) view).getText())) return true;
+        if (!(view instanceof ViewGroup)) return false;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            if (containsText(group.getChildAt(index), expected)) return true;
+        }
+        return false;
     }
 
     private static void assertMinimumDpHeight(View view, float density, int expectedDp) {
