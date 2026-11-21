@@ -1089,10 +1089,7 @@ public class MainActivity extends AppCompatActivity {
         addFieldView(fields, shoppingUnitInput, 10, 26);
 
         addText(fields, "Danh mục", 15, TEXT, true, 0, 0, 0, 0);
-        shoppingCategoryInput = text(shoppingDraftCategory + "     ▾", 16, TEXT, false);
-        shoppingCategoryInput.setGravity(Gravity.CENTER_VERTICAL);
-        shoppingCategoryInput.setPadding(dp(15), 0, dp(15), 0);
-        shoppingCategoryInput.setBackground(roundRect(WHITE, BORDER, 14));
+        shoppingCategoryInput = selectionField(shoppingDraftCategory + "     ▾", 16, 56);
         addFieldView(fields, shoppingCategoryInput, 10, 26);
         shoppingCategoryInput.setOnClickListener(v -> showShoppingCategoryPicker());
 
@@ -1128,6 +1125,17 @@ public class MainActivity extends AppCompatActivity {
         params.topMargin = dp(top);
         params.bottomMargin = dp(bottom);
         parent.addView(field, params);
+    }
+
+    private TextView selectionField(String value, int textSize, int minHeight) {
+        TextView field = text(value, textSize, TEXT, false);
+        field.setGravity(Gravity.CENTER_VERTICAL);
+        field.setPadding(dp(15), dp(8), dp(15), dp(8));
+        field.setMinHeight(dp(minHeight));
+        field.setBackground(roundRect(WHITE, BORDER, 14));
+        field.setFocusable(true);
+        field.setClickable(true);
+        return field;
     }
 
     private void showShoppingCategoryPicker() {
@@ -2097,9 +2105,7 @@ public class MainActivity extends AppCompatActivity {
         addFieldView(fields, pantryNameInput, 8, 20);
 
         addText(fields, "Trạng thái trong tủ", 14, TEXT, true, 0, 0, 0, 0);
-        pantryStatusInput = text(pantryStockStatusLabel(pantryDraftStockStatus) + "     ▾", 15, TEXT, false);
-        pantryStatusInput.setPadding(dp(15), 0, dp(15), 0);
-        pantryStatusInput.setBackground(roundRect(WHITE, BORDER, 14));
+        pantryStatusInput = selectionField(pantryStockStatusLabel(pantryDraftStockStatus) + "     ▾", 15, 52);
         addFieldView(fields, pantryStatusInput, 8, 20);
         pantryStatusInput.setOnClickListener(v -> showPantryStockStatusPicker());
 
@@ -2123,9 +2129,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         addText(fields, "Danh mục", 14, TEXT, true, 0, 0, 0, 0);
-        pantryCategoryInput = text(pantryDraftCategory + "     ▾", 15, TEXT, false);
-        pantryCategoryInput.setPadding(dp(15), 0, dp(15), 0);
-        pantryCategoryInput.setBackground(roundRect(WHITE, BORDER, 14));
+        pantryCategoryInput = selectionField(pantryDraftCategory + "     ▾", 15, 52);
         addFieldView(fields, pantryCategoryInput, 8, 20);
         pantryCategoryInput.setOnClickListener(v -> showPantryCategoryPicker());
 

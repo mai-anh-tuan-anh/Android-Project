@@ -4,6 +4,7 @@ import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -147,6 +148,39 @@ public class MainActivityStateTest {
                     throw new AssertionError(e);
                 }
             });
+        }
+    }
+
+    @Test
+    public void categorySelectionFieldsKeepTheirDesignedTouchHeight() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    float density = activity.getResources().getDisplayMetrics().density;
+                    Method openShoppingForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
+                    openShoppingForm.setAccessible(true);
+                    openShoppingForm.invoke(activity, new Object[]{null});
+                    View shoppingCategory = (View) getField(activity, "shoppingCategoryInput");
+                    assertMinimumDpHeight(shoppingCategory, density, 56);
+
+                    Method openPantryForm = MainActivity.class.getDeclaredMethod("openPantryForm", String.class);
+                    openPantryForm.setAccessible(true);
+                    openPantryForm.invoke(activity, new Object[]{null});
+                    View pantryCategory = (View) getField(activity, "pantryCategoryInput");
+                    assertMinimumDpHeight(pantryCategory, density, 52);
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    private static void assertMinimumDpHeight(View view, float density, int expectedDp) {
+        int expectedPx = Math.round(expectedDp * density);
+        int actualPx = ((TextView) view).getMinHeight();
+        if (actualPx < expectedPx) {
+            throw new AssertionError("Expected minimum height >= " + expectedDp + "dp, was "
+                    + actualPx / density + "dp");
         }
     }
 
