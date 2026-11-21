@@ -89,7 +89,9 @@ public final class ShoppingViewModel extends AndroidViewModel {
 
     private String serializePlan(List<PersonalDataDbHelper.PlannedRecipe> plan) {
         JSONArray json = new JSONArray();
-        for (PersonalDataDbHelper.PlannedRecipe item : plan) {
+        List<PersonalDataDbHelper.PlannedRecipe> stableOrder = new ArrayList<>(plan);
+        stableOrder.sort((left, right) -> left.recipe.id.compareTo(right.recipe.id));
+        for (PersonalDataDbHelper.PlannedRecipe item : stableOrder) {
             JSONObject row = new JSONObject();
             try {
                 row.put("recipeId", item.recipe.id);

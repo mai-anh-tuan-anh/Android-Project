@@ -12,6 +12,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Presentation state and business actions for module 6. */
 public final class MealPlanViewModel extends AndroidViewModel {
@@ -73,6 +75,90 @@ public final class MealPlanViewModel extends AndroidViewModel {
     }
 
     void removeMealPlanRecipe(String recipeId) { repository.removeMealPlanRecipe(recipeId); }
+
+    RemovedPlanRecipe removeMealPlanRecipeForUndo(String recipeId) {
+        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
+        for (int i = 0; i < current.size(); i++) {
+            PersonalDataDbHelper.PlannedRecipe planned = current.get(i);
+            if (planned.recipe.id.equals(recipeId)) {
+                current.remove(i);
+                repository.replaceMealPlanRecipes(current);
+                return new RemovedPlanRecipe(planned, i);
+            }
+        }
+        return null;
+    }
+
+    boolean restoreMealPlanRecipe(RemovedPlanRecipe removed) {
+        if (removed == null) return false;
+        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
+        for (PersonalDataDbHelper.PlannedRecipe planned : current) {
+            if (planned.recipe.id.equals(removed.recipe.recipe.id)) return false;
+        }
+        current.add(Math.min(removed.position, current.size()), removed.recipe);
+        repository.replaceMealPlanRecipes(current);
+        return true;
+    }
+
+    boolean moveMealPlanRecipe(String recipeId, int direction) {
+        if (direction != -1 && direction != 1) return false;
+        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
+        int index = -1;
+        for (int i = 0; i < current.size(); i++) {
+            if (current.get(i).recipe.id.equals(recipeId)) { index = i; break; }
+        }
+        int destination = index + direction;
+        if (index < 0 || destination < 0 || destination >= current.size()) return false;
+        PersonalDataDbHelper.PlannedRecipe moved = current.get(index);
+        current.set(index, current.get(destination));
+        current.set(destination, moved);
+        repository.replaceMealPlanRecipes(current);
+        return true;
+    }
+
+    MealDurationEstimate estimateTotalDuration(List<PersonalDataDbHelper.PlannedRecipe> planned) {
+        int totalMinutes = 0;
+        int knownDurations = 0;
+        for (PersonalDataDbHelper.PlannedRecipe item : planned) {
+            int minutes = parseDurationMinutes(item.recipe.duration);
+            if (minutes <= 0) continue;
+            totalMinutes += minutes;
+            knownDurations++;
+        }
+        return new MealDurationEstimate(totalMinutes, knownDurations, planned.size() - knownDurations);
+    }
+
+    private int parseDurationMinutes(String value) {
+        if (value == null || value.trim().isEmpty()
+                || Pattern.compile("\\d+\\s*[-–]\\s*\\d+").matcher(value).find()) return -1;
+        Matcher matcher = Pattern.compile("(?:(\\d+)\\s*giờ)?\\s*(?:(\\d+)\\s*phút)?",
+                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(value);
+        if (!matcher.find() || (matcher.group(1) == null && matcher.group(2) == null)) return -1;
+        int hours = matcher.group(1) == null ? 0 : Integer.parseInt(matcher.group(1));
+        int minutes = matcher.group(2) == null ? 0 : Integer.parseInt(matcher.group(2));
+        return hours * 60 + minutes;
+    }
+
+    static final class RemovedPlanRecipe {
+        final PersonalDataDbHelper.PlannedRecipe recipe;
+        final int position;
+        RemovedPlanRecipe(PersonalDataDbHelper.PlannedRecipe recipe, int position) {
+            this.recipe = recipe;
+            this.position = position;
+        }
+    }
+
+    static final class MealDurationEstimate {
+        final int knownMinutes;
+        final int knownRecipes;
+        final int unknownRecipes;
+        MealDurationEstimate(int knownMinutes, int knownRecipes, int unknownRecipes) {
+            this.knownMinutes = knownMinutes;
+            this.knownRecipes = knownRecipes;
+            this.unknownRecipes = unknownRecipes;
+        }
+    }
+
     void setMealPlanRecipeServings(String recipeId, int servings) {
         validateServings(servings);
         repository.setMealPlanRecipeServings(recipeId, servings);

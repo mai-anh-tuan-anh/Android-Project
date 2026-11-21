@@ -30,6 +30,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.lifecycle.ViewModelProvider;
+import com.google.android.material.snackbar.Snackbar;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -119,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
     private CookingJournalViewModel cookingJournalViewModel;
     private ActivityResultLauncher<String> cookingPhotoPicker;
     private LinearLayout appRoot;
+    private View bottomNavigationBar;
     private Screen screen = Screen.LIBRARY;
     private Screen noteReturnScreen = Screen.LIBRARY;
     private Screen collectionReturnScreen = Screen.LIBRARY;
@@ -456,6 +458,7 @@ public class MainActivity extends AppCompatActivity {
         planPickerSourceButton = null;
         planPickerScrollView = null;
         mealPlanScrollView = null;
+        bottomNavigationBar = null;
         FrameLayout frame = new FrameLayout(this);
         appRoot = new LinearLayout(this);
         appRoot.setOrientation(LinearLayout.VERTICAL);
@@ -720,7 +723,28 @@ public class MainActivity extends AppCompatActivity {
 
         List<PersonalDataDbHelper.PlannedRecipe> planned = mealPlanViewModel.getMealPlanRecipes();
         if (!planned.isEmpty()) {
-            TextView summary = text(planned.size() + " món cho bữa cơm nhà.", 15, MUTED, false);
+            LinearLayout summary = vertical();
+            summary.setPadding(dp(14), dp(12), dp(14), dp(12));
+            summary.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
+            summary.addView(text(planned.size() + " món cho bữa cơm nhà.", 15, TEXT, true));
+            MealPlanViewModel.MealDurationEstimate estimate = mealPlanViewModel.estimateTotalDuration(planned);
+            String durationLabel;
+            if (estimate.unknownRecipes == 0) {
+                durationLabel = "Tổng thời gian ước tính: " + estimate.knownMinutes + " phút";
+            } else if (estimate.knownRecipes > 0) {
+                durationLabel = "Ít nhất " + estimate.knownMinutes + " phút · "
+                        + estimate.unknownRecipes + " món chưa có thời lượng";
+            } else {
+                durationLabel = "Chưa đủ dữ liệu thời lượng để ước tính";
+            }
+            TextView duration = text(durationLabel, 13, GREEN, true);
+            LinearLayout.LayoutParams durationParams = new LinearLayout.LayoutParams(-1, -2);
+            durationParams.topMargin = dp(5);
+            summary.addView(duration, durationParams);
+            TextView estimateNote = text("Cộng thời lượng từng món; chưa tính việc nấu song song.", 11, MUTED, false);
+            LinearLayout.LayoutParams estimateNoteParams = new LinearLayout.LayoutParams(-1, -2);
+            estimateNoteParams.topMargin = dp(3);
+            summary.addView(estimateNote, estimateNoteParams);
             LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
             summaryParams.topMargin = dp(18);
             summaryParams.bottomMargin = dp(22);
@@ -758,7 +782,7 @@ public class MainActivity extends AppCompatActivity {
             TextView choose = primaryButton("Chọn món", () -> openMealPlanPicker());
             empty.addView(choose, new LinearLayout.LayoutParams(-1, dp(49)));
         } else {
-            for (PersonalDataDbHelper.PlannedRecipe item : planned) addPlannedRecipeCard(content, item);
+            for (int i = 0; i < planned.size(); i++) addPlannedRecipeCard(content, planned.get(i), i, planned.size());
             TextView addMore = text("＋     Thêm món khác", 16, GREEN, true);
             addMore.setGravity(Gravity.CENTER);
             addMore.setBackground(roundRect(WHITE, BORDER, 15));
@@ -1241,7 +1265,8 @@ public class MainActivity extends AppCompatActivity {
         if (update != null) showShoppingPlanUpdate(update);
     }
 
-    private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item) {
+    private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item,
+                                      int position, int totalCount) {
         boolean compact = getResources().getConfiguration().screenWidthDp < 360
                 || getResources().getConfiguration().fontScale >= 1.15f;
         LinearLayout card = new LinearLayout(this);
@@ -1279,6 +1304,8 @@ public class MainActivity extends AppCompatActivity {
         if (!compact) detailsParams.leftMargin = dp(1);
         contentRow.addView(details, detailsParams);
 
+        addMealPlanOrderControls(compact ? card : details, item, position, totalCount);
+
         LinearLayout servings = new LinearLayout(this);
         servings.setGravity(Gravity.CENTER_VERTICAL);
         servings.setPadding(dp(4), 0, dp(4), 0);
@@ -1306,10 +1333,56 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.bottomMargin = dp(16);
         parent.addView(card, cardParams);
-        remove.setOnClickListener(v -> {
-            mealPlanViewModel.removeMealPlanRecipe(item.recipe.id);
-            render();
-        });
+        remove.setOnClickListener(v -> removePlannedRecipe(item));
+    }
+
+    private void addMealPlanOrderControls(LinearLayout card, PersonalDataDbHelper.PlannedRecipe item,
+                                          int position, int totalCount) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text("Thứ tự nấu · " + (position + 1) + "/" + totalCount, 12, MUTED, false);
+        row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView up = mealPlanOrderButton("↑", "Đưa " + item.recipe.title + " lên trước",
+                position > 0, () -> movePlannedRecipe(item.recipe.id, -1));
+        TextView down = mealPlanOrderButton("↓", "Đưa " + item.recipe.title + " xuống sau",
+                position < totalCount - 1, () -> movePlannedRecipe(item.recipe.id, 1));
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        buttonParams.leftMargin = dp(4);
+        row.addView(up, buttonParams);
+        LinearLayout.LayoutParams downParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        downParams.leftMargin = dp(4);
+        row.addView(down, downParams);
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+        rowParams.topMargin = dp(6);
+        card.addView(row, rowParams);
+    }
+
+    private TextView mealPlanOrderButton(String glyph, String description, boolean enabled, Runnable action) {
+        TextView button = text(glyph, 20, enabled ? GREEN : MUTED, true);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(roundRect(enabled ? PALE_GREEN : CREAM, enabled ? PALE_GREEN : BORDER, 14));
+        button.setContentDescription(description);
+        button.setFocusable(true);
+        button.setEnabled(enabled);
+        if (enabled) button.setOnClickListener(v -> action.run());
+        return button;
+    }
+
+    private void movePlannedRecipe(String recipeId, int direction) {
+        if (mealPlanViewModel.moveMealPlanRecipe(recipeId, direction)) render();
+    }
+
+    private void removePlannedRecipe(PersonalDataDbHelper.PlannedRecipe item) {
+        MealPlanViewModel.RemovedPlanRecipe removed = mealPlanViewModel.removeMealPlanRecipeForUndo(item.recipe.id);
+        if (removed == null) return;
+        render();
+        Snackbar snackbar = Snackbar.make(appRoot, "Đã bỏ " + item.recipe.title + " khỏi kế hoạch.",
+                Snackbar.LENGTH_LONG).setDuration(5000).setAction("Hoàn tác", view -> {
+                    if (mealPlanViewModel.restoreMealPlanRecipe(removed)) render();
+                    else Toast.makeText(this, "Món này đã có lại trong kế hoạch.", Toast.LENGTH_SHORT).show();
+                });
+        if (bottomNavigationBar != null) snackbar.setAnchorView(bottomNavigationBar);
+        snackbar.show();
     }
 
     private void changeServings(PersonalDataDbHelper.PlannedRecipe item, int delta) {
@@ -2960,6 +3033,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void addBottomNavigation(int selectedTab) {
         LinearLayout nav = new LinearLayout(this);
+        bottomNavigationBar = nav;
         nav.setGravity(Gravity.CENTER_VERTICAL);
         nav.setBackgroundColor(WHITE);
         nav.setPadding(dp(7), dp(5), dp(7), dp(2));
