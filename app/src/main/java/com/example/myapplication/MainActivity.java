@@ -690,9 +690,12 @@ public class MainActivity extends AppCompatActivity {
                     ? item.category : ShoppingCategoryCatalog.OTHER;
             groupedItems.get(category).add(item);
         }
+        int renderedCategoryCount = 0;
         for (Map.Entry<String, List<PersonalDataDbHelper.ShoppingItem>> group : groupedItems.entrySet()) {
             if (group.getValue().isEmpty()) continue;
-            addText(content, group.getKey(), 20, TEXT, true, 0, 0, 0, 0);
+            addText(content, group.getKey(), 20, TEXT, true, 0,
+                    renderedCategoryCount == 0 ? 0 : 18, 0, 0);
+            renderedCategoryCount++;
             for (PersonalDataDbHelper.ShoppingItem item : group.getValue()) {
                 addShoppingItemRow(content, item);
             }
