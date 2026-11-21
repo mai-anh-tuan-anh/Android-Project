@@ -238,6 +238,7 @@ public class MainActivity extends AppCompatActivity {
                     discardCookingLogDraftPhoto();
                     screen = cookingLogFormReturnScreen;
                 } else if (screen == Screen.COOKING_JOURNAL) {
+                    clearCookingJournalDateRange();
                     screen = cookingLogReturnScreen;
                 } else if (screen == Screen.COOKING_LOGS) {
                     screen = cookingLogReturnScreen;
@@ -2431,16 +2432,35 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private TextView createJournalDateFilter(boolean startDate) {
+    private LinearLayout createJournalDateFilter(boolean startDate) {
         long selectedDate = startDate ? cookingJournalFromDate : cookingJournalToDate;
         String title = startDate ? "Từ ngày" : "Đến ngày";
         TextView field = text(title + "\n" + (selectedDate == 0 ? "Chọn ngày" : formatDate(selectedDate)),
                 12, selectedDate == 0 ? MUTED : TEXT, true);
         field.setGravity(Gravity.CENTER_VERTICAL);
-        field.setPadding(dp(12), dp(5), dp(12), dp(5));
-        field.setBackground(roundRect(WHITE, BORDER, 14));
+        field.setPadding(dp(12), dp(5), dp(6), dp(5));
         field.setOnClickListener(v -> showJournalDatePicker(startDate));
-        return field;
+        LinearLayout container = new LinearLayout(this);
+        container.setGravity(Gravity.CENTER_VERTICAL);
+        container.setBackground(roundRect(WHITE, BORDER, 14));
+        container.addView(field, new LinearLayout.LayoutParams(0, -1, 1));
+        if (selectedDate > 0) {
+            TextView clear = text("×", 20, MUTED, true);
+            clear.setGravity(Gravity.CENTER);
+            clear.setContentDescription(startDate ? "Xóa ngày bắt đầu" : "Xóa ngày kết thúc");
+            container.addView(clear, new LinearLayout.LayoutParams(dp(38), dp(44)));
+            clear.setOnClickListener(v -> {
+                if (startDate) cookingJournalFromDate = 0;
+                else cookingJournalToDate = 0;
+                render();
+            });
+        }
+        return container;
+    }
+
+    private void clearCookingJournalDateRange() {
+        cookingJournalFromDate = 0;
+        cookingJournalToDate = 0;
     }
 
     private void showJournalDatePicker(boolean startDate) {
@@ -3175,17 +3195,24 @@ public class MainActivity extends AppCompatActivity {
             nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
             tab.setOnClickListener(v -> {
                 if (index == 3) {
+                    clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.LIBRARY;
                     render();
                 } else if (index == 1) {
+                    clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.MEAL_PLAN;
                     render();
                 } else if (index == 2) {
+                    clearCookingJournalDateRangeIfLeavingJournal();
                     openShoppingList(screen);
                 }
             });
         }
         appRoot.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
+    }
+
+    private void clearCookingJournalDateRangeIfLeavingJournal() {
+        if (screen == Screen.COOKING_JOURNAL) clearCookingJournalDateRange();
     }
 
     private void addBackTitle(LinearLayout parent, String title) {

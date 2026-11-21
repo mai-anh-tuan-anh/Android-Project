@@ -234,7 +234,7 @@ Tìm lại những lần bạn đã nấu.
 │ Đánh giá gần nhất                         ★★★★☆│
 └─────────────────────────────────────────────┘
 [ Tìm món hoặc ghi chú                         ]
-[ Từ ngày                 ] [ Đến ngày         ]
+[ Từ ngày            ×    ] [ Đến ngày     ×   ]
 [Tất cả] [5 ★] [4 ★] [3 ★] [2 ★] [1 ★]
 Xóa bộ lọc
 
@@ -246,6 +246,7 @@ Canh chua cá
 - Tìm kiếm không phân biệt dấu trong tên món và ghi chú điều chỉnh; lọc theo ngày bắt đầu/kết thúc và mức đánh giá. Kết quả vẫn mới nhất trước.
 - Thống kê tính từ toàn bộ nhật ký, không đổi theo bộ lọc; “đánh giá gần nhất” là bản ghi mới nhất có đánh giá.
 - Trạng thái chưa có nhật ký hướng người dùng mở ghi chú của một món; trạng thái không có kết quả cho phép xóa bộ lọc.
+- Khi có ngày đã chọn, nút `×` trong từng ô xóa riêng ngày đó; rời màn tổng hợp qua nút Quay lại hoặc thanh điều hướng sẽ xóa cả ngày bắt đầu/kết thúc. Xoay màn hình hoặc mở lịch chọn ngày không làm mất lựa chọn hiện tại.
 - **Đã triển khai trong nhánh Người 3:** điểm vào từ Kho của tôi; ô tìm kiếm, lọc ngày/sao và ba thống kê được lấy từ SQLite cục bộ. Màn này vẫn theo wireframe đề xuất, chưa thay thế hình prototype 01–28.
 
 ### Màn 33 — Ghi lại lần nấu

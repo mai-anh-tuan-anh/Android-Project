@@ -2,6 +2,8 @@ package com.example.myapplication;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import android.view.View;
+import android.view.ViewGroup;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -99,6 +101,64 @@ public class MainActivityStateTest {
                 assertEquals(42L, viewModel.getPickerCollectionId());
             });
         }
+    }
+
+    @Test
+    public void clearingOneJournalDateKeepsTheOtherDate() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
+                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
+                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
+                    Method render = MainActivity.class.getDeclaredMethod("render");
+                    render.setAccessible(true);
+                    render.invoke(activity);
+                    View clearStartDate = findViewWithDescription(activity.getWindow().getDecorView(),
+                            "Xóa ngày bắt đầu");
+                    if (clearStartDate == null) throw new AssertionError("Start-date clear button is missing");
+                    clearStartDate.performClick();
+                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
+                    assertEquals(1_795_478_400_000L, getField(activity, "cookingJournalToDate"));
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void leavingCookingJournalClearsBothDateBoundaries() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
+                    setField(activity, "cookingLogReturnScreen", MainActivity.Screen.LIBRARY);
+                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
+                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
+                    Method render = MainActivity.class.getDeclaredMethod("render");
+                    render.setAccessible(true);
+                    render.invoke(activity);
+                    activity.getOnBackPressedDispatcher().onBackPressed();
+                    assertEquals(MainActivity.Screen.LIBRARY, getField(activity, "screen"));
+                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
+                    assertEquals(0L, getField(activity, "cookingJournalToDate"));
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    private static View findViewWithDescription(View view, String description) {
+        if (description.equals(view.getContentDescription())) return view;
+        if (!(view instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            View match = findViewWithDescription(group.getChildAt(index), description);
+            if (match != null) return match;
+        }
+        return null;
     }
 
     private static Object getField(Object target, String name) throws ReflectiveOperationException {
