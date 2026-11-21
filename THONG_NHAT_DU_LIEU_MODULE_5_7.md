@@ -36,7 +36,7 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 - Khi người dùng sửa lượng của mục tổng hợp, lưu phần điều chỉnh của người dùng riêng với tổng tính từ công thức. Lần cập nhật sau áp dụng lại phần điều chỉnh trên tổng mới; không cho lưu tổng lượng âm. Nếu toàn bộ nguồn công thức bị bỏ, giữ đóng góp thủ công và phần điều chỉnh như mục do người dùng quản lý.
 - Nếu người dùng chọn **Giữ danh sách cũ**, không tính lại các mục. Nếu chọn **Cập nhật**, dùng quy tắc trên. Thêm cùng một nguồn công thức lần nữa là thao tác upsert, không tạo thêm đóng góp trùng.
 
-**Tình trạng code Module 7 (21/11/2026):** đã có một danh sách mua sắm cục bộ trong SQLite, thêm/sửa/xóa mục nhập tay, đổi ba trạng thái và chuẩn hóa đơn vị ban đầu theo danh mục người dùng cung cấp. Kho công thức chưa có dữ liệu `RecipeIngredient`, nên nút từ Nấu hôm nay mới mở màn Mua sắm; chưa tạo dòng công thức, chưa tính đóng góp/điều chỉnh và chưa mở xác nhận cập nhật màn 22. Không lấy nguyên liệu minh họa trong ảnh làm dữ liệu công thức giả. Hoàn tất phần này sau khi module công thức cung cấp `recipeId`, `recipeIngredientId`, `ingredientId`, lượng, `unitId`, ghi chú định tính và `baseServings`.
+**Tình trạng code Module 7 (21/11/2026):** đã có một danh sách mua sắm cục bộ trong SQLite, thêm/sửa/xóa mục nhập tay, chọn nhóm danh mục, đổi ba trạng thái và chuẩn hóa đơn vị ban đầu theo danh mục người dùng cung cấp. Module 7 lưu snapshot kế hoạch và có sheet màn 22 khi món/khẩu phần thay đổi; sheet có thể ghi nhận kế hoạch mới và giữ mục nhập tay. Kho công thức chưa có dữ liệu `RecipeIngredient`, nên chưa thể tạo dòng công thức, tính đóng góp/điều chỉnh hoặc hiển thị chênh lệch định lượng nguyên liệu. Không lấy nguyên liệu minh họa trong ảnh làm dữ liệu công thức giả. Hoàn tất phần tổng hợp sau khi module công thức cung cấp `recipeId`, `recipeIngredientId`, `ingredientId`, lượng, `unitId`, ghi chú định tính và `baseServings`.
 
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
@@ -57,8 +57,8 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 | `RecipeNote` | Khóa duy nhất `recipeId`, nội dung ghi chú và thời điểm cập nhật |
 | `RecipeViewHistory` | Khóa duy nhất `recipeId`, thời điểm xem gần nhất; cập nhật thay vì thêm trùng |
 | `MealPlan`, `MealPlanRecipe` | ID kế hoạch; khóa duy nhất `(planId, recipeId)`, `servings`, thứ tự |
-| `ShoppingList` | `listId`, `planId`, trạng thái hiện hành và thời điểm cập nhật |
-| `ShoppingListItem` | `itemId`, `listId`, nguyên liệu chuẩn hoặc tên thủ công, đơn vị/đại lượng/loại lượng, lượng tổng, phần điều chỉnh, trạng thái |
+| `ShoppingList` | `listId`, `planId`, snapshot kế hoạch, trạng thái hiện hành và thời điểm cập nhật |
+| `ShoppingListItem` | `itemId`, `listId`, nguyên liệu chuẩn hoặc tên thủ công, danh mục, đơn vị/đại lượng/loại lượng, lượng tổng, phần điều chỉnh, trạng thái |
 | `ShoppingContribution` | `itemId`, `recipeId`, `recipeIngredientId`, lượng nguồn đã tính; khóa duy nhất theo mục và dòng nguồn |
 | `ShoppingManualContribution` | `manualContributionId`, `itemId`, tên hoặc `ingredientId`, lượng/đơn vị, thời điểm thêm; giữ độc lập với đóng góp công thức |
 

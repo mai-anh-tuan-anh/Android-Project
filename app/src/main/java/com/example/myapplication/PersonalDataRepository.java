@@ -47,9 +47,11 @@ final class PersonalDataRepository {
         database.replaceMealPlanRecipes(recipes);
     }
     List<PersonalDataDbHelper.ShoppingItem> getShoppingItems() { return database.getShoppingItems(); }
-    void saveShoppingItem(String id, String name, String amount, String unit, String status) {
-        database.saveShoppingItem(id, name, amount, unit, status);
+    void saveShoppingItem(String id, String name, String amount, String unit, String category, String status) {
+        database.saveShoppingItem(id, name, amount, unit, category, status);
     }
     void setShoppingItemStatus(String id, String status) { database.setShoppingItemStatus(id, status); }
     void deleteShoppingItem(String id) { database.deleteShoppingItem(id); }
+    String getShoppingPlanSnapshot() { return database.getShoppingPlanSnapshot(); }
+    void saveShoppingPlanSnapshot(String snapshot) { database.saveShoppingPlanSnapshot(snapshot); }
 }

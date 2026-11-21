@@ -17,7 +17,7 @@ import java.util.Set;
 /** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 6;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
@@ -53,14 +53,21 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         if (oldVersion < 2) createMealPlanTables(db);
         if (oldVersion < 3) migrateMealPlanServingRange(db);
         if (oldVersion < 4) createShoppingTables(db);
+        if (oldVersion >= 4 && oldVersion < 5) {
+            db.execSQL("ALTER TABLE ShoppingListItem ADD COLUMN category TEXT NOT NULL DEFAULT 'Khác'");
+        }
+        if (oldVersion >= 4 && oldVersion < 6) {
+            db.execSQL("ALTER TABLE ShoppingList ADD COLUMN planSnapshot TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     private static void createShoppingTables(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE ShoppingList (listId INTEGER PRIMARY KEY CHECK(listId=1), " +
-                "updatedAt INTEGER NOT NULL)");
+                "updatedAt INTEGER NOT NULL, planSnapshot TEXT NOT NULL DEFAULT '')");
         db.execSQL("INSERT OR IGNORE INTO ShoppingList(listId,updatedAt) VALUES(1,0)");
         db.execSQL("CREATE TABLE ShoppingListItem (itemId TEXT PRIMARY KEY, listId INTEGER NOT NULL DEFAULT 1, " +
                 "ingredientId TEXT, name TEXT NOT NULL, amount TEXT NOT NULL, unit TEXT NOT NULL, " +
+                "category TEXT NOT NULL DEFAULT 'Khác', " +
                 "status TEXT NOT NULL CHECK(status IN ('NEED_TO_BUY','AVAILABLE','PURCHASED')), " +
                 "position INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
                 "FOREIGN KEY(listId) REFERENCES ShoppingList(listId) ON DELETE CASCADE)");
@@ -369,18 +376,18 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     List<ShoppingItem> getShoppingItems() {
         List<ShoppingItem> items = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT itemId,name,amount,unit,status FROM ShoppingListItem WHERE listId=1 ORDER BY position,rowid", null)) {
+                "SELECT itemId,name,amount,unit,status,category FROM ShoppingListItem WHERE listId=1 ORDER BY position,rowid", null)) {
             while (cursor.moveToNext()) {
                 items.add(new ShoppingItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
-                        cursor.getString(3), cursor.getString(4)));
+                        cursor.getString(3), cursor.getString(4), cursor.getString(5)));
             }
         }
         return items;
     }
 
-    void saveShoppingItem(String itemId, String name, String amount, String unit, String status) {
+    void saveShoppingItem(String itemId, String name, String amount, String unit, String category, String status) {
         if (name == null || name.trim().isEmpty() || amount == null || amount.trim().isEmpty()
-                || unit == null || unit.trim().isEmpty()) {
+                || unit == null || unit.trim().isEmpty() || category == null || category.trim().isEmpty()) {
             throw new IllegalArgumentException("shopping item fields cannot be empty");
         }
         if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status) && !"PURCHASED".equals(status)) {
@@ -394,6 +401,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         values.put("name", name.trim().replaceAll("\\s+", " "));
         values.put("amount", amount.trim());
         values.put("unit", unit.trim().replaceAll("\\s+", " "));
+        values.put("category", category.trim());
         values.put("status", status);
         values.put("updatedAt", System.currentTimeMillis());
         if (itemId == null) {
@@ -436,6 +444,20 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         updateShoppingListTimestamp(db);
     }
 
+    String getShoppingPlanSnapshot() {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT planSnapshot FROM ShoppingList WHERE listId=1", null)) {
+            return cursor.moveToFirst() ? cursor.getString(0) : "";
+        }
+    }
+
+    void saveShoppingPlanSnapshot(String snapshot) {
+        ContentValues values = new ContentValues();
+        values.put("planSnapshot", snapshot == null ? "" : snapshot);
+        values.put("updatedAt", System.currentTimeMillis());
+        getWritableDatabase().update("ShoppingList", values, "listId=1", null);
+    }
+
     private static void validateServings(int servings) {
         if (servings < 1 || servings > 999) {
             throw new IllegalArgumentException("servings must be between 1 and 999");
@@ -457,12 +479,14 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         final String amount;
         final String unit;
         final String status;
-        ShoppingItem(String id, String name, String amount, String unit, String status) {
+        final String category;
+        ShoppingItem(String id, String name, String amount, String unit, String status, String category) {
             this.id = id;
             this.name = name;
             this.amount = amount;
             this.unit = unit;
             this.status = status;
+            this.category = category;
         }
     }
 
