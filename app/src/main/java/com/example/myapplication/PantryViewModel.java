@@ -13,6 +13,8 @@ import java.util.Locale;
 
 /** Local pantry state and actions. */
 public final class PantryViewModel extends AndroidViewModel {
+    static final String IN_STOCK = "IN_STOCK";
+    static final String OUT_OF_STOCK = "OUT_OF_STOCK";
     private static final int EXPIRING_WITHIN_DAYS = 3;
     private final PersonalDataRepository repository;
 
@@ -24,8 +26,9 @@ public final class PantryViewModel extends AndroidViewModel {
     List<PersonalDataDbHelper.PantryItem> getItems() { return repository.getPantryItems(); }
     PersonalDataDbHelper.PantryItem getItem(String id) { return repository.getPantryItem(id); }
     boolean saveItem(String id, String name, String amount, String unit, String category,
-                     String expiryDate, String storageLocation) {
-        return repository.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation);
+                     String expiryDate, String storageLocation, String stockStatus, String purchaseDate) {
+        return repository.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation,
+                stockStatus, purchaseDate);
     }
     boolean deleteItem(String id) { return repository.deletePantryItem(id); }
 
