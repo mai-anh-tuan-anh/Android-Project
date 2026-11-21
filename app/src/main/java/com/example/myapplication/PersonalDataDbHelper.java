@@ -20,7 +20,7 @@ import java.util.Set;
 /** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 8;
+    private static final int DB_VERSION = 10;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
@@ -67,12 +67,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             migrateShoppingStatusesToTwoStates(db);
         }
         if (oldVersion < 8) createOfflinePersonalFeatureTables(db);
+        if (oldVersion == 8) {
+            db.execSQL("ALTER TABLE PantryItem ADD COLUMN stockStatus TEXT NOT NULL DEFAULT 'IN_STOCK'");
+            db.execSQL("ALTER TABLE PantryItem ADD COLUMN purchaseDate TEXT");
+        }
+        if (oldVersion >= 8 && oldVersion < 10) migratePantryWithoutManualStockStatus(db);
     }
 
     private static void createOfflinePersonalFeatureTables(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE PantryItem (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
                 "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
-                "storageLocation TEXT NOT NULL DEFAULT '', updatedAt INTEGER NOT NULL)");
+                "storageLocation TEXT NOT NULL DEFAULT '', purchaseDate TEXT, updatedAt INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX PantryItem_expiry_idx ON PantryItem(expiryDate)");
         db.execSQL("CREATE TABLE CookingLog (logId TEXT PRIMARY KEY, recipeId TEXT NOT NULL, title TEXT NOT NULL, " +
                 "imageRes TEXT NOT NULL, cookedAt INTEGER NOT NULL, servings INTEGER NOT NULL " +
@@ -80,6 +85,18 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
                 "CHECK(rating IS NULL OR rating BETWEEN 1 AND 5), adjustmentNote TEXT NOT NULL DEFAULT '', " +
                 "photoLocalPath TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX CookingLog_recipe_date_idx ON CookingLog(recipeId,cookedAt DESC)");
+    }
+
+    private static void migratePantryWithoutManualStockStatus(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE PantryItem_v10 (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
+                "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
+                "storageLocation TEXT NOT NULL DEFAULT '', purchaseDate TEXT, updatedAt INTEGER NOT NULL)");
+        db.execSQL("INSERT INTO PantryItem_v10(itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate," +
+                "storageLocation,purchaseDate,updatedAt) SELECT itemId,ingredientId,name,amountDecimal,unitId," +
+                "category,expiryDate,storageLocation,purchaseDate,updatedAt FROM PantryItem");
+        db.execSQL("DROP TABLE PantryItem");
+        db.execSQL("ALTER TABLE PantryItem_v10 RENAME TO PantryItem");
+        db.execSQL("CREATE INDEX PantryItem_expiry_idx ON PantryItem(expiryDate)");
     }
 
     private static void createShoppingTables(SQLiteDatabase db) {
@@ -503,12 +520,13 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     List<PantryItem> getPantryItems() {
         List<PantryItem> items = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,updatedAt " +
-                        "FROM PantryItem ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, expiryDate, name COLLATE NOCASE, rowid", null)) {
+                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,purchaseDate,updatedAt " +
+                        "FROM PantryItem ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, " +
+                        "expiryDate, name COLLATE NOCASE, rowid", null)) {
             while (cursor.moveToNext()) {
                 items.add(new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
                         cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
-                        cursor.getString(6), cursor.getString(7), cursor.getLong(8)));
+                        cursor.getString(6), cursor.getString(7), cursor.getString(8), cursor.getLong(9)));
             }
         }
         return items;
@@ -517,17 +535,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     PantryItem getPantryItem(String itemId) {
         if (itemId == null) return null;
         try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,updatedAt " +
+                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,purchaseDate,updatedAt " +
                         "FROM PantryItem WHERE itemId=?", new String[]{itemId})) {
             if (!cursor.moveToFirst()) return null;
             return new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
                     cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
-                    cursor.getString(6), cursor.getString(7), cursor.getLong(8));
+                    cursor.getString(6), cursor.getString(7), cursor.getString(8), cursor.getLong(9));
         }
     }
 
     boolean savePantryItem(String itemId, String name, String amount, String unitId,
-                           String category, String expiryDate, String storageLocation) {
+                           String category, String expiryDate, String storageLocation, String purchaseDate) {
         String cleanName = cleanDisplayValue(name);
         if (cleanName.isEmpty() || category == null || category.trim().isEmpty()) return false;
         String cleanAmount = amount == null ? "" : amount.trim().replace(',', '.');
@@ -546,6 +564,8 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
         String cleanExpiry = expiryDate == null || expiryDate.trim().isEmpty() ? null : expiryDate.trim();
         if (cleanExpiry != null && !isValidIsoDate(cleanExpiry)) return false;
+        String cleanPurchaseDate = purchaseDate == null || purchaseDate.trim().isEmpty() ? null : purchaseDate.trim();
+        if (cleanPurchaseDate != null && !isValidIsoDate(cleanPurchaseDate)) return false;
 
         ContentValues values = new ContentValues();
         values.put("itemId", itemId == null ? java.util.UUID.randomUUID().toString() : itemId);
@@ -556,6 +576,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         values.put("category", category.trim());
         if (cleanExpiry == null) values.putNull("expiryDate"); else values.put("expiryDate", cleanExpiry);
         values.put("storageLocation", cleanDisplayValue(storageLocation));
+        if (cleanPurchaseDate == null) values.putNull("purchaseDate"); else values.put("purchaseDate", cleanPurchaseDate);
         values.put("updatedAt", System.currentTimeMillis());
         SQLiteDatabase db = getWritableDatabase();
         if (itemId != null && getPantryItem(itemId) == null) return false;
@@ -567,6 +588,10 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return getWritableDatabase().delete("PantryItem", "itemId=?", new String[]{itemId}) > 0;
     }
 
+    int deleteAllPantryItems() {
+        return getWritableDatabase().delete("PantryItem", null, null);
+    }
+
     List<CookingLog> getCookingLogs(String recipeId) {
         List<CookingLog> logs = new ArrayList<>();
         if (recipeId == null) return logs;
@@ -574,6 +599,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
                 "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
                         "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog " +
                         "WHERE recipeId=? ORDER BY cookedAt DESC,createdAt DESC", new String[]{recipeId})) {
+            while (cursor.moveToNext()) logs.add(readCookingLog(cursor));
+        }
+        return logs;
+    }
+
+    List<CookingLog> getAllCookingLogs() {
+        List<CookingLog> logs = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
+                        "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog " +
+                        "ORDER BY cookedAt DESC,createdAt DESC", null)) {
             while (cursor.moveToNext()) logs.add(readCookingLog(cursor));
         }
         return logs;
@@ -683,9 +719,10 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         final String category;
         final String expiryDate;
         final String storageLocation;
+        final String purchaseDate;
         final long updatedAt;
         PantryItem(String id, String ingredientId, String name, String amountDecimal, String unitId,
-                   String category, String expiryDate, String storageLocation, long updatedAt) {
+                   String category, String expiryDate, String storageLocation, String purchaseDate, long updatedAt) {
             this.id = id;
             this.ingredientId = ingredientId;
             this.name = name;
@@ -694,6 +731,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             this.category = category;
             this.expiryDate = expiryDate;
             this.storageLocation = storageLocation;
+            this.purchaseDate = purchaseDate;
             this.updatedAt = updatedAt;
         }
     }

@@ -63,11 +63,13 @@ final class PersonalDataRepository {
     List<PersonalDataDbHelper.PantryItem> getPantryItems() { return database.getPantryItems(); }
     PersonalDataDbHelper.PantryItem getPantryItem(String id) { return database.getPantryItem(id); }
     boolean savePantryItem(String id, String name, String amount, String unit, String category,
-                           String expiryDate, String storageLocation) {
-        return database.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation);
+                           String expiryDate, String storageLocation, String purchaseDate) {
+        return database.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation, purchaseDate);
     }
     boolean deletePantryItem(String id) { return database.deletePantryItem(id); }
+    int deleteAllPantryItems() { return database.deleteAllPantryItems(); }
     List<PersonalDataDbHelper.CookingLog> getCookingLogs(String recipeId) { return database.getCookingLogs(recipeId); }
+    List<PersonalDataDbHelper.CookingLog> getAllCookingLogs() { return database.getAllCookingLogs(); }
     PersonalDataDbHelper.CookingLog getCookingLog(String id) { return database.getCookingLog(id); }
     boolean saveCookingLog(String id, MainActivity.RecipePreview recipe, long cookedAt, int servings,
                            Integer duration, Integer rating, String adjustment, String photoPath) {

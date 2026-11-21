@@ -1,7 +1,7 @@
 # Bếp nhà · Đề xuất luồng và giao diện cho ba ưu tiên offline
 
 **Ngày:** 21/11/2026  
-**Trạng thái:** Hai phần do Người 3 phụ trách (Tủ nguyên liệu và Nhật ký lần nấu) đã được người dùng chọn để triển khai cục bộ trong nhánh hiện tại. Đề xuất “Tối nay nấu gì?” vẫn do Người 1 phụ trách và ngoài phạm vi. Các wireframe dưới đây chưa thay thế prototype 28 màn đã duyệt; schema và tích hợp liên module vẫn cần review.
+**Trạng thái:** Hai phần do Người 3 phụ trách (Tủ nguyên liệu và Nhật ký lần nấu) đã được người dùng chọn để triển khai cục bộ trong nhánh hiện tại. Tủ nguyên liệu tính trạng thái hạn dùng tự động, có ngày mua tùy chọn và xóa toàn bộ sau xác nhận; Module 7 có Hoàn tác đổi trạng thái mua sắm. Nhật ký nấu có màn tổng hợp và tìm/lọc. Đề xuất “Tối nay nấu gì?” vẫn do Người 1 phụ trách và ngoài phạm vi. Các wireframe dưới đây chưa thay thế prototype 28 màn đã duyệt; schema và tích hợp liên module vẫn cần review.
 **Phạm vi:** Android, dữ liệu cá nhân lưu trên thiết bị; không cần đăng nhập/mạng để đọc và sửa dữ liệu cục bộ.
 
 Tài liệu này cụ thể hóa ba ưu tiên đã được người dùng yêu cầu nghiên cứu. Màn 01–28 hiện có vẫn là nguồn thiết kế đã duyệt. Màn 29–33 và các điểm chuyển mới dưới đây là đề xuất; chỉ sau khi nhóm đồng ý mới cập nhật prototype chính thức và kế hoạch module. Không thêm tab đáy thứ năm.
@@ -55,24 +55,26 @@ Từ Module 7 có thể mở màn quản lý. Chuyển một dòng mua sắm th�
 ```text
 ‹  Tủ nguyên liệu                                      [+]
 [ Tìm nguyên liệu                              🔍 ]
-[Tất cả] [Sắp hết hạn] [Đã hết]
+[Tất cả] [Sử dụng được] [Sắp hết hạn] [Hết hạn]
 
 Rau củ
 ┌─────────────────────────────────────────────┐
 │ Cà chua                              [Sửa]  │
-│ 4 quả · Dùng trước 24/11                    │
+│ 4 quả · Sử dụng được · Rau củ                │
+│ Mua 20/11 · Dùng trước 24/11                │
 └─────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────┐
 │ Rau thơm                             [Sửa]  │
 │ Vừa đủ · Chưa có ngày hết hạn               │
 └─────────────────────────────────────────────┘
 
-                         [ + Thêm nguyên liệu ]
+               [ + Thêm nguyên liệu ] [Xóa tất cả]
 ```
 
-- Thẻ có tên, lượng/đơn vị nếu biết, ngày hết hạn nếu người dùng nhập và nút sửa. Nhãn hết hạn dùng màu cảnh báo hiện có; ngày chưa biết thì không suy ra.
+- Thẻ có tên, lượng/đơn vị nếu biết, trạng thái hạn dùng tự tính, ngày mua/ngày hết hạn/vị trí nếu người dùng nhập và nút sửa. Nhãn sắp/hết hạn dùng màu cảnh báo hiện có; ngày chưa biết thì trạng thái là `Sử dụng được`.
 - Chip lọc giữ từ khóa tìm kiếm. Trạng thái rỗng: `Tủ nguyên liệu đang trống`, lời giải thích ngắn và CTA `Thêm nguyên liệu`.
-- **Đã triển khai trong nhánh Người 3:** danh sách có tìm kiếm tên/nhóm/vị trí, chip lọc `Tất cả`, `Sắp hết hạn`, `Hết hạn`; thẻ hiển thị lượng/đơn vị, nhóm, hạn và vị trí; có thêm/sửa/xóa.
+- `Xóa tất cả` hỏi xác nhận và chỉ xóa nguyên liệu trong tủ; nút bị vô hiệu hóa khi tủ trống.
+- **Đã triển khai trong nhánh Người 3:** danh sách có tìm kiếm tên/nhóm/vị trí, chip lọc `Tất cả`, `Sử dụng được`, `Sắp hết hạn`, `Hết hạn`; thẻ hiển thị trạng thái hạn dùng, lượng/đơn vị nếu biết, nhóm, ngày mua/hạn và vị trí; có thêm/sửa/xóa từng món và xóa toàn bộ sau xác nhận.
 - **Mốc tạm dùng trong code:** `Sắp hết hạn` là từ hôm nay đến hết 3 ngày lịch tới; ngày trước hôm nay là `Hết hạn`. Đây là lựa chọn vận hành để bộ lọc có hành vi xác định, chưa phải tiêu chuẩn nghiệp vụ được cả nhóm phê duyệt. Chưa có thông báo hệ thống.
 
 ### Màn đề xuất 30 — Thêm/Sửa nguyên liệu
@@ -85,14 +87,16 @@ Số lượng (không bắt buộc)       Đơn vị
 [ 1,5                         ] [ Chọn đơn vị v ]
 Hạn sử dụng (không bắt buộc)
 [ Chọn ngày                                      ]
+Ngày mua (không bắt buộc)
+[ Chọn ngày                                      ]
 Nơi cất (không bắt buộc)
 [ Ví dụ: Ngăn mát                               ]
                          [ Lưu nguyên liệu ]
 ```
 
 - Ưu tiên chọn từ danh mục chuẩn bằng `ingredientId`; có thể cho nhập tên tự do nhưng không dùng tự động để khớp công thức cho tới khi có ánh xạ rõ ràng.
-- Lượng lưu chính xác dạng decimal; để trống nghĩa là “có nhưng chưa biết lượng”, khác số 0. Đơn vị theo danh mục K.4, không tự đổi g ↔ ml.
-- Hạn sử dụng và nơi cất không bắt buộc. Xóa bản ghi pantry không xóa công thức hay nhật ký nấu.
+- Lượng lưu chính xác dạng decimal; để trống nghĩa là chưa biết lượng, khác số 0. Trạng thái không nhập tay: hạn trên 3 ngày hoặc không đặt là `Sử dụng được`; hạn trong 3 ngày lịch tới là `Sắp hết hạn`; ngày đã qua là `Hết hạn`.
+- Hạn sử dụng, ngày mua và nơi cất không bắt buộc. Ngày mua không tự suy ra hạn sử dụng. Xóa bản ghi pantry không xóa công thức hay nhật ký nấu.
 - `Lưu nguyên liệu` tối thiểu 48 dp; khi IME mở form vẫn cuộn tới được.
 
 ### Quy tắc dữ liệu và nối với mua sắm
@@ -216,6 +220,34 @@ Khi chưa có bản ghi: `Bạn chưa ghi lại lần nấu nào` và CTA `Ghi l
 
 Sắp xếp mới nhất trước. Không có ảnh thì giữ thứ bậc thông tin và bố cục thẻ. Trạng thái rỗng dùng câu hướng dẫn và CTA.
 
+### Màn tổng hợp — Nhật ký nấu của tôi
+
+Mở từ `Kho của tôi`; không thêm tab đáy. Dùng nền kem, thẻ trắng/viền nhạt, xanh chính và nhịp cách 8/16/24 dp như các màn hiện hữu.
+
+```text
+‹  Nhật ký nấu của tôi
+Tìm lại những lần bạn đã nấu.
+┌─────────────────────────────────────────────┐
+│ Món nấu nhiều nhất        Canh chua cá · 4 lần│
+│ Lần nấu gần nhất                        20/11 │
+│ Đánh giá gần nhất                         ★★★★☆│
+└─────────────────────────────────────────────┘
+[ Tìm món hoặc ghi chú                         ]
+[ Từ ngày            ×    ] [ Đến ngày     ×   ]
+[Tất cả] [5 ★] [4 ★] [3 ★] [2 ★] [1 ★]
+Xóa bộ lọc
+
+Canh chua cá
+20/11/2026 · 2 người · 35 phút · ★★★★☆
+Điều chỉnh: Giảm me lần sau.
+```
+
+- Tìm kiếm không phân biệt dấu trong tên món và ghi chú điều chỉnh; lọc theo ngày bắt đầu/kết thúc và mức đánh giá. Kết quả vẫn mới nhất trước.
+- Thống kê tính từ toàn bộ nhật ký, không đổi theo bộ lọc; “đánh giá gần nhất” là bản ghi mới nhất có đánh giá.
+- Trạng thái chưa có nhật ký hướng người dùng mở ghi chú của một món; trạng thái không có kết quả cho phép xóa bộ lọc.
+- Khi có ngày đã chọn, nút `×` trong từng ô xóa riêng ngày đó; rời màn tổng hợp qua nút Quay lại hoặc thanh điều hướng sẽ xóa cả ngày bắt đầu/kết thúc. Xoay màn hình hoặc mở lịch chọn ngày không làm mất lựa chọn hiện tại.
+- **Đã triển khai trong nhánh Người 3:** điểm vào từ Kho của tôi; ô tìm kiếm, lọc ngày/sao và ba thống kê được lấy từ SQLite cục bộ. Màn này vẫn theo wireframe đề xuất, chưa thay thế hình prototype 01–28.
+
 ### Màn 33 — Ghi lại lần nấu
 
 ```text
@@ -255,7 +287,7 @@ Bạn đánh giá món này
 
 ## 7. Cần thống nhất trước khi tích hợp và hoàn thiện
 
-1. Người điều phối schema review migration SQLite mới (schema 8) và hợp đồng khóa trước khi merge.
+1. Người điều phối schema review migration SQLite mới (schema 10) và hợp đồng khóa trước khi merge.
 2. Xác nhận mốc “sắp hết hạn” 3 ngày tạm dùng và có cần thông báo cục bộ không.
 3. Người 2 cung cấp ingredientId/danh mục nguyên liệu và phối hợp quy tắc gộp/bù trừ Module 7.
 4. Người 2 xác nhận điểm vào từ Module 4; nhóm quyết định có cần snapshot phiên bản công thức, backup và retention ảnh/nhật ký không.

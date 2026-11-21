@@ -7,9 +7,11 @@ import androidx.lifecycle.AndroidViewModel;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.json.JSONArray;
@@ -29,6 +31,52 @@ public final class ShoppingViewModel extends AndroidViewModel {
     }
 
     List<PersonalDataDbHelper.ShoppingItem> getItems() { return repository.getShoppingItems(); }
+
+    String initialStatusForPantry(String ingredientId, String name, String amount, String unitId) {
+        return initialStatusForPantry(ingredientId, name, amount, unitId,
+                repository.getPantryItems(), System.currentTimeMillis());
+    }
+
+    static String initialStatusForPantry(String ingredientId, String name, String amount, String unitId,
+                                         List<PersonalDataDbHelper.PantryItem> pantryItems, long nowMillis) {
+        if (name == null || amount == null || unitId == null || unitId.trim().isEmpty()) return NEED_TO_BUY;
+        final BigDecimal requested;
+        try {
+            requested = new BigDecimal(amount.trim().replace(',', '.'));
+            if (requested.signum() <= 0) return NEED_TO_BUY;
+        } catch (NumberFormatException qualitativeAmount) {
+            return NEED_TO_BUY;
+        }
+
+        String expectedName = normalizeIngredientName(name);
+        String expectedUnit = KitchenUnitCatalog.canonicalId(unitId);
+        if (expectedName.isEmpty() || expectedUnit.isEmpty()) return NEED_TO_BUY;
+        BigDecimal available = BigDecimal.ZERO;
+        for (PersonalDataDbHelper.PantryItem item : pantryItems) {
+            if (item == null || item.amountDecimal == null || item.unitId == null) continue;
+            if (ingredientId != null && !ingredientId.trim().isEmpty()) {
+                if (!ingredientId.equals(item.ingredientId)) continue;
+            } else if (!expectedName.equals(normalizeIngredientName(item.name))) {
+                continue;
+            }
+            if (!expectedUnit.equals(KitchenUnitCatalog.canonicalId(item.unitId))) continue;
+            if ("EXPIRED".equals(PantryViewModel.expiryStateForDate(item.expiryDate, nowMillis))) continue;
+            try {
+                BigDecimal pantryAmount = new BigDecimal(item.amountDecimal.trim());
+                if (pantryAmount.signum() > 0) available = available.add(pantryAmount);
+            } catch (NumberFormatException invalidStoredAmount) {
+                // Malformed/qualitative pantry amounts cannot establish that enough is available.
+            }
+        }
+        return available.compareTo(requested) >= 0 ? AVAILABLE : NEED_TO_BUY;
+    }
+
+    private static String normalizeIngredientName(String value) {
+        if (value == null) return "";
+        String normalized = Normalizer.normalize(value.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "").replace('đ', 'd');
+        return normalized.replaceAll("\\s+", " ");
+    }
 
     PersonalDataDbHelper.ShoppingItem findItem(String id) {
         if (id == null) return null;
@@ -89,7 +137,9 @@ public final class ShoppingViewModel extends AndroidViewModel {
 
     private String serializePlan(List<PersonalDataDbHelper.PlannedRecipe> plan) {
         JSONArray json = new JSONArray();
-        for (PersonalDataDbHelper.PlannedRecipe item : plan) {
+        List<PersonalDataDbHelper.PlannedRecipe> stableOrder = new ArrayList<>(plan);
+        stableOrder.sort((left, right) -> left.recipe.id.compareTo(right.recipe.id));
+        for (PersonalDataDbHelper.PlannedRecipe item : stableOrder) {
             JSONObject row = new JSONObject();
             try {
                 row.put("recipeId", item.recipe.id);
