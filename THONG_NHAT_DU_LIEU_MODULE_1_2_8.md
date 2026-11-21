@@ -1,9 +1,7 @@
 # Đề xuất hợp đồng dữ liệu chung cho Module 1, 2 và 8
 
-**Phiên bản 1 · 22/11/2026**
-
-**Phạm vi:** Module 1 – Khám phá & danh mục; Module 2 – Tìm kiếm & bộ lọc; Module 8 – Gợi ý món theo nguyên liệu.
-
+**Phiên bản 1 · 22/11/2026**  
+**Phạm vi:** Module 1 – Khám phá & danh mục; Module 2 – Tìm kiếm & bộ lọc; Module 8 – Gợi ý món theo nguyên liệu.  
 **Trạng thái:** Tài liệu đề xuất dựa trên `BAN_GIAO_DU_AN_ANDROID.md` và `ui-ux-bep-nha/THIET_KE.md`. Những nội dung đã được handoff xác nhận được ghi rõ; quy tắc còn chờ nhóm thống nhất không được xem là hợp đồng đã duyệt.
 
 ## 1. Mục tiêu và nguyên tắc

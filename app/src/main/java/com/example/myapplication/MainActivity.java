@@ -41,12 +41,10 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.Calendar;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -113,21 +111,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int WHITE = Color.WHITE;
 
     static final List<RecipePreview> DESIGN_RECIPES = Arrays.asList(
-            new RecipePreview("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ",
-                    30, "Không giới hạn", Arrays.asList("Món Việt", "Canh & súp", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ")),
-            new RecipePreview("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
-                    25, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh"),
-                    Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô")),
-            new RecipePreview("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
-                    35, "Không giới hạn", Arrays.asList("Món Âu", "Món chính", "Món nhanh"),
-                    Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi")),
-            new RecipePreview("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
-                    20, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi")),
-            new RecipePreview("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
-                    15, "Món chay", Arrays.asList("Món chay", "Món Âu", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Xà lách", "Cà chua", "Dưa chuột", "Sốt mè rang", "Bắp ngọt"))
+            new RecipePreview("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ"),
+            new RecipePreview("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ"),
+            new RecipePreview("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa"),
+            new RecipePreview("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ"),
+            new RecipePreview("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ")
     );
     private static final List<RecipePreview> MEAL_PLAN_PREVIEWS = Arrays.asList(
             DESIGN_RECIPES.get(0), DESIGN_RECIPES.get(1), DESIGN_RECIPES.get(3));
@@ -137,13 +125,10 @@ public class MainActivity extends AppCompatActivity {
     private ShoppingViewModel shoppingViewModel;
     private PantryViewModel pantryViewModel;
     private CookingJournalViewModel cookingJournalViewModel;
-    private DiscoverSearchViewModel searchViewModel;
-    private final DiscoverViewModel discoverViewModel = new DiscoverViewModel();
     private ActivityResultLauncher<String> cookingPhotoPicker;
     private LinearLayout appRoot;
     private View bottomNavigationBar;
     private Screen screen = Screen.DISCOVER;
-    private boolean animateNextScreen;
     private Screen noteReturnScreen = Screen.LIBRARY;
     private Screen collectionReturnScreen = Screen.LIBRARY;
     private Screen detailReturnScreen = Screen.DISCOVER;
@@ -224,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
     private int cookingJournalRatingFilter;
     private List<PersonalDataDbHelper.CookingLog> cookingJournalAllLogs = new ArrayList<>();
 
-    enum Screen { DISCOVER, CATEGORY_LIST, CATEGORY_RECIPES, NEW_RECIPES, SEARCH, SEARCH_FILTER, SEARCH_RESULTS,
+    enum Screen { DISCOVER, CATEGORY_RECIPES, NEW_RECIPES, SEARCH, SEARCH_FILTER, SEARCH_RESULTS,
         WHAT_TO_COOK_INGREDIENTS, WHAT_TO_COOK_RESULTS, RECIPE_DETAIL,
         LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN,
         MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM, PANTRY, PANTRY_FORM, COOKING_JOURNAL,
@@ -236,56 +221,12 @@ public class MainActivity extends AppCompatActivity {
         final String imageName;
         final String duration;
         final String difficulty;
-        final int durationMinutes;
-        final String diet;
-        final List<String> categories;
-        final List<String> ingredients;
-        final long publishedAtMillis;
-        final boolean ingredientListComplete;
-
         RecipePreview(String id, String title, String imageName, String duration, String difficulty) {
-            this(id, title, imageName, duration, difficulty, parseMinutes(duration), "Không giới hạn",
-                    Collections.emptyList(), Collections.emptyList(), 0L);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients) {
-            this(id, title, imageName, duration, difficulty, durationMinutes, diet, categories, ingredients, 0L);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients,
-                      long publishedAtMillis) {
-            this(id, title, imageName, duration, difficulty, durationMinutes, diet, categories, ingredients,
-                    publishedAtMillis, false);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients,
-                      long publishedAtMillis, boolean ingredientListComplete) {
             this.id = id;
             this.title = title;
             this.imageName = imageName;
             this.duration = duration;
             this.difficulty = difficulty;
-            this.durationMinutes = durationMinutes;
-            this.diet = diet == null ? "Không giới hạn" : diet;
-            this.categories = categories == null ? Collections.emptyList()
-                    : Collections.unmodifiableList(new ArrayList<>(categories));
-            this.ingredients = ingredients == null ? Collections.emptyList()
-                    : Collections.unmodifiableList(new ArrayList<>(ingredients));
-            this.publishedAtMillis = Math.max(0L, publishedAtMillis);
-            this.ingredientListComplete = ingredientListComplete;
-        }
-
-        private static int parseMinutes(String dur) {
-            if (dur == null) return 30;
-            String digits = dur.replaceAll("[^0-9]", "").trim();
-            try {
-                return Integer.parseInt(digits);
-            } catch (NumberFormatException e) {
-                return 30;
-            }
         }
     }
 
@@ -304,11 +245,8 @@ public class MainActivity extends AppCompatActivity {
                 } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
                     screen = Screen.WHAT_TO_COOK_INGREDIENTS;
                 } else if (screen == Screen.CATEGORY_RECIPES || screen == Screen.NEW_RECIPES
-                        || screen == Screen.CATEGORY_LIST || screen == Screen.SEARCH
-                        || screen == Screen.WHAT_TO_COOK_INGREDIENTS) {
+                        || screen == Screen.SEARCH || screen == Screen.WHAT_TO_COOK_INGREDIENTS) {
                     screen = Screen.DISCOVER;
-                } else if (screen == Screen.CATEGORY_RECIPES) {
-                    screen = Screen.CATEGORY_LIST;
                 } else if (screen == Screen.RECIPE_DETAIL) {
                     screen = detailReturnScreen == Screen.RECIPE_DETAIL ? Screen.DISCOVER : detailReturnScreen;
                 } else if (screen == Screen.PANTRY_FORM) {
@@ -348,7 +286,6 @@ public class MainActivity extends AppCompatActivity {
         shoppingViewModel = new ViewModelProvider(this).get(ShoppingViewModel.class);
         pantryViewModel = new ViewModelProvider(this).get(PantryViewModel.class);
         cookingJournalViewModel = new ViewModelProvider(this).get(CookingJournalViewModel.class);
-        searchViewModel = new ViewModelProvider(this).get(DiscoverSearchViewModel.class);
         cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
             CookingJournalPhotoStore.CopyResult result = cookingJournalViewModel.savePhoto(uri);
@@ -514,7 +451,6 @@ public class MainActivity extends AppCompatActivity {
                         mealPlanScrollView == null ? 0 : mealPlanScrollView.getScrollY());
             }
         }
-        searchViewModel.setSearchQuery(discoverSearchQuery);
         if (screen == Screen.SHOPPING || screen == Screen.SHOPPING_ITEM_FORM) {
             outState.putString(STATE_SHOPPING_SCREEN, screen.name());
             outState.putString(STATE_SHOPPING_ITEM_ID, editingShoppingItemId);
@@ -564,8 +500,7 @@ public class MainActivity extends AppCompatActivity {
         }
         outState.putString(STATE_APP_SCREEN, screen.name());
         outState.putString(STATE_SELECTED_CATEGORY, selectedCategory);
-        outState.putString(STATE_DISCOVER_SEARCH_QUERY, searchViewModel == null
-                ? discoverSearchQuery : searchViewModel.getSearchQuery());
+        outState.putString(STATE_DISCOVER_SEARCH_QUERY, discoverSearchQuery);
         outState.putString(STATE_DETAIL_RECIPE_ID, detailRecipeId);
         outState.putString(STATE_DETAIL_RETURN_SCREEN, detailReturnScreen.name());
         super.onSaveInstanceState(outState);
@@ -604,7 +539,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (screen == Screen.DISCOVER) renderDiscover();
-        else if (screen == Screen.CATEGORY_LIST) renderCategoryList();
         else if (screen == Screen.CATEGORY_RECIPES) renderCategoryRecipes();
         else if (screen == Screen.NEW_RECIPES) renderNewRecipes();
         else if (screen == Screen.SEARCH) renderSearch();
@@ -629,12 +563,6 @@ public class MainActivity extends AppCompatActivity {
         else if (screen == Screen.COOKING_LOGS) renderCookingLogs();
         else renderCookingLogForm();
         setContentView(frame);
-        if (animateNextScreen) {
-            animateNextScreen = false;
-            frame.setAlpha(0f);
-            frame.setTranslationY(dp(6));
-            frame.animate().alpha(1f).translationY(0f).setDuration(160L).start();
-        }
         ViewCompat.requestApplyInsets(frame);
         if (screen == Screen.MEAL_PLAN && mealPlanScrollView != null && restoredMealPlanScrollY > 0) {
             int scrollY = restoredMealPlanScrollY;
@@ -701,7 +629,8 @@ public class MainActivity extends AppCompatActivity {
         content.addView(banner, bannerParams);
 
         addSectionHeader(content, "Danh mục món ăn", "Xem tất cả ›", () -> {
-            screen = Screen.CATEGORY_LIST;
+            selectedCategory = "Tất cả";
+            screen = Screen.CATEGORY_RECIPES;
             render();
         }, 24);
 
@@ -730,83 +659,20 @@ public class MainActivity extends AppCompatActivity {
             screen = Screen.NEW_RECIPES;
             render();
         }, 24);
-        List<RecipePreview> newRecipes = discoverViewModel.newlyPublished(
-                DESIGN_RECIPES, recipe -> recipe.publishedAtMillis);
-        if (newRecipes.isEmpty()) {
-            addText(content, "Chưa có món mới công bố.", 13, MUTED, false, 0, 0, 0, 0);
-        } else {
-            addRecipeGrid(content, newRecipes, true, true);
-        }
+        addRecipeGrid(content, DESIGN_RECIPES, true, true);
 
         addSectionHeader(content, "Món nhanh & Dễ làm", "", () -> {}, 24);
-        List<RecipePreview> quickRecipes = discoverViewModel.quickAndEasy(
-                DESIGN_RECIPES, recipe -> recipe.durationMinutes, recipe -> recipe.difficulty);
-        if (quickRecipes.isEmpty()) addText(content, "Chưa có món vừa nhanh vừa dễ.", 13, MUTED, false, 0, 0, 0, 0);
-        else addRecipeGrid(content, quickRecipes, true, true);
-
-        appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(0);
-    }
-
-    private void renderCategoryList() {
-        ScrollView scroll = scrollContent();
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(24));
-        addBackTitle(page, "Danh mục món ăn");
-        addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
-
-        String[][] categories = {
-                {"Món Việt", "category_vietnamese"},
-                {"Món chính", "category_main"},
-                {"Canh & súp", "category_soup"},
-                {"Món nhanh", "category_quick"},
-                {"Món chay", "category_vegetarian"},
-                {"Bữa sáng", "category_breakfast"}
-        };
-        for (int i = 0; i < categories.length; i += 2) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-            rowParams.bottomMargin = dp(20);
-            row.addView(createCategoryTile(categories[i][0], categories[i][1]),
-                    new LinearLayout.LayoutParams(0, -2, 1));
-            View gap = new View(this);
-            row.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-            if (i + 1 < categories.length) {
-                row.addView(createCategoryTile(categories[i + 1][0], categories[i + 1][1]),
-                        new LinearLayout.LayoutParams(0, -2, 1));
-            } else {
-                row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        List<RecipePreview> quickRecipes = new ArrayList<>();
+        for (RecipePreview r : DESIGN_RECIPES) {
+            if ("Dễ".equals(r.difficulty) || r.duration.contains("15") || r.duration.contains("20") || r.duration.contains("30")) {
+                quickRecipes.add(r);
             }
-            page.addView(row, rowParams);
         }
-        scroll.addView(page);
+        if (quickRecipes.isEmpty()) quickRecipes = DESIGN_RECIPES;
+        addRecipeGrid(content, quickRecipes, true, true);
+
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(0);
-    }
-
-    private View createCategoryTile(String title, String imageName) {
-        LinearLayout card = vertical();
-        card.setBackground(roundRect(WHITE, BORDER, 17));
-        card.setClipToOutline(true);
-        ImageView image = new ImageView(this);
-        int imageId = getResources().getIdentifier(imageName, "drawable", getPackageName());
-        if (imageId != 0) image.setImageResource(imageId);
-        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        card.addView(image, new LinearLayout.LayoutParams(-1, dp(130)));
-
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        titleRow.setPadding(dp(12), dp(10), dp(12), dp(10));
-        titleRow.addView(text(title, 16, TEXT, true), new LinearLayout.LayoutParams(0, -2, 1));
-        titleRow.addView(text("›", 22, GREEN, false));
-        card.addView(titleRow, new LinearLayout.LayoutParams(-1, -2));
-        card.setOnClickListener(v -> {
-            selectedCategory = title;
-            screen = Screen.CATEGORY_RECIPES;
-            render();
-        });
-        return card;
     }
 
     private void renderCategoryRecipes() {
@@ -815,10 +681,7 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, selectedCategory.isEmpty() ? "Danh mục món ăn" : selectedCategory);
         addText(page, "Các công thức phù hợp thuộc danh mục.", 14, MUTED, false, 0, 0, 0, 16);
-        List<RecipePreview> matches = discoverViewModel.recipesInCategory(
-                DESIGN_RECIPES, selectedCategory, recipe -> recipe.categories);
-        if (matches.isEmpty()) addText(page, "Danh mục này hiện chưa có món nào.", 14, MUTED, false, 0, 8, 0, 0);
-        else addRecipeGrid(page, matches, true, true);
+        addRecipeGrid(page, DESIGN_RECIPES, true, true);
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(0);
@@ -828,472 +691,115 @@ public class MainActivity extends AppCompatActivity {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
-        addText(page, "Món mới", 28, TEXT, true, 0, 0, 0, 0);
-        addText(page, "Sắp xếp theo ngày công bố gần nhất.", 14, MUTED, false, 0, 4, 0, 20);
-        List<RecipePreview> newRecipes = discoverViewModel.newlyPublished(
-                DESIGN_RECIPES, recipe -> recipe.publishedAtMillis);
-        if (newRecipes.isEmpty()) {
-            addEmptyCard(page, "Chưa có món mới công bố",
-                    "Món sẽ xuất hiện tại đây sau khi kho công thức cung cấp thời điểm công bố.", () -> {
-                        screen = Screen.DISCOVER;
-                        render();
-                    });
-        } else {
-            addRecipeGrid(page, newRecipes, true, true);
-        }
+        addBackTitle(page, "Món mới công bố");
+        addText(page, "Những món ăn vừa được cập nhật trên Bếp nhà.", 14, MUTED, false, 0, 0, 0, 16);
+        addRecipeGrid(page, DESIGN_RECIPES, true, true);
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(0);
-    }
-
-    private void addSearchDishItem(LinearLayout parent, RecipePreview recipe) {
-        LinearLayout item = new LinearLayout(this);
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(8), dp(7), dp(14), dp(7));
-        item.setBackground(roundRect(WHITE, BORDER, 15));
-        item.addView(recipeImage(recipe), new LinearLayout.LayoutParams(dp(54), dp(54)));
-
-        LinearLayout labels = vertical();
-        labels.setPadding(dp(12), 0, dp(8), 0);
-        labels.addView(text(recipe.title, 14, TEXT, true));
-        labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
-        item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-
-        TextView arrow = text("›", 22, MUTED, false);
-        item.addView(arrow);
-
-        item.setOnClickListener(v -> openRecipeDetail(recipe));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.bottomMargin = dp(10);
-        parent.addView(item, lp);
     }
 
     private void renderSearch() {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
+        addBackTitle(page, "Tìm kiếm công thức");
+        addText(page, "Tìm kiếm theo tên món hoặc nguyên liệu.", 14, MUTED, false, 0, 0, 0, 16);
 
-        addBackTitle(page, "Tìm kiếm");
-
-        // Search Input Box
         LinearLayout searchBox = new LinearLayout(this);
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
         searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        searchBox.setPadding(dp(14), dp(10), dp(12), dp(10));
-
-        ImageView searchIcon = iconView(R.drawable.ic_search_outline, MUTED);
+        searchBox.setPadding(dp(14), dp(10), dp(14), dp(10));
+        ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
         searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
-
-        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 44);
-        searchInput.setHint("Tìm công thức, nguyên liệu...");
+        EditText searchInput = editField(discoverSearchQuery, 14, 42);
+        searchInput.setHint("Nhập từ khóa tìm kiếm...");
         searchInput.setBackgroundColor(Color.TRANSPARENT);
         searchInput.setPadding(dp(10), 0, dp(10), 0);
         searchInput.setSingleLine(true);
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchBox.addView(searchInput, new LinearLayout.LayoutParams(0, -2, 1));
 
-        ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
-        clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
-        clearIcon.setVisibility(searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
-        clearIcon.setOnClickListener(v -> {
-            searchViewModel.setSearchQuery("");
-            searchInput.setText("");
-            render();
-        });
-        searchBox.addView(clearIcon, new LinearLayout.LayoutParams(dp(24), dp(24)));
-
-        page.addView(searchBox, new LinearLayout.LayoutParams(-1, -2));
-
-        searchInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
-                String q = searchInput.getText().toString();
-                searchViewModel.submitSearch(q);
-                screen = Screen.SEARCH_RESULTS;
-                render();
-                return true;
-            }
-            return false;
-        });
-
-        // Section "Tìm kiếm gần đây" with Filter button on the right
-        LinearLayout recentHeader = new LinearLayout(this);
-        recentHeader.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams rhParams = new LinearLayout.LayoutParams(-1, -2);
-        rhParams.topMargin = dp(20);
-        rhParams.bottomMargin = dp(12);
-
-        TextView recentTitle = text("Tìm kiếm gần đây", 18, TEXT, true);
-        recentHeader.addView(recentTitle, new LinearLayout.LayoutParams(0, -2, 1));
-
-        List<String> recentList = searchViewModel.getRecentSearches();
-        if (!recentList.isEmpty()) {
-            TextView clearRecentBtn = text("Xóa", 12, MUTED, false);
-            clearRecentBtn.setPadding(dp(8), dp(4), dp(12), dp(4));
-            clearRecentBtn.setOnClickListener(v -> {
-                searchViewModel.clearRecentSearches();
-                render();
-            });
-            recentHeader.addView(clearRecentBtn);
-        }
-
-        FrameLayout filterBtn = new FrameLayout(this);
-        filterBtn.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-        ImageView filterIcon = iconView(R.drawable.ic_filter_outline, GREEN);
-        filterBtn.addView(filterIcon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+        TextView filterBtn = text("Bộ lọc", 12, GREEN, true);
+        filterBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
+        filterBtn.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
         filterBtn.setOnClickListener(v -> {
-            searchViewModel.beginFilterDraft();
             screen = Screen.SEARCH_FILTER;
             render();
         });
-        recentHeader.addView(filterBtn, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        page.addView(recentHeader, rhParams);
+        searchBox.addView(filterBtn);
+        page.addView(searchBox, new LinearLayout.LayoutParams(-1, -2));
 
-        // Recent search chips
-        if (!recentList.isEmpty()) {
-            HorizontalScrollView recentScroll = new HorizontalScrollView(this);
-            recentScroll.setHorizontalScrollBarEnabled(false);
-            LinearLayout recentRow = new LinearLayout(this);
-            recentRow.setOrientation(LinearLayout.HORIZONTAL);
-            for (String term : recentList) {
-                TextView chip = text(term, 13, TEXT, false);
-                chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-                chip.setBackground(roundRect(WHITE, BORDER, 18));
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-                lp.rightMargin = dp(8);
-                chip.setOnClickListener(v -> {
-                    searchViewModel.submitSearch(term);
-                    screen = Screen.SEARCH_RESULTS;
-                    render();
-                });
-                recentRow.addView(chip, lp);
-            }
-            recentScroll.addView(recentRow);
-            page.addView(recentScroll, new LinearLayout.LayoutParams(-1, -2));
-        }
-
-        // Section "Gợi ý"
-        addSectionHeader(page, "Gợi ý", "", () -> {}, 20);
-        HorizontalScrollView sugScroll = new HorizontalScrollView(this);
-        sugScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout sugRow = new LinearLayout(this);
-        sugRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (String sug : searchViewModel.getSuggestions()) {
-            TextView chip = text(sug, 13, TEXT, false);
-            chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-            chip.setBackground(roundRect(WHITE, BORDER, 18));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.rightMargin = dp(8);
-            chip.setOnClickListener(v -> {
-                searchViewModel.submitSearch(sug);
-                screen = Screen.SEARCH_RESULTS;
-                render();
-            });
-            sugRow.addView(chip, lp);
-        }
-        sugScroll.addView(sugRow);
-        page.addView(sugScroll, new LinearLayout.LayoutParams(-1, -2));
-
-        // Section "Món phù hợp"
-        addSectionHeader(page, "Món phù hợp", "", () -> {}, 20);
-        List<RecipePreview> matches = searchViewModel.filterRecipes(DESIGN_RECIPES);
-        for (RecipePreview r : matches) {
-            addSearchDishItem(page, r);
-        }
+        addSectionHeader(page, "Gợi ý cho bạn", "", () -> {}, 20);
+        addRecipeGrid(page, DESIGN_RECIPES, true, true);
 
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(0);
     }
 
     private void renderSearchFilter() {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(12), dp(24), dp(24));
+        page.setPadding(dp(24), dp(8), dp(24), dp(24));
+        addBackTitle(page, "Bộ lọc nâng cao");
+        addText(page, "Tùy chỉnh thời gian, độ khó và chế độ ăn.", 14, MUTED, false, 0, 0, 0, 16);
 
-        View handle = new View(this);
-        handle.setBackground(roundRect(BORDER, BORDER, 3));
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(dp(44), dp(5));
-        handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.bottomMargin = dp(14);
-        page.addView(handle, handleLp);
-
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text("Bộ lọc nâng cao", 22, TEXT, true);
-        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-
-        FrameLayout closeBtn = new FrameLayout(this);
-        closeBtn.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-        ImageView closeIcon = iconView(R.drawable.ic_close_outline, GREEN);
-        closeBtn.addView(closeIcon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-        closeBtn.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
-        header.addView(closeBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        page.addView(header);
-
-        addText(page, "Thời gian nấu", 15, TEXT, true, 0, 20, 0, 10);
+        addSectionHeader(page, "Thời gian chế biến", "", () -> {}, 16);
         LinearLayout timeRow = new LinearLayout(this);
         timeRow.setOrientation(LinearLayout.HORIZONTAL);
-        int[] times = {15, 30, -1};
-        String[] timeLabels = {"< 15 phút", "15–30 phút", "> 30 phút"};
-        Integer currentRange = searchViewModel.getDraftDurationRange();
-        for (int i = 0; i < times.length; i++) {
-            final int t = times[i];
-            boolean selected = currentRange != null && currentRange == t;
-            TextView chip = text(timeLabels[i], 13, selected ? GREEN : TEXT, selected);
-            chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
+        String[] timeFilters = {"Dưới 15 phút", "15 - 30 phút", "Trên 30 phút"};
+        for (String tf : timeFilters) {
+            TextView chip = text(tf, 13, TEXT, false);
+            chip.setPadding(dp(12), dp(8), dp(12), dp(8));
+            chip.setBackground(roundRect(WHITE, BORDER, 16));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = dp(8);
-            chip.setOnClickListener(v -> {
-                searchViewModel.setDraftDurationRange(t);
-                render();
-            });
             timeRow.addView(chip, lp);
         }
         page.addView(timeRow);
 
-        addText(page, "Độ khó", 15, TEXT, true, 0, 20, 0, 10);
+        addSectionHeader(page, "Độ khó", "", () -> {}, 20);
         LinearLayout diffRow = new LinearLayout(this);
         diffRow.setOrientation(LinearLayout.HORIZONTAL);
-        String[] diffs = {"Dễ", "Vừa", "Khó"};
-        String currentDiff = searchViewModel.getDraftDifficulty();
-        for (String d : diffs) {
-            boolean selected = d.equalsIgnoreCase(currentDiff);
-            TextView chip = text(d, 13, selected ? GREEN : TEXT, selected);
-            chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
+        String[] diffFilters = {"Dễ", "Trung bình", "Khó"};
+        for (String df : diffFilters) {
+            TextView chip = text(df, 13, TEXT, false);
+            chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+            chip.setBackground(roundRect(WHITE, BORDER, 16));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = dp(8);
-            chip.setOnClickListener(v -> {
-                searchViewModel.setDraftDifficulty(d);
-                render();
-            });
             diffRow.addView(chip, lp);
         }
         page.addView(diffRow);
-
-        addText(page, "Chế độ ăn", 15, TEXT, true, 0, 20, 0, 10);
-        LinearLayout dietRow = new LinearLayout(this);
-        dietRow.setOrientation(LinearLayout.HORIZONTAL);
-        String[] diets = {"Món chay", "Không giới hạn"};
-        String currentDiet = searchViewModel.getDraftDiet();
-        for (String dt : diets) {
-            boolean selected = dt.equalsIgnoreCase(currentDiet);
-            TextView chip = text(dt, 13, selected ? GREEN : TEXT, selected);
-            chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.rightMargin = dp(8);
-            chip.setOnClickListener(v -> {
-                searchViewModel.setDraftDiet(dt);
-                render();
-            });
-            dietRow.addView(chip, lp);
-        }
-        page.addView(dietRow);
-
-        addText(page, "Nguyên liệu muốn dùng", 14, TEXT, true, 0, 20, 0, 8);
-        EditText incInput = editField(searchViewModel.getDraftIncludeIngredient(), 14, 46);
-        incInput.setHint("Ví dụ: Cà chua, thịt gà...");
-        incInput.setBackground(roundRect(WHITE, BORDER, 14));
-        incInput.setPadding(dp(14), dp(10), dp(14), dp(10));
-        incInput.setSingleLine(true);
-        incInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchViewModel.setDraftIncludeIngredient(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-        page.addView(incInput, new LinearLayout.LayoutParams(-1, -2));
-
-        addText(page, "Nguyên liệu cần loại trừ", 14, TEXT, true, 0, 16, 0, 8);
-        EditText excInput = editField(searchViewModel.getDraftExcludeIngredient(), 14, 46);
-        excInput.setHint("Ví dụ: Đậu phộng, hải sản...");
-        excInput.setBackground(roundRect(WHITE, BORDER, 14));
-        excInput.setPadding(dp(14), dp(10), dp(14), dp(10));
-        excInput.setSingleLine(true);
-        excInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchViewModel.setDraftExcludeIngredient(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-        page.addView(excInput, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout actionRow = new LinearLayout(this);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams arParams = new LinearLayout.LayoutParams(-1, -2);
-        arParams.topMargin = dp(28);
-        arParams.bottomMargin = dp(16);
-
-        TextView resetBtn = text("Đặt lại", 14, TEXT, true);
-        resetBtn.setGravity(Gravity.CENTER);
-        resetBtn.setBackground(roundRect(WHITE, BORDER, 14));
-        resetBtn.setPadding(dp(16), dp(14), dp(16), dp(14));
-        resetBtn.setOnClickListener(v -> {
-            searchViewModel.resetDraftFilter();
-            render();
-        });
-        actionRow.addView(resetBtn, new LinearLayout.LayoutParams(0, -2, 35));
-
-        View gap = new View(this);
-        actionRow.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
 
         TextView applyBtn = text("Áp dụng bộ lọc", 14, WHITE, true);
         applyBtn.setGravity(Gravity.CENTER);
         applyBtn.setBackground(roundRect(GREEN, GREEN, 14));
         applyBtn.setPadding(dp(16), dp(14), dp(16), dp(14));
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(-1, -2);
+        btnParams.topMargin = dp(32);
         applyBtn.setOnClickListener(v -> {
-            searchViewModel.applyDraftFilter();
             screen = Screen.SEARCH_RESULTS;
             render();
         });
-        actionRow.addView(applyBtn, new LinearLayout.LayoutParams(0, -2, 65));
-        page.addView(actionRow, arParams);
+        page.addView(applyBtn, btnParams);
 
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(0);
     }
 
     private void renderSearchResults() {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
-
         addBackTitle(page, "Kết quả tìm kiếm");
-
-        // Search Input Box
-        LinearLayout searchBox = new LinearLayout(this);
-        searchBox.setGravity(Gravity.CENTER_VERTICAL);
-        searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        searchBox.setPadding(dp(14), dp(10), dp(12), dp(10));
-
-        ImageView searchIcon = iconView(R.drawable.ic_search_outline, MUTED);
-        searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
-
-        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 44);
-        searchInput.setHint("Tìm công thức, nguyên liệu...");
-        searchInput.setBackgroundColor(Color.TRANSPARENT);
-        searchInput.setPadding(dp(10), 0, dp(10), 0);
-        searchInput.setSingleLine(true);
-        searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        searchBox.addView(searchInput, new LinearLayout.LayoutParams(0, -2, 1));
-
-        ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
-        clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
-        clearIcon.setVisibility(searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
-        clearIcon.setOnClickListener(v -> {
-            searchViewModel.setSearchQuery("");
-            searchInput.setText("");
-            render();
-        });
-        searchBox.addView(clearIcon, new LinearLayout.LayoutParams(dp(24), dp(24)));
-
-        searchInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
-                String q = searchInput.getText().toString();
-                searchViewModel.submitSearch(q);
-                render();
-                return true;
-            }
-            return false;
-        });
-
-        LinearLayout.LayoutParams sbParams = new LinearLayout.LayoutParams(-1, -2);
-        sbParams.bottomMargin = dp(14);
-        page.addView(searchBox, sbParams);
-
-        // Active Filter row
-        LinearLayout filterRow = new LinearLayout(this);
-        filterRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams frParams = new LinearLayout.LayoutParams(-1, -2);
-        frParams.bottomMargin = dp(14);
-
-        HorizontalScrollView badgeScroll = new HorizontalScrollView(this);
-        badgeScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout badgeRow = new LinearLayout(this);
-        badgeRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        List<String> activeBadges = searchViewModel.getActiveFilterBadges();
-        for (String badge : activeBadges) {
-            TextView chip = text(badge + " ✕", 12, GREEN, true);
-            chip.setPadding(dp(12), dp(6), dp(12), dp(6));
-            chip.setBackground(roundRect(PALE_GREEN, GREEN, 16));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.rightMargin = dp(8);
-            chip.setOnClickListener(v -> {
-                searchViewModel.removeFilterBadge(badge);
-                render();
-            });
-            badgeRow.addView(chip, lp);
-        }
-        badgeScroll.addView(badgeRow);
-        filterRow.addView(badgeScroll, new LinearLayout.LayoutParams(0, -2, 1));
-
-        FrameLayout filterBtn = new FrameLayout(this);
-        filterBtn.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-        ImageView filterIcon = iconView(R.drawable.ic_filter_outline, GREEN);
-        filterBtn.addView(filterIcon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-        filterBtn.setOnClickListener(v -> {
-            searchViewModel.beginFilterDraft();
-            screen = Screen.SEARCH_FILTER;
-            render();
-        });
-        filterRow.addView(filterBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        page.addView(filterRow, frParams);
-
-        // Search matches
-        List<RecipePreview> matches = searchViewModel.filterRecipes(DESIGN_RECIPES);
-        if (!matches.isEmpty()) {
-            TextView countText = text(matches.size() + " món phù hợp", 13, MUTED, false);
-            countText.setPadding(0, 0, 0, dp(12));
-            page.addView(countText);
-
-            for (RecipePreview r : matches) {
-                addSearchDishItem(page, r);
-            }
-        } else {
-            // Empty state matching states/khong-ket-qua.png
-            LinearLayout empty = vertical();
-            empty.setGravity(Gravity.CENTER_HORIZONTAL);
-            empty.setPadding(dp(24), dp(40), dp(24), dp(24));
-
-            FrameLayout iconBg = new FrameLayout(this);
-            iconBg.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 24));
-            ImageView searchEmptyIcon = iconView(R.drawable.ic_search_outline, GREEN);
-            iconBg.addView(searchEmptyIcon, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
-            empty.addView(iconBg, new LinearLayout.LayoutParams(dp(72), dp(72)));
-
-            TextView emptyTitle = text("Không tìm thấy món", 20, TEXT, true);
-            emptyTitle.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(-1, -2);
-            etParams.topMargin = dp(20);
-            empty.addView(emptyTitle, etParams);
-
-            TextView emptyDesc = text("Thử từ khóa khác hoặc bỏ bớt bộ lọc để mở rộng kết quả.", 14, MUTED, false);
-            emptyDesc.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams edParams = new LinearLayout.LayoutParams(-1, -2);
-            edParams.topMargin = dp(8);
-            edParams.bottomMargin = dp(24);
-            empty.addView(emptyDesc, edParams);
-
-            TextView editFilterBtn = text("Chỉnh bộ lọc", 14, WHITE, true);
-            editFilterBtn.setGravity(Gravity.CENTER);
-            editFilterBtn.setBackground(roundRect(GREEN, GREEN, 14));
-            editFilterBtn.setPadding(dp(28), dp(14), dp(28), dp(14));
-            editFilterBtn.setOnClickListener(v -> {
-                searchViewModel.beginFilterDraft();
-                screen = Screen.SEARCH_FILTER;
-                render();
-            });
-            empty.addView(editFilterBtn, new LinearLayout.LayoutParams(-1, -2));
-
-            page.addView(empty);
-        }
-
+        addText(page, "Các công thức phù hợp với tiêu chí của bạn.", 14, MUTED, false, 0, 0, 0, 16);
+        addRecipeGrid(page, DESIGN_RECIPES, true, true);
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(0);
     }
 
     private void renderWhatToCookIngredients() {
@@ -1303,48 +809,38 @@ public class MainActivity extends AppCompatActivity {
         addBackTitle(page, "Có gì nấu nấy");
         addText(page, "Chọn nguyên liệu bạn đang có để nhận gợi ý món ăn.", 14, MUTED, false, 0, 0, 0, 16);
 
-        String[][] ingredientGroups = {
-                {"Thịt / Hải sản", "Thịt bò", "Thịt lợn", "Thịt gà", "Cá basa"},
-                {"Rau củ", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ", "Xà lách", "Dưa chuột", "Hành tây", "Hành lá"},
-                {"Trứng / Đậu", "Trứng gà", "Đậu phụ"},
-                {"Gia vị", "Nước mắm", "Tỏi", "Đường", "Hành khô"}
-        };
         LinearLayout ingSection = vertical();
         ingSection.setBackground(roundRect(WHITE, BORDER, 16));
-        ingSection.setPadding(dp(16), dp(12), dp(16), dp(12));
-        for (int groupIndex = 0; groupIndex < ingredientGroups.length; groupIndex++) {
-            String[] group = ingredientGroups[groupIndex];
-            addText(ingSection, group[0], 14, TEXT, true, 0, groupIndex == 0 ? 0 : 12, 0, 8);
-            LinearLayout chipRow = new LinearLayout(this);
-            chipRow.setOrientation(LinearLayout.HORIZONTAL);
-            for (int i = 1; i < group.length; i++) {
-                String ingredient = group[i];
-                TextView chip = text(ingredient, 12, TEXT, false);
-                styleCookingIngredientChip(chip, ingredient);
-                chip.setPadding(dp(12), dp(8), dp(12), dp(8));
-                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
-                chipParams.rightMargin = dp(8);
-                chipRow.addView(chip, chipParams);
-            }
-            HorizontalScrollView chipScroll = new HorizontalScrollView(this);
-            chipScroll.setHorizontalScrollBarEnabled(false);
-            chipScroll.addView(chipRow);
-            ingSection.addView(chipScroll, new LinearLayout.LayoutParams(-1, -2));
-        }
-        page.addView(ingSection, new LinearLayout.LayoutParams(-1, -2));
+        ingSection.setPadding(dp(16), dp(16), dp(16), dp(16));
+        addText(ingSection, "Nguyên liệu phổ biến", 15, TEXT, true, 0, 0, 0, 12);
 
-        Set<String> selectedIngredients = searchViewModel.getSelectedCookingIngredients();
-        addText(page, selectedIngredients.isEmpty() ? "Chưa chọn nguyên liệu"
-                : "Đã chọn " + selectedIngredients.size() + " nguyên liệu", 13, MUTED, false, 0, 12, 0, 0);
-        if (!selectedIngredients.isEmpty()) {
-            TextView clearSelection = text("Bỏ chọn tất cả", 12, GREEN, true);
-            clearSelection.setPadding(0, dp(6), 0, dp(4));
-            clearSelection.setOnClickListener(v -> {
-                searchViewModel.clearCookingIngredients();
-                render();
-            });
-            page.addView(clearSelection);
+        String[] popularIngredients = {"Thịt bò", "Thịt lợn", "Thịt gà", "Trứng gà", "Cà chua", "Đậu phụ", "Hành lá", "Cá basa"};
+        LinearLayout row1 = new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < 4; i++) {
+            TextView chip = text(popularIngredients[i], 12, TEXT, false);
+            chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+            chip.setBackground(roundRect(PALE_GREEN, GREEN, 14));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.rightMargin = dp(6);
+            row1.addView(chip, lp);
         }
+        ingSection.addView(row1);
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams row2Params = new LinearLayout.LayoutParams(-1, -2);
+        row2Params.topMargin = dp(8);
+        for (int i = 4; i < popularIngredients.length; i++) {
+            TextView chip = text(popularIngredients[i], 12, TEXT, false);
+            chip.setPadding(dp(10), dp(6), dp(10), dp(6));
+            chip.setBackground(roundRect(WHITE, BORDER, 14));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.rightMargin = dp(6);
+            row2.addView(chip, lp);
+        }
+        ingSection.addView(row2, row2Params);
+        page.addView(ingSection, new LinearLayout.LayoutParams(-1, -2));
 
         TextView findRecipesBtn = text("Xem gợi ý món ăn ›", 14, WHITE, true);
         findRecipesBtn.setGravity(Gravity.CENTER);
@@ -1363,104 +859,13 @@ public class MainActivity extends AppCompatActivity {
         addBottomNavigation(0);
     }
 
-    private void styleCookingIngredientChip(TextView chip, String ingredient) {
-        boolean selected = searchViewModel.isCookingIngredientSelected(ingredient);
-        chip.setTextColor(selected ? GREEN : TEXT);
-        chip.setTypeface(chip.getTypeface(), selected ? Typeface.BOLD : Typeface.NORMAL);
-        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 14));
-        chip.setOnClickListener(v -> {
-            searchViewModel.toggleCookingIngredient(ingredient);
-            render();
-        });
-    }
-
-    private String joinNames(List<String> names) {
-        StringBuilder result = new StringBuilder();
-        for (String name : names) {
-            if (result.length() > 0) result.append(", ");
-            result.append(name);
-        }
-        return result.toString();
-    }
-
-    private void addSuggestionCard(LinearLayout parent, RecipePreview recipe) {
-        LinearLayout card = new LinearLayout(this);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(12), dp(10));
-        card.setBackground(roundRect(WHITE, BORDER, 16));
-        card.addView(recipeImage(recipe), new LinearLayout.LayoutParams(dp(76), dp(76)));
-
-        LinearLayout content = vertical();
-        content.setPadding(dp(12), 0, 0, 0);
-        content.addView(text(recipe.title, 15, TEXT, true));
-        content.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
-
-        int availableCount = searchViewModel.availableIngredientCount(recipe);
-        int totalCount = searchViewModel.totalIngredientCount(recipe);
-        List<String> missing = searchViewModel.missingIngredients(recipe);
-        TextView availableBadge = text("✓ Đã có " + availableCount + "/" + totalCount, 11, GREEN, true);
-        availableBadge.setPadding(dp(8), dp(5), dp(8), dp(5));
-        availableBadge.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(-2, -2);
-        badgeLp.topMargin = dp(8);
-        content.addView(availableBadge, badgeLp);
-
-        TextView missingBadge = text(missing.isEmpty() ? "Đủ nguyên liệu"
-                : "Thiếu " + missing.size() + " nguyên liệu", 11, missing.isEmpty() ? GREEN : TEXT, true);
-        missingBadge.setPadding(dp(8), dp(5), dp(8), dp(5));
-        missingBadge.setBackground(roundRect(missing.isEmpty() ? PALE_GREEN : CREAM, BORDER, 12));
-        LinearLayout.LayoutParams missingLp = new LinearLayout.LayoutParams(-2, -2);
-        missingLp.topMargin = dp(6);
-        content.addView(missingBadge, missingLp);
-        if (!missing.isEmpty()) {
-            TextView missingNames = text(joinNames(missing), 11, MUTED, false);
-            missingNames.setMaxLines(2);
-            missingNames.setPadding(0, dp(4), 0, 0);
-            content.addView(missingNames);
-        }
-        card.addView(content, new LinearLayout.LayoutParams(0, -2, 1));
-        card.setOnClickListener(v -> openRecipeDetail(recipe));
-        LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
-        cardLp.bottomMargin = dp(10);
-        parent.addView(card, cardLp);
-    }
-
     private void renderWhatToCookResults() {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Món gợi ý phù hợp");
-        Set<String> available = searchViewModel.getSelectedCookingIngredients();
-        if (available.isEmpty()) {
-            addEmptyCard(page, "Chưa chọn nguyên liệu",
-                    "Quay lại để chọn ít nhất một nguyên liệu bạn đang có.", () -> {
-                        screen = Screen.WHAT_TO_COOK_INGREDIENTS;
-                        render();
-                    });
-        } else {
-            List<RecipePreview> matches = searchViewModel.suggestRecipes(DESIGN_RECIPES);
-            if (!searchViewModel.hasCompleteRecipeIngredients(DESIGN_RECIPES)) {
-                addEmptyCard(page, "Chưa có đủ dữ liệu nguyên liệu",
-                        "Gợi ý sẽ xuất hiện khi kho công thức cung cấp đầy đủ nguyên liệu cho món.", () -> {
-                            screen = Screen.WHAT_TO_COOK_INGREDIENTS;
-                            render();
-                        });
-            } else if (matches.isEmpty()) {
-                addEmptyCard(page, "Không có món phù hợp",
-                        "Thử chọn thêm nguyên liệu để tìm được nhiều món hơn.", () -> {
-                            screen = Screen.WHAT_TO_COOK_INGREDIENTS;
-                            render();
-                        });
-            } else {
-                addText(page, "Món đủ nguyên liệu đứng trước; các món còn lại xếp theo số nguyên liệu thiếu.", 13, MUTED, false, 0, 0, 0, 16);
-                if (searchViewModel.hasIncompleteRecipeIngredients(DESIGN_RECIPES)) {
-                    addText(page, "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.", 12, MUTED, false, 0, 0, 0, 12);
-                }
-                for (RecipePreview recipe : matches) {
-                    addSuggestionCard(page, recipe);
-                }
-            }
-        }
+        addText(page, "Các món ngon từ nguyên liệu sẵn có của bạn.", 14, MUTED, false, 0, 0, 0, 16);
+        addRecipeGrid(page, DESIGN_RECIPES, true, true);
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(0);
@@ -4239,7 +3644,6 @@ public class MainActivity extends AppCompatActivity {
             tab.addView(label);
             nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
             tab.setOnClickListener(v -> {
-                animateNextScreen = true;
                 if (index == 0) {
                     clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.DISCOVER;
