@@ -28,13 +28,17 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 ## 4. Kế hoạch và danh sách mua sắm
 
 - Kế hoạch lưu cục bộ gồm `recipeId` duy nhất, khẩu phần đã chọn và thứ tự hiển thị. Danh sách mua sắm được tạo từ các món và khẩu phần trong kế hoạch; không tạo lại bằng cách cộng dồn vào kết quả cũ.
+- Khi người dùng chủ động bấm **Tạo danh sách mua sắm** từ Nấu hôm nay, phải tính lại toàn bộ nguyên liệu cho mọi món theo đúng `servings/baseServings`, thay thế các mục của danh sách cũ trong một giao dịch; mọi mục mới bắt đầu ở `Cần mua`. Không xóa danh sách cũ trước khi đã có thể tính và lưu thành công danh sách mới. Quy tắc này yêu cầu có nguồn `RecipeIngredient` thật và không được thay bằng dữ liệu tự dựng.
 - Module 6 cho phép lọc nguồn chọn món theo danh sách hiện có, món yêu thích hoặc một bộ sưu tập cụ thể. Tìm kiếm lọc trong nguồn đang chọn; đổi nguồn không làm mất các `recipeId` đã tích hay khẩu phần của món đã có trong kế hoạch.
 - Mỗi danh sách mua sắm có các mục tổng hợp và các đóng góp nguồn theo món/dòng nguyên liệu. Khóa gộp đề xuất: `ingredientId + đại lượng + unitId chuẩn + loại lượng`; nhờ vậy có thể tính lại khi đổi khẩu phần hoặc bỏ món mà không làm mất nguồn còn lại.
 - Nút cập nhật danh sách (luồng màn 22) tính lại các đóng góp từ công thức theo kế hoạch hiện tại và giữ nguyên mục thêm tay. Thực hiện trong một giao dịch cục bộ để không lưu trạng thái nửa chừng.
-- Mục được gộp giữ trạng thái `Cần mua`, `Đã có` hoặc `Đã mua`. Khi cập nhật, giữ trạng thái nếu lượng không tăng; nếu lượng cần tăng thì chuyển về `Cần mua` để tránh hiểu nhầm là đã đủ. Mục không còn nguồn công thức sẽ bị loại nếu chỉ do công thức tạo; mục thêm tay vẫn giữ.
+- Danh sách chỉ có hai trạng thái: `Cần mua` và `Đã có` (nguyên liệu hiện có sẵn ở nhà). Nút tích chuyển trực tiếp qua lại giữa hai trạng thái mà không đổi tab; mục rời ngay khỏi danh sách đang xem và được hiển thị trong tab trạng thái còn lại. Sau thao tác, giữ nguyên tab đang chọn. Chạm chip luôn lọc đúng trạng thái đó; không có trạng thái riêng `Đã mua`. Khi cập nhật công thức, giữ `Đã có` nếu lượng không tăng; nếu lượng cần tăng thì chuyển về `Cần mua` để tránh hiểu nhầm là đã đủ. Mục không còn nguồn công thức sẽ bị loại nếu chỉ do công thức tạo; mục thêm tay vẫn giữ.
+- Nút cuối danh sách mua sắm là `Xóa toàn bộ`; yêu cầu xác nhận trước khi xóa tất cả mục của danh sách. Nút thêm nguyên liệu vẫn mở form tạo mục; sửa từng mục qua thao tác chạm vào thẻ.
 - Mục người dùng thêm có đóng góp riêng. Nếu cùng nguyên liệu/đơn vị với mục công thức thì hiển thị chung một dòng nhưng giữ riêng đóng góp thủ công để cập nhật công thức không xóa nó; nếu không cùng khóa gộp thì hiển thị dòng riêng.
 - Khi người dùng sửa lượng của mục tổng hợp, lưu phần điều chỉnh của người dùng riêng với tổng tính từ công thức. Lần cập nhật sau áp dụng lại phần điều chỉnh trên tổng mới; không cho lưu tổng lượng âm. Nếu toàn bộ nguồn công thức bị bỏ, giữ đóng góp thủ công và phần điều chỉnh như mục do người dùng quản lý.
 - Nếu người dùng chọn **Giữ danh sách cũ**, không tính lại các mục. Nếu chọn **Cập nhật**, dùng quy tắc trên. Thêm cùng một nguồn công thức lần nữa là thao tác upsert, không tạo thêm đóng góp trùng.
+
+**Tình trạng code Module 7 (21/11/2026):** đã có một danh sách mua sắm cục bộ trong SQLite, thêm/sửa/xóa từng mục nhập tay, xóa toàn bộ danh sách sau xác nhận, chọn nhóm danh mục, nút tích chuyển qua lại hai trạng thái `Cần mua`/`Đã có`, và chuẩn hóa đơn vị ban đầu theo danh mục người dùng cung cấp. Module 7 lưu snapshot kế hoạch và có sheet màn 22 khi món/khẩu phần thay đổi; sheet có thể ghi nhận kế hoạch mới và giữ mục nhập tay. **Chưa thể tạo danh sách tự động từ kế hoạch:** kho công thức chưa có dữ liệu `RecipeIngredient` hay `baseServings`, nên chưa thể tính lượng chính xác hoặc thay danh sách cũ an toàn. Không lấy nguyên liệu minh họa trong ảnh làm dữ liệu công thức giả. Hoàn tất phần này sau khi module công thức cung cấp `recipeId`, `recipeIngredientId`, `ingredientId`, lượng, `unitId`, ghi chú định tính và `baseServings`.
 
 ## 5. Hành vi dữ liệu cá nhân và món bị gỡ
 
@@ -55,8 +59,8 @@ Phạm vi: Kho món cá nhân, Nấu hôm nay, Mua sắm; phối hợp với mod
 | `RecipeNote` | Khóa duy nhất `recipeId`, nội dung ghi chú và thời điểm cập nhật |
 | `RecipeViewHistory` | Khóa duy nhất `recipeId`, thời điểm xem gần nhất; cập nhật thay vì thêm trùng |
 | `MealPlan`, `MealPlanRecipe` | ID kế hoạch; khóa duy nhất `(planId, recipeId)`, `servings`, thứ tự |
-| `ShoppingList` | `listId`, `planId`, trạng thái hiện hành và thời điểm cập nhật |
-| `ShoppingListItem` | `itemId`, `listId`, nguyên liệu chuẩn hoặc tên thủ công, đơn vị/đại lượng/loại lượng, lượng tổng, phần điều chỉnh, trạng thái |
+| `ShoppingList` | `listId`, `planId`, snapshot kế hoạch, trạng thái hiện hành và thời điểm cập nhật |
+| `ShoppingListItem` | `itemId`, `listId`, nguyên liệu chuẩn hoặc tên thủ công, danh mục, đơn vị/đại lượng/loại lượng, lượng tổng, phần điều chỉnh, trạng thái |
 | `ShoppingContribution` | `itemId`, `recipeId`, `recipeIngredientId`, lượng nguồn đã tính; khóa duy nhất theo mục và dòng nguồn |
 | `ShoppingManualContribution` | `manualContributionId`, `itemId`, tên hoặc `ingredientId`, lượng/đơn vị, thời điểm thêm; giữ độc lập với đóng góp công thức |
 

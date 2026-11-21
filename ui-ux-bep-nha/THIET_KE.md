@@ -6,6 +6,7 @@
 
 - [Hệ thiết kế](he-thiet-ke.png) · [Showcase](showcase.png) · [Sơ đồ luồng A–F](luong-a-f.png)
 - [Prototype PDF](prototype.pdf) · [Màn 01–07](man-hinh-1.png) · [Màn 08–14](man-hinh-2.png) · [Màn 15–21](man-hinh-3.png) · [Màn 22–28](man-hinh-4.png)
+- [Wireframe đề xuất cho ba ưu tiên offline (chưa duyệt)](DE_XUAT_TINH_NANG_OFFLINE.md)
 
 Mở PDF bằng trình đọc hỗ trợ liên kết nội bộ. Chạm các nút trong những luồng mẫu hoặc dùng mục lục trang để chuyển màn. PDF mô phỏng trạng thái bằng ảnh tĩnh và liên kết. Đồng hồ, tìm kiếm, đồng bộ và thay đổi dữ liệu được minh họa qua các trạng thái có sẵn.
 
@@ -70,6 +71,10 @@ Mở PDF bằng trình đọc hỗ trợ liên kết nội bộ. Chạm các nú
 - Màu chính **#326C4F**, nền xanh **#E8F2E9**, cam đất **#F2A65A**, nền kem **#FAF9F6**, bề mặt **#FFFFFF**, chữ **#25352D**, chữ phụ **#58665C**, lỗi **#A93636**. Xanh chính và chữ phụ được làm đậm so với màu gợi ý.
 - Dùng chung thẻ món, thẻ nổi bật, thẻ danh mục, ô tìm kiếm, chip lọc/nguyên liệu, dòng nguyên liệu, checklist, khối bước nấu, bộ đếm khẩu phần, đồng hồ, chỉ báo tiến độ, thanh tiêu đề/điều hướng, bảng trượt, xác nhận, thông báo, trạng thái trống/đang tải/offline.
 - Các ảnh món được tạo bằng ImageGen tích hợp từ một lưới ảnh 3 × 3. Nội dung ảnh gồm phở bò, bún chả, canh chua cá, gà chiên nước mắm, cơm rang dưa bò, mì Ý sốt bò bằm, salad, pancake và cảnh sơ chế cà chua. Phong cách ảnh ẩm thực editorial, ánh sáng cửa sổ, không chữ hoặc nhãn hiệu. Ảnh, định lượng và thời gian trong mockup dùng minh họa giao diện.
+
+## Đề xuất mở rộng offline — prototype 28 màn vẫn là chuẩn hiện hành
+
+Ba hạng mục — Tủ nguyên liệu/hạn sử dụng, gợi ý “Tối nay nấu gì?” offline và Nhật ký lần nấu — có luồng, wireframe văn bản, điểm vào, chủ sở hữu đề xuất và ranh giới dữ liệu riêng trong [DE_XUAT_TINH_NANG_OFFLINE.md](DE_XUAT_TINH_NANG_OFFLINE.md). Người dùng đã yêu cầu triển khai hai hạng mục Người 3 (Tủ nguyên liệu và Nhật ký lần nấu) ở mức lưu cục bộ; “Tối nay nấu gì?” vẫn thuộc Người 1. Việc triển khai không thay thế prototype 28 màn, không thêm tab điều hướng và chưa đồng nghĩa nhóm đã duyệt wireframe thành thiết kế chính thức. Giao diện mới phải tiếp tục đối chiếu hệ màu, khoảng cách, thẻ và hành vi responsive hiện có.
 
 ## Giả định cần xác nhận khi đặc tả
 
