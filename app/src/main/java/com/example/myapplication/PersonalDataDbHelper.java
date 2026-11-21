@@ -579,6 +579,17 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return logs;
     }
 
+    List<CookingLog> getAllCookingLogs() {
+        List<CookingLog> logs = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
+                        "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog " +
+                        "ORDER BY cookedAt DESC,createdAt DESC", null)) {
+            while (cursor.moveToNext()) logs.add(readCookingLog(cursor));
+        }
+        return logs;
+    }
+
     CookingLog getCookingLog(String logId) {
         if (logId == null) return null;
         try (Cursor cursor = getReadableDatabase().rawQuery(

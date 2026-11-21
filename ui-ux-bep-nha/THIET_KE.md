@@ -74,7 +74,7 @@ Mở PDF bằng trình đọc hỗ trợ liên kết nội bộ. Chạm các nú
 
 ## Đề xuất mở rộng offline — prototype 28 màn vẫn là chuẩn hiện hành
 
-Ba hạng mục — Tủ nguyên liệu/hạn sử dụng, gợi ý “Tối nay nấu gì?” offline và Nhật ký lần nấu — có luồng, wireframe văn bản, điểm vào, chủ sở hữu đề xuất và ranh giới dữ liệu riêng trong [DE_XUAT_TINH_NANG_OFFLINE.md](DE_XUAT_TINH_NANG_OFFLINE.md). Người dùng đã yêu cầu triển khai hai hạng mục Người 3 (Tủ nguyên liệu và Nhật ký lần nấu) ở mức lưu cục bộ; “Tối nay nấu gì?” vẫn thuộc Người 1. Việc triển khai không thay thế prototype 28 màn, không thêm tab điều hướng và chưa đồng nghĩa nhóm đã duyệt wireframe thành thiết kế chính thức. Giao diện mới phải tiếp tục đối chiếu hệ màu, khoảng cách, thẻ và hành vi responsive hiện có.
+Ba hạng mục — Tủ nguyên liệu/hạn sử dụng, gợi ý “Tối nay nấu gì?” offline và Nhật ký lần nấu — có luồng, wireframe văn bản, điểm vào, chủ sở hữu đề xuất và ranh giới dữ liệu riêng trong [DE_XUAT_TINH_NANG_OFFLINE.md](DE_XUAT_TINH_NANG_OFFLINE.md). Người dùng đã yêu cầu triển khai hai hạng mục Người 3 (Tủ nguyên liệu và Nhật ký lần nấu) ở mức lưu cục bộ; “Tối nay nấu gì?” vẫn thuộc Người 1. Màn tổng hợp Nhật ký nấu của tôi cũng đã được thêm và có wireframe trong tài liệu đề xuất. Việc triển khai không thay thế prototype 28 màn, không thêm tab điều hướng và chưa đồng nghĩa nhóm đã duyệt wireframe thành thiết kế chính thức. Giao diện mới phải tiếp tục đối chiếu hệ màu, khoảng cách, thẻ và hành vi responsive hiện có.
 
 ## Giả định cần xác nhận khi đặc tả
 

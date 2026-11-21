@@ -68,6 +68,7 @@ final class PersonalDataRepository {
     }
     boolean deletePantryItem(String id) { return database.deletePantryItem(id); }
     List<PersonalDataDbHelper.CookingLog> getCookingLogs(String recipeId) { return database.getCookingLogs(recipeId); }
+    List<PersonalDataDbHelper.CookingLog> getAllCookingLogs() { return database.getAllCookingLogs(); }
     PersonalDataDbHelper.CookingLog getCookingLog(String id) { return database.getCookingLog(id); }
     boolean saveCookingLog(String id, MainActivity.RecipePreview recipe, long cookedAt, int servings,
                            Integer duration, Integer rating, String adjustment, String photoPath) {

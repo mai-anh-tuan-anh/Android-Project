@@ -216,6 +216,33 @@ Khi chưa có bản ghi: `Bạn chưa ghi lại lần nấu nào` và CTA `Ghi l
 
 Sắp xếp mới nhất trước. Không có ảnh thì giữ thứ bậc thông tin và bố cục thẻ. Trạng thái rỗng dùng câu hướng dẫn và CTA.
 
+### Màn tổng hợp — Nhật ký nấu của tôi
+
+Mở từ `Kho của tôi`; không thêm tab đáy. Dùng nền kem, thẻ trắng/viền nhạt, xanh chính và nhịp cách 8/16/24 dp như các màn hiện hữu.
+
+```text
+‹  Nhật ký nấu của tôi
+Tìm lại những lần bạn đã nấu.
+┌─────────────────────────────────────────────┐
+│ Món nấu nhiều nhất        Canh chua cá · 4 lần│
+│ Lần nấu gần nhất                        20/11 │
+│ Đánh giá gần nhất                         ★★★★☆│
+└─────────────────────────────────────────────┘
+[ Tìm món hoặc ghi chú                         ]
+[ Từ ngày                 ] [ Đến ngày         ]
+[Tất cả] [5 ★] [4 ★] [3 ★] [2 ★] [1 ★]
+Xóa bộ lọc
+
+Canh chua cá
+20/11/2026 · 2 người · 35 phút · ★★★★☆
+Điều chỉnh: Giảm me lần sau.
+```
+
+- Tìm kiếm không phân biệt dấu trong tên món và ghi chú điều chỉnh; lọc theo ngày bắt đầu/kết thúc và mức đánh giá. Kết quả vẫn mới nhất trước.
+- Thống kê tính từ toàn bộ nhật ký, không đổi theo bộ lọc; “đánh giá gần nhất” là bản ghi mới nhất có đánh giá.
+- Trạng thái chưa có nhật ký hướng người dùng mở ghi chú của một món; trạng thái không có kết quả cho phép xóa bộ lọc.
+- **Đã triển khai trong nhánh Người 3:** điểm vào từ Kho của tôi; ô tìm kiếm, lọc ngày/sao và ba thống kê được lấy từ SQLite cục bộ. Màn này vẫn theo wireframe đề xuất, chưa thay thế hình prototype 01–28.
+
 ### Màn 33 — Ghi lại lần nấu
 
 ```text

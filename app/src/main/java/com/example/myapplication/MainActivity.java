@@ -87,6 +87,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_LOG_RATING = "journal.rating";
     private static final String STATE_LOG_NOTE = "journal.note";
     private static final String STATE_LOG_PHOTO = "journal.photo";
+    private static final String STATE_LOG_RETURN_SCREEN = "journal.returnScreen";
+    private static final String STATE_LOG_FORM_RETURN_SCREEN = "journal.formReturnScreen";
+    private static final String STATE_LOG_SEARCH = "journal.search";
+    private static final String STATE_LOG_FROM_DATE = "journal.fromDate";
+    private static final String STATE_LOG_TO_DATE = "journal.toDate";
+    private static final String STATE_LOG_FILTER_RATING = "journal.filterRating";
     private static final int CREAM = Color.rgb(250, 249, 246);
     private static final int GREEN = Color.rgb(50, 108, 79);
     private static final int PALE_GREEN = Color.rgb(232, 242, 233);
@@ -165,6 +171,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView pantryCategoryInput;
     private TextView pantryExpiryInput;
     private Screen cookingLogReturnScreen = Screen.NOTE;
+    private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
     private String cookingLogRecipeId;
     private String editingCookingLogId;
     private long cookingLogCookedAt = System.currentTimeMillis();
@@ -180,9 +187,15 @@ public class MainActivity extends AppCompatActivity {
     private TextView cookingLogDateInput;
     private LinearLayout cookingLogRatingRow;
     private TextView cookingLogPhotoButton;
+    private String cookingJournalSearch = "";
+    private long cookingJournalFromDate;
+    private long cookingJournalToDate;
+    private int cookingJournalRatingFilter;
+    private List<PersonalDataDbHelper.CookingLog> cookingJournalAllLogs = new ArrayList<>();
 
     enum Screen { LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN,
-        MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM, PANTRY, PANTRY_FORM, COOKING_LOGS, COOKING_LOG_FORM }
+        MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM, PANTRY, PANTRY_FORM, COOKING_JOURNAL,
+        COOKING_LOGS, COOKING_LOG_FORM }
 
     static final class RecipePreview {
         final String id;
@@ -215,7 +228,9 @@ public class MainActivity extends AppCompatActivity {
                     screen = pantryReturnScreen;
                 } else if (screen == Screen.COOKING_LOG_FORM) {
                     discardCookingLogDraftPhoto();
-                    screen = Screen.COOKING_LOGS;
+                    screen = cookingLogFormReturnScreen;
+                } else if (screen == Screen.COOKING_JOURNAL) {
+                    screen = cookingLogReturnScreen;
                 } else if (screen == Screen.COOKING_LOGS) {
                     screen = cookingLogReturnScreen;
                 } else if (screen == Screen.COLLECTION_FORM) {
@@ -326,7 +341,8 @@ public class MainActivity extends AppCompatActivity {
             pantryReturnScreen = Screen.SHOPPING;
         }
         String savedLogScreen = state.getString(STATE_LOG_SCREEN);
-        if (Screen.COOKING_LOGS.name().equals(savedLogScreen)
+        if (Screen.COOKING_JOURNAL.name().equals(savedLogScreen)
+                || Screen.COOKING_LOGS.name().equals(savedLogScreen)
                 || Screen.COOKING_LOG_FORM.name().equals(savedLogScreen)) {
             screen = Screen.valueOf(savedLogScreen);
             cookingLogRecipeId = state.getString(STATE_LOG_RECIPE_ID);
@@ -340,7 +356,16 @@ public class MainActivity extends AppCompatActivity {
             cookingLogPhotoPath = state.getString(STATE_LOG_PHOTO, "");
             PersonalDataDbHelper.CookingLog original = cookingJournalViewModel.getLog(editingCookingLogId);
             originalCookingLogPhotoPath = original == null ? "" : original.photoLocalPath;
-            cookingLogReturnScreen = Screen.NOTE;
+            String savedReturn = state.getString(STATE_LOG_RETURN_SCREEN, Screen.NOTE.name());
+            try { cookingLogReturnScreen = Screen.valueOf(savedReturn); }
+            catch (IllegalArgumentException invalid) { cookingLogReturnScreen = Screen.NOTE; }
+            String savedFormReturn = state.getString(STATE_LOG_FORM_RETURN_SCREEN, Screen.COOKING_LOGS.name());
+            try { cookingLogFormReturnScreen = Screen.valueOf(savedFormReturn); }
+            catch (IllegalArgumentException invalid) { cookingLogFormReturnScreen = Screen.COOKING_LOGS; }
+            cookingJournalSearch = state.getString(STATE_LOG_SEARCH, "");
+            cookingJournalFromDate = state.getLong(STATE_LOG_FROM_DATE, 0L);
+            cookingJournalToDate = state.getLong(STATE_LOG_TO_DATE, 0L);
+            cookingJournalRatingFilter = state.getInt(STATE_LOG_FILTER_RATING, 0);
         }
     }
 
@@ -391,7 +416,7 @@ public class MainActivity extends AppCompatActivity {
             outState.putString(STATE_PANTRY_FILTER, pantryFilter);
             outState.putString(STATE_PANTRY_QUERY, pantrySearchQuery);
         }
-        if (screen == Screen.COOKING_LOGS || screen == Screen.COOKING_LOG_FORM) {
+        if (screen == Screen.COOKING_JOURNAL || screen == Screen.COOKING_LOGS || screen == Screen.COOKING_LOG_FORM) {
             outState.putString(STATE_LOG_SCREEN, screen.name());
             outState.putString(STATE_LOG_RECIPE_ID, cookingLogRecipeId);
             outState.putString(STATE_LOG_ID, editingCookingLogId);
@@ -404,6 +429,12 @@ public class MainActivity extends AppCompatActivity {
             outState.putString(STATE_LOG_NOTE, cookingLogAdjustmentInput == null ? cookingLogAdjustment
                     : cookingLogAdjustmentInput.getText().toString());
             outState.putString(STATE_LOG_PHOTO, cookingLogPhotoPath);
+            outState.putString(STATE_LOG_RETURN_SCREEN, cookingLogReturnScreen.name());
+            outState.putString(STATE_LOG_FORM_RETURN_SCREEN, cookingLogFormReturnScreen.name());
+            outState.putString(STATE_LOG_SEARCH, cookingJournalSearch);
+            outState.putLong(STATE_LOG_FROM_DATE, cookingJournalFromDate);
+            outState.putLong(STATE_LOG_TO_DATE, cookingJournalToDate);
+            outState.putInt(STATE_LOG_FILTER_RATING, cookingJournalRatingFilter);
         }
         super.onSaveInstanceState(outState);
     }
@@ -451,6 +482,7 @@ public class MainActivity extends AppCompatActivity {
         else if (screen == Screen.SHOPPING_ITEM_FORM) renderShoppingItemForm();
         else if (screen == Screen.PANTRY) renderPantry();
         else if (screen == Screen.PANTRY_FORM) renderPantryForm();
+        else if (screen == Screen.COOKING_JOURNAL) renderAllCookingLogs();
         else if (screen == Screen.COOKING_LOGS) renderCookingLogs();
         else renderCookingLogForm();
         setContentView(frame);
@@ -498,6 +530,10 @@ public class MainActivity extends AppCompatActivity {
         addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
         List<RecipePreview> history = personalDataViewModel.getHistory();
         for (int i = 0; i < Math.min(10, history.size()); i++) addHistoryRow(content, history.get(i));
+
+        addSectionHeader(content, "Nhật ký nấu", "Xem tất cả ›", () -> openAllCookingLogs(Screen.LIBRARY), 24);
+        addText(content, cookingJournalViewModel.getAllLogs().size() + " lần nấu đã ghi", 13, MUTED,
+                false, 0, 0, 0, 8);
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(3);
@@ -2092,6 +2128,200 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
+    private void openAllCookingLogs(Screen returnScreen) {
+        cookingLogRecipeId = null;
+        cookingLogReturnScreen = returnScreen;
+        screen = Screen.COOKING_JOURNAL;
+        render();
+    }
+
+    private void renderAllCookingLogs() {
+        LinearLayout page = vertical();
+        page.setPadding(dp(24), dp(8), dp(24), dp(12));
+        addBackTitle(page, "Nhật ký nấu của tôi");
+        addText(page, "Tìm lại những lần bạn đã nấu.", 14, MUTED, false, 0, 0, 0, 14);
+
+        List<PersonalDataDbHelper.CookingLog> allLogs = cookingJournalViewModel.getAllLogs();
+        cookingJournalAllLogs = allLogs;
+        addJournalStatsCard(page, cookingJournalViewModel.getStats());
+
+        FrameLayout searchBox = createRecipeSearchBox(cookingJournalSearch, "Tìm món hoặc ghi chú",
+                new TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        cookingJournalSearch = s.toString();
+                        populateAllCookingLogs(logRows, allLogs.size());
+                    }
+                    @Override public void afterTextChanged(Editable s) { }
+                });
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+        searchParams.topMargin = dp(16);
+        searchParams.bottomMargin = dp(10);
+        page.addView(searchBox, searchParams);
+
+        LinearLayout dateFilters = new LinearLayout(this);
+        dateFilters.setGravity(Gravity.CENTER_VERTICAL);
+        dateFilters.addView(createJournalDateFilter(true), new LinearLayout.LayoutParams(0, dp(54), 1));
+        View dateGap = new View(this);
+        dateFilters.addView(dateGap, new LinearLayout.LayoutParams(dp(8), 1));
+        dateFilters.addView(createJournalDateFilter(false), new LinearLayout.LayoutParams(0, dp(54), 1));
+        page.addView(dateFilters);
+
+        LinearLayout ratingFilters = new LinearLayout(this);
+        addJournalRatingChip(ratingFilters, "Tất cả", 0);
+        for (int rating = 5; rating >= 1; rating--) addJournalRatingChip(ratingFilters, rating + " ★", rating);
+        HorizontalScrollView ratingScroll = new HorizontalScrollView(this);
+        ratingScroll.setHorizontalScrollBarEnabled(false);
+        ratingScroll.addView(ratingFilters, new HorizontalScrollView.LayoutParams(-2, -2));
+        LinearLayout.LayoutParams ratingParams = new LinearLayout.LayoutParams(-1, dp(46));
+        ratingParams.topMargin = dp(8);
+        page.addView(ratingScroll, ratingParams);
+
+        if (cookingJournalFromDate > 0 || cookingJournalToDate > 0 || cookingJournalRatingFilter > 0
+                || !cookingJournalSearch.trim().isEmpty()) {
+            TextView clearFilters = text("Xóa bộ lọc", 13, GREEN, true);
+            clearFilters.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-1, dp(36));
+            clearParams.bottomMargin = dp(4);
+            page.addView(clearFilters, clearParams);
+            clearFilters.setOnClickListener(v -> {
+                cookingJournalSearch = "";
+                cookingJournalFromDate = 0;
+                cookingJournalToDate = 0;
+                cookingJournalRatingFilter = 0;
+                render();
+            });
+        }
+
+        ScrollView scroll = scrollContent();
+        logRows = vertical();
+        logRows.setPadding(0, dp(8), 0, dp(12));
+        scroll.addView(logRows);
+        populateAllCookingLogs(logRows, allLogs.size());
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(3);
+    }
+
+    private LinearLayout logRows;
+
+    private void addJournalStatsCard(LinearLayout parent, CookingJournalViewModel.JournalStats stats) {
+        LinearLayout card = vertical();
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
+        addJournalStatRow(card, "Món nấu nhiều nhất", stats.mostCookedCount == 0
+                ? "Chưa có" : stats.mostCookedRecipe + " · " + stats.mostCookedCount + " lần");
+        addJournalStatRow(card, "Lần nấu gần nhất", stats.lastCookedAt == null
+                ? "Chưa có" : formatDate(stats.lastCookedAt));
+        addJournalStatRow(card, "Đánh giá gần nhất", stats.latestRating == null
+                ? "Chưa đánh giá" : ratingStars(stats.latestRating));
+        parent.addView(card, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void addJournalStatRow(LinearLayout card, String label, String value) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView labelView = text(label, 12, MUTED, false);
+        row.addView(labelView, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView valueView = text(value, 13, TEXT, true);
+        valueView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        valueView.setMaxLines(2);
+        valueView.setMaxWidth(dp(200));
+        row.addView(valueView, new LinearLayout.LayoutParams(0, -2, 1));
+        card.addView(row);
+        if (!"Đánh giá gần nhất".equals(label)) {
+            View divider = new View(this);
+            divider.setBackgroundColor(Color.rgb(211, 226, 212));
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+            dividerParams.topMargin = dp(7);
+            dividerParams.bottomMargin = dp(7);
+            card.addView(divider, dividerParams);
+        }
+    }
+
+    private TextView createJournalDateFilter(boolean startDate) {
+        long selectedDate = startDate ? cookingJournalFromDate : cookingJournalToDate;
+        String title = startDate ? "Từ ngày" : "Đến ngày";
+        TextView field = text(title + "\n" + (selectedDate == 0 ? "Chọn ngày" : formatDate(selectedDate)),
+                12, selectedDate == 0 ? MUTED : TEXT, true);
+        field.setGravity(Gravity.CENTER_VERTICAL);
+        field.setPadding(dp(12), dp(5), dp(12), dp(5));
+        field.setBackground(roundRect(WHITE, BORDER, 14));
+        field.setOnClickListener(v -> showJournalDatePicker(startDate));
+        return field;
+    }
+
+    private void showJournalDatePicker(boolean startDate) {
+        long selectedDate = startDate ? cookingJournalFromDate : cookingJournalToDate;
+        Calendar selected = Calendar.getInstance();
+        if (selectedDate > 0) selected.setTimeInMillis(selectedDate);
+        new DatePickerDialog(this, (picker, year, month, day) -> {
+            Calendar picked = Calendar.getInstance();
+            picked.clear();
+            picked.set(year, month, day);
+            long value = picked.getTimeInMillis();
+            if (startDate) cookingJournalFromDate = value;
+            else cookingJournalToDate = value;
+            render();
+        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void addJournalRatingChip(LinearLayout parent, String label, int rating) {
+        boolean selected = cookingJournalRatingFilter == rating;
+        TextView chip = text(label, 12, selected ? GREEN : MUTED, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(11), 0, dp(11), 0);
+        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? PALE_GREEN : BORDER, 20));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(34));
+        params.rightMargin = dp(7);
+        parent.addView(chip, params);
+        chip.setOnClickListener(v -> {
+            cookingJournalRatingFilter = rating;
+            render();
+        });
+    }
+
+    private void populateAllCookingLogs(LinearLayout rows, int totalCount) {
+        if (rows == null) return;
+        rows.removeAllViews();
+        long fromInclusive = cookingJournalFromDate;
+        long toExclusive = 0;
+        if (cookingJournalToDate > 0) {
+            Calendar nextDay = Calendar.getInstance();
+            nextDay.setTimeInMillis(cookingJournalToDate);
+            nextDay.add(Calendar.DAY_OF_YEAR, 1);
+            toExclusive = nextDay.getTimeInMillis();
+        }
+        if (fromInclusive > 0 && toExclusive > 0 && fromInclusive >= toExclusive) {
+            addEmptyCard(rows, "Khoảng ngày chưa hợp lệ", "Ngày bắt đầu phải trước hoặc cùng ngày kết thúc.", () -> {
+                cookingJournalFromDate = 0;
+                cookingJournalToDate = 0;
+                render();
+            });
+            return;
+        }
+        List<PersonalDataDbHelper.CookingLog> filtered = cookingJournalViewModel.filterLogs(
+                cookingJournalAllLogs, cookingJournalSearch, fromInclusive, toExclusive, cookingJournalRatingFilter);
+        addText(rows, filtered.size() + " lần nấu",
+                13, MUTED, false, 0, 4, 0, 8);
+        if (filtered.isEmpty()) {
+            if (totalCount == 0) {
+                addEmptyCard(rows, "Chưa có lần nấu nào", "Mở ghi chú của một món để ghi lại lần nấu đầu tiên.",
+                        () -> { screen = Screen.LIBRARY; render(); });
+            } else {
+                addEmptyCard(rows, "Không tìm thấy lần nấu phù hợp", "Thử đổi từ khóa hoặc điều kiện lọc.", () -> {
+                    cookingJournalSearch = "";
+                    cookingJournalFromDate = 0;
+                    cookingJournalToDate = 0;
+                    cookingJournalRatingFilter = 0;
+                    render();
+                });
+            }
+            return;
+        }
+        for (PersonalDataDbHelper.CookingLog log : filtered) addCookingLogCard(rows, log, true);
+    }
+
     private void renderCookingLogs() {
         RecipePreview recipe = recipeById(cookingLogRecipeId);
         LinearLayout page = vertical();
@@ -2150,6 +2380,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addCookingLogCard(LinearLayout parent, PersonalDataDbHelper.CookingLog log) {
+        addCookingLogCard(parent, log, false);
+    }
+
+    private void addCookingLogCard(LinearLayout parent, PersonalDataDbHelper.CookingLog log, boolean showRecipeTitle) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -2164,7 +2398,9 @@ public class MainActivity extends AppCompatActivity {
         card.addView(photo, new LinearLayout.LayoutParams(dp(64), dp(64)));
         LinearLayout details = vertical();
         details.setPadding(dp(10), 0, dp(4), 0);
-        details.addView(text(formatDate(log.cookedAt), 14, TEXT, true));
+        if (showRecipeTitle) details.addView(text(log.title, 14, TEXT, true));
+        details.addView(text(formatDate(log.cookedAt), showRecipeTitle ? 12 : 14,
+                showRecipeTitle ? MUTED : TEXT, !showRecipeTitle));
         String info = log.servings + " người" + (log.actualDurationMinutes == null ? ""
                 : " · " + log.actualDurationMinutes + " phút");
         TextView detail = text(info, 12, MUTED, false);
@@ -2197,6 +2433,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openCookingLogForm(String logId, String recipeId) {
+        if (screen == Screen.NOTE) cookingLogReturnScreen = Screen.NOTE;
+        cookingLogFormReturnScreen = screen == Screen.COOKING_JOURNAL
+                ? Screen.COOKING_JOURNAL : Screen.COOKING_LOGS;
         cookingLogRecipeId = recipeId;
         editingCookingLogId = logId;
         PersonalDataDbHelper.CookingLog log = cookingJournalViewModel.getLog(logId);
@@ -2387,7 +2626,7 @@ public class MainActivity extends AppCompatActivity {
         }
         originalCookingLogPhotoPath = cookingLogPhotoPath;
         editingCookingLogId = null;
-        screen = Screen.COOKING_LOGS;
+        screen = cookingLogFormReturnScreen;
         render();
         Toast.makeText(this, "Đã lưu lần nấu.", Toast.LENGTH_SHORT).show();
     }
@@ -2906,7 +3145,7 @@ public class MainActivity extends AppCompatActivity {
         empty.setPadding(dp(20), dp(24), dp(20), dp(24));
         empty.setBackground(roundRect(WHITE, BORDER, 15));
         empty.setFocusable(true);
-        empty.setContentDescription("Tạo bộ sưu tập đầu tiên");
+        empty.setContentDescription(title + ". " + subtitle);
         empty.setOnClickListener(v -> action.run());
         empty.addView(text(title, 15, TEXT, true));
         empty.addView(text(subtitle, 13, MUTED, false));
