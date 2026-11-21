@@ -5,6 +5,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.Spannable;
@@ -77,7 +79,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_PANTRY_CATEGORY = "pantry.category";
     private static final String STATE_PANTRY_EXPIRY = "pantry.expiry";
     private static final String STATE_PANTRY_LOCATION = "pantry.location";
-    private static final String STATE_PANTRY_STATUS = "pantry.status";
     private static final String STATE_PANTRY_PURCHASE_DATE = "pantry.purchaseDate";
     private static final String STATE_PANTRY_FILTER = "pantry.filter";
     private static final String STATE_PANTRY_QUERY = "pantry.query";
@@ -166,7 +167,6 @@ public class MainActivity extends AppCompatActivity {
     private String pantryDraftCategory = ShoppingCategoryCatalog.OTHER;
     private String pantryDraftExpiry = "";
     private String pantryDraftLocation = "";
-    private String pantryDraftStockStatus = PantryViewModel.IN_STOCK;
     private String pantryDraftPurchaseDate = "";
     private String pantryFilter = "ALL";
     private String pantrySearchQuery = "";
@@ -176,8 +176,9 @@ public class MainActivity extends AppCompatActivity {
     private EditText pantryLocationInput;
     private TextView pantryCategoryInput;
     private TextView pantryExpiryInput;
-    private TextView pantryStatusInput;
     private TextView pantryPurchaseDateInput;
+    private final Handler pantryExpiryHandler = new Handler(Looper.getMainLooper());
+    private Runnable pantryExpiryRefresh;
     private Screen cookingLogReturnScreen = Screen.NOTE;
     private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
     private String cookingLogRecipeId;
@@ -284,6 +285,18 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (screen == Screen.PANTRY && appRoot != null) render();
+    }
+
+    @Override
+    protected void onPause() {
+        if (pantryExpiryRefresh != null) pantryExpiryHandler.removeCallbacks(pantryExpiryRefresh);
+        super.onPause();
+    }
+
     private void restoreMealPlanState(Bundle state) {
         if (state == null) return;
         String savedScreen = state.getString(STATE_SCREEN);
@@ -345,7 +358,6 @@ public class MainActivity extends AppCompatActivity {
             pantryDraftCategory = state.getString(STATE_PANTRY_CATEGORY, ShoppingCategoryCatalog.OTHER);
             pantryDraftExpiry = state.getString(STATE_PANTRY_EXPIRY, "");
             pantryDraftLocation = state.getString(STATE_PANTRY_LOCATION, "");
-            pantryDraftStockStatus = state.getString(STATE_PANTRY_STATUS, PantryViewModel.IN_STOCK);
             pantryDraftPurchaseDate = state.getString(STATE_PANTRY_PURCHASE_DATE, "");
             pantryFilter = state.getString(STATE_PANTRY_FILTER, "ALL");
             pantrySearchQuery = state.getString(STATE_PANTRY_QUERY, "");
@@ -424,7 +436,6 @@ public class MainActivity extends AppCompatActivity {
             outState.putString(STATE_PANTRY_CATEGORY, pantryDraftCategory);
             outState.putString(STATE_PANTRY_EXPIRY, pantryDraftExpiry);
             outState.putString(STATE_PANTRY_LOCATION, pantryLocationInput == null ? pantryDraftLocation : pantryLocationInput.getText().toString());
-            outState.putString(STATE_PANTRY_STATUS, pantryDraftStockStatus);
             outState.putString(STATE_PANTRY_PURCHASE_DATE, pantryDraftPurchaseDate);
             outState.putString(STATE_PANTRY_FILTER, pantryFilter);
             outState.putString(STATE_PANTRY_QUERY, pantrySearchQuery);
@@ -949,6 +960,23 @@ public class MainActivity extends AppCompatActivity {
         clear.setOnClickListener(v -> confirmClearShoppingList(items.size()));
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(2);
+    }
+
+    private void schedulePantryExpiryRefresh() {
+        if (pantryExpiryRefresh != null) pantryExpiryHandler.removeCallbacks(pantryExpiryRefresh);
+        if (screen != Screen.PANTRY) return;
+        Calendar nextDay = Calendar.getInstance();
+        nextDay.add(Calendar.DAY_OF_YEAR, 1);
+        nextDay.set(Calendar.HOUR_OF_DAY, 0);
+        nextDay.set(Calendar.MINUTE, 0);
+        nextDay.set(Calendar.SECOND, 0);
+        nextDay.set(Calendar.MILLISECOND, 0);
+        long delay = Math.max(1000L, nextDay.getTimeInMillis() - System.currentTimeMillis());
+        pantryExpiryRefresh = () -> {
+            pantryExpiryRefresh = null;
+            if (screen == Screen.PANTRY) render();
+        };
+        pantryExpiryHandler.postDelayed(pantryExpiryRefresh, delay);
     }
 
     private void addShoppingFilterChip(LinearLayout parent, String label, String status) {
@@ -1900,12 +1928,16 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Tủ nguyên liệu");
         List<PersonalDataDbHelper.PantryItem> items = pantryViewModel.getItems();
-        int inStockCount = 0;
+        int usableCount = 0;
+        int expiringCount = 0;
+        int expiredCount = 0;
         for (PersonalDataDbHelper.PantryItem item : items) {
-            if (!PantryViewModel.OUT_OF_STOCK.equals(item.stockStatus)) inStockCount++;
+            String state = pantryViewModel.expiryState(item.expiryDate);
+            if ("EXPIRED".equals(state)) expiredCount++;
+            else if ("EXPIRING".equals(state)) expiringCount++;
+            else usableCount++;
         }
-        int outOfStockCount = items.size() - inStockCount;
-        addText(page, inStockCount + " còn trong tủ · " + outOfStockCount + " đã hết",
+        addText(page, usableCount + " sử dụng được · " + expiringCount + " sắp hết hạn · " + expiredCount + " hết hạn",
                 14, MUTED, false, 0, 8, 0, 12);
 
         EditText search = editField(pantrySearchQuery, 15, 48);
@@ -1927,8 +1959,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout filters = new LinearLayout(this);
         filters.setGravity(Gravity.CENTER_VERTICAL);
         addPantryFilterChip(filters, "Tất cả", "ALL");
-        addPantryFilterChip(filters, "Còn trong tủ", "IN_STOCK");
-        addPantryFilterChip(filters, "Đã hết", "OUT_OF_STOCK");
+        addPantryFilterChip(filters, "Sử dụng được", "USABLE");
         addPantryFilterChip(filters, "Sắp hết hạn", "EXPIRING");
         addPantryFilterChip(filters, "Hết hạn", "EXPIRED");
         HorizontalScrollView filterScroll = new HorizontalScrollView(this);
@@ -1950,9 +1981,29 @@ public class MainActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) { }
         });
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addButton(page, "+   Thêm nguyên liệu", true, () -> openPantryForm(null), 8);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView add = text("+   Thêm nguyên liệu", 14, WHITE, true);
+        add.setGravity(Gravity.CENTER);
+        add.setBackground(roundRect(GREEN, GREEN, 14));
+        actions.addView(add, new LinearLayout.LayoutParams(0, dp(48), 1));
+        add.setOnClickListener(v -> openPantryForm(null));
+        TextView clear = text("Xóa tất cả", 14, ERROR, true);
+        clear.setGravity(Gravity.CENTER);
+        clear.setPadding(dp(10), 0, dp(10), 0);
+        clear.setBackground(roundRect(WHITE, BORDER, 14));
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-2, dp(48));
+        clearParams.leftMargin = dp(10);
+        actions.addView(clear, clearParams);
+        clear.setEnabled(!items.isEmpty());
+        clear.setAlpha(items.isEmpty() ? 0.5f : 1f);
+        clear.setOnClickListener(v -> confirmClearPantryItems(items.size()));
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.topMargin = dp(8);
+        page.addView(actions, actionsParams);
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
         addBottomNavigation(2);
+        schedulePantryExpiryRefresh();
     }
 
     private void populatePantryRows(LinearLayout content, List<PersonalDataDbHelper.PantryItem> allItems) {
@@ -1961,8 +2012,7 @@ public class MainActivity extends AppCompatActivity {
         String query = normalizeSearchText(pantrySearchQuery);
         for (PersonalDataDbHelper.PantryItem item : allItems) {
             String expiryState = pantryViewModel.expiryState(item.expiryDate);
-            if ("IN_STOCK".equals(pantryFilter) && PantryViewModel.OUT_OF_STOCK.equals(item.stockStatus)) continue;
-            if ("OUT_OF_STOCK".equals(pantryFilter) && !PantryViewModel.OUT_OF_STOCK.equals(item.stockStatus)) continue;
+            if ("USABLE".equals(pantryFilter) && !expiryState.isEmpty()) continue;
             if ("EXPIRING".equals(pantryFilter) && !"EXPIRING".equals(expiryState)) continue;
             if ("EXPIRED".equals(pantryFilter) && !"EXPIRED".equals(expiryState)) continue;
             if (!query.isEmpty() && !normalizeSearchText(item.name + " " + item.category + " " + item.storageLocation)
@@ -2025,13 +2075,13 @@ public class MainActivity extends AppCompatActivity {
         edit.setPadding(dp(10), 0, dp(10), 0);
         top.addView(edit, new LinearLayout.LayoutParams(-2, dp(40)));
         card.addView(top);
-        boolean outOfStock = PantryViewModel.OUT_OF_STOCK.equals(item.stockStatus);
         String quantity = item.amountDecimal == null ? "Chưa biết lượng" :
                 item.amountDecimal + (item.unitId == null || item.unitId.isEmpty() ? "" : " " + KitchenUnitCatalog.label(item.unitId));
-        String detailText = outOfStock ? "Đã hết · " + item.category
-                : quantity + " · Còn trong tủ · " + item.category;
+        String availability = pantryViewModel.availabilityLabel(item.expiryDate);
+        String detailText = quantity + " · " + availability + " · " + item.category;
         TextView detail = text(detailText,
-                13, outOfStock ? ERROR : MUTED, false);
+                13, "Hết hạn".equals(availability) ? ERROR
+                        : "Sắp hết hạn".equals(availability) ? Color.rgb(180, 112, 30) : MUTED, false);
         LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
         detailParams.topMargin = dp(4);
         card.addView(detail, detailParams);
@@ -2042,8 +2092,8 @@ public class MainActivity extends AppCompatActivity {
             if (item.expiryDate != null) {
                 int color = "EXPIRED".equals(expiryState) ? ERROR
                         : "EXPIRING".equals(expiryState) ? Color.rgb(180, 112, 30) : MUTED;
-                String label = "EXPIRED".equals(expiryState) ? "Hết hạn · "
-                        : "EXPIRING".equals(expiryState) ? "Sắp hết hạn · " : "Dùng trước · ";
+                String label = "EXPIRED".equals(expiryState) ? "Hạn đã qua · "
+                        : "EXPIRING".equals(expiryState) ? "Hạn sắp đến · " : "Dùng trước · ";
                 meta.addView(text(label + displayIsoDate(item.expiryDate), 13, color, true),
                         new LinearLayout.LayoutParams(0, -2, 1));
             }
@@ -2081,8 +2131,6 @@ public class MainActivity extends AppCompatActivity {
         pantryDraftCategory = item == null ? ShoppingCategoryCatalog.OTHER : item.category;
         pantryDraftExpiry = item == null || item.expiryDate == null ? "" : item.expiryDate;
         pantryDraftLocation = item == null ? "" : item.storageLocation;
-        pantryDraftStockStatus = item == null || item.stockStatus == null
-                ? PantryViewModel.IN_STOCK : item.stockStatus;
         pantryDraftPurchaseDate = item == null || item.purchaseDate == null ? "" : item.purchaseDate;
         screen = Screen.PANTRY_FORM;
         render();
@@ -2104,29 +2152,18 @@ public class MainActivity extends AppCompatActivity {
         pantryNameInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
         addFieldView(fields, pantryNameInput, 8, 20);
 
-        addText(fields, "Trạng thái trong tủ", 14, TEXT, true, 0, 0, 0, 0);
-        pantryStatusInput = selectionField(pantryStockStatusLabel(pantryDraftStockStatus) + "     ▾", 15, 52);
-        addFieldView(fields, pantryStatusInput, 8, 20);
-        pantryStatusInput.setOnClickListener(v -> showPantryStockStatusPicker());
-
         addText(fields, "Số lượng (không bắt buộc)", 14, TEXT, true, 0, 0, 0, 0);
         pantryAmountInput = editField(pantryDraftAmount, 16, 52);
         pantryAmountInput.setSingleLine(true);
         pantryAmountInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         pantryAmountInput.setHint("Để trống nếu chưa biết lượng");
-        pantryAmountInput.setEnabled(!PantryViewModel.OUT_OF_STOCK.equals(pantryDraftStockStatus));
         addFieldView(fields, pantryAmountInput, 8, 20);
 
         addText(fields, "Đơn vị", 14, TEXT, true, 0, 0, 0, 0);
         pantryUnitInput = editField(pantryDraftUnit, 16, 52);
         pantryUnitInput.setSingleLine(true);
         pantryUnitInput.setHint("Ví dụ: quả, g, ml, muỗng cà phê");
-        pantryUnitInput.setEnabled(!PantryViewModel.OUT_OF_STOCK.equals(pantryDraftStockStatus));
         addFieldView(fields, pantryUnitInput, 8, 20);
-        if (PantryViewModel.OUT_OF_STOCK.equals(pantryDraftStockStatus)) {
-            addText(fields, "Nguyên liệu đã hết nên không lưu số lượng tồn.", 12, MUTED,
-                    false, 0, -12, 0, 18);
-        }
 
         addText(fields, "Danh mục", 14, TEXT, true, 0, 0, 0, 0);
         pantryCategoryInput = selectionField(pantryDraftCategory + "     ▾", 15, 52);
@@ -2199,27 +2236,6 @@ public class MainActivity extends AppCompatActivity {
                 }).setNegativeButton("Hủy", null).show();
     }
 
-    private void showPantryStockStatusPicker() {
-        capturePantryDraftFields();
-        String[] statuses = {"Còn trong tủ", "Đã hết"};
-        int selected = PantryViewModel.OUT_OF_STOCK.equals(pantryDraftStockStatus) ? 1 : 0;
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Trạng thái nguyên liệu")
-                .setSingleChoiceItems(statuses, selected, (dialog, which) -> {
-                    pantryDraftStockStatus = which == 1 ? PantryViewModel.OUT_OF_STOCK : PantryViewModel.IN_STOCK;
-                    if (which == 1) {
-                        pantryDraftAmount = "";
-                        pantryDraftUnit = "";
-                        pantryDraftUnitId = "";
-                    }
-                    dialog.dismiss();
-                    render();
-                }).setNegativeButton("Hủy", null).show();
-    }
-
-    private String pantryStockStatusLabel(String status) {
-        return PantryViewModel.OUT_OF_STOCK.equals(status) ? "Đã hết" : "Còn trong tủ";
-    }
-
     private void showPantryExpiryPicker() {
         Calendar selected = Calendar.getInstance();
         if (!pantryDraftExpiry.isEmpty()) {
@@ -2274,7 +2290,7 @@ public class MainActivity extends AppCompatActivity {
         }
         if (!pantryViewModel.saveItem(editingPantryItemId, pantryDraftName, pantryDraftAmount,
                 pantryDraftUnitId, pantryDraftCategory, pantryDraftExpiry, pantryDraftLocation,
-                pantryDraftStockStatus, pantryDraftPurchaseDate)) {
+                pantryDraftPurchaseDate)) {
             Toast.makeText(this, "Vui lòng kiểm tra tên, số lượng và đơn vị.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -2289,6 +2305,21 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton("Hủy", null)
                 .setPositiveButton("Xóa", (dialog, which) -> {
                     pantryViewModel.deleteItem(item.id);
+                    screen = Screen.PANTRY;
+                    render();
+                }).show();
+    }
+
+    private void confirmClearPantryItems(int itemCount) {
+        if (itemCount <= 0) return;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Xóa tất cả nguyên liệu trong tủ?")
+                .setMessage("Xóa toàn bộ " + itemCount + " nguyên liệu đã lưu trong tủ? Thao tác này không thể hoàn tác.")
+                .setNegativeButton("Hủy", null)
+                .setPositiveButton("Xóa tất cả", (dialog, which) -> {
+                    pantryViewModel.deleteAllItems();
+                    pantryFilter = "ALL";
+                    pantrySearchQuery = "";
                     screen = Screen.PANTRY;
                     render();
                 }).show();

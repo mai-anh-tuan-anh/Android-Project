@@ -11,8 +11,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.text.SimpleDateFormat;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -221,20 +224,18 @@ public class PersonalDataDbHelperTest {
     }
 
     @Test
-    public void pantrySeparatesUnknownQuantityFromOutOfStockAndStoresPurchaseDate() {
+    public void pantryKeepsUnknownQuantityAndPurchaseDateWithoutManualStatus() {
         assertTrue(data.savePantryItem(null, "Muối", "", "", "Gia vị", null, "Tủ bếp",
-                "IN_STOCK", "2026-11-20"));
+                "2026-11-20"));
         PersonalDataDbHelper.PantryItem item = data.getPantryItems().get(0);
-        assertEquals("IN_STOCK", item.stockStatus);
         assertEquals(null, item.amountDecimal);
         assertEquals("2026-11-20", item.purchaseDate);
 
         assertTrue(data.savePantryItem(item.id, "Muối", "2", "G", "Gia vị", null, "Tủ bếp",
-                "OUT_OF_STOCK", "2026-11-20"));
+                "2026-11-20"));
         item = data.getPantryItem(item.id);
-        assertEquals("OUT_OF_STOCK", item.stockStatus);
-        assertEquals(null, item.amountDecimal);
-        assertEquals("", item.unitId);
+        assertEquals("2", item.amountDecimal);
+        assertEquals("G", item.unitId);
         assertEquals("2026-11-20", item.purchaseDate);
     }
 
@@ -247,19 +248,83 @@ public class PersonalDataDbHelperTest {
                 TEST_DATABASE, Context.MODE_PRIVATE, null);
         legacy.execSQL("CREATE TABLE PantryItem (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
                 "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
-                "storageLocation TEXT NOT NULL DEFAULT '', updatedAt INTEGER NOT NULL)");
-        legacy.execSQL("INSERT INTO PantryItem(itemId,name,amountDecimal,unitId,category,storageLocation,updatedAt) " +
-                "VALUES('pantry-a','Gạo','2','KG','Ngũ cốc','Tủ khô',1)");
-        legacy.setVersion(8);
+                "storageLocation TEXT NOT NULL DEFAULT '', stockStatus TEXT NOT NULL DEFAULT 'IN_STOCK', " +
+                "purchaseDate TEXT, updatedAt INTEGER NOT NULL)");
+        legacy.execSQL("INSERT INTO PantryItem(itemId,name,amountDecimal,unitId,category,storageLocation," +
+                "stockStatus,purchaseDate,updatedAt) " +
+                "VALUES('pantry-a','Gạo','2','KG','Ngũ cốc','Tủ khô','OUT_OF_STOCK','2026-11-20',1)");
+        legacy.setVersion(9);
         legacy.close();
 
         data = new PersonalDataDbHelper(context, TEST_DATABASE);
         PersonalDataDbHelper.PantryItem migrated = data.getPantryItem("pantry-a");
         assertTrue(migrated != null);
         assertEquals("Gạo", migrated.name);
-        assertEquals("IN_STOCK", migrated.stockStatus);
-        assertEquals(null, migrated.purchaseDate);
         assertEquals("2", migrated.amountDecimal);
+        assertEquals("2026-11-20", migrated.purchaseDate);
+        boolean hasStockStatusColumn = false;
+        try (android.database.Cursor columns = data.getReadableDatabase().rawQuery("PRAGMA table_info(PantryItem)", null)) {
+            while (columns.moveToNext()) {
+                if ("stockStatus".equals(columns.getString(1))) hasStockStatusColumn = true;
+            }
+        }
+        assertFalse(hasStockStatusColumn);
+    }
+
+    @Test
+    public void pantrySchemaEightMigrationAddsPurchaseDateAndKeepsItem() {
+        data.close();
+        data = null;
+        context.deleteDatabase(TEST_DATABASE);
+        android.database.sqlite.SQLiteDatabase legacy = context.openOrCreateDatabase(
+                TEST_DATABASE, Context.MODE_PRIVATE, null);
+        legacy.execSQL("CREATE TABLE PantryItem (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
+                "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
+                "storageLocation TEXT NOT NULL DEFAULT '', updatedAt INTEGER NOT NULL)");
+        legacy.execSQL("INSERT INTO PantryItem(itemId,name,amountDecimal,unitId,category,expiryDate,updatedAt) " +
+                "VALUES('pantry-old','Đậu xanh','500','G','Ngũ cốc','2026-12-01',1)");
+        legacy.setVersion(8);
+        legacy.close();
+
+        data = new PersonalDataDbHelper(context, TEST_DATABASE);
+        PersonalDataDbHelper.PantryItem migrated = data.getPantryItem("pantry-old");
+        assertTrue(migrated != null);
+        assertEquals("Đậu xanh", migrated.name);
+        assertEquals("500", migrated.amountDecimal);
+        assertEquals("2026-12-01", migrated.expiryDate);
+        assertEquals(null, migrated.purchaseDate);
+        try (android.database.Cursor columns = data.getReadableDatabase().rawQuery("PRAGMA table_info(PantryItem)", null)) {
+            while (columns.moveToNext()) assertFalse("stockStatus".equals(columns.getString(1)));
+        }
+    }
+
+    @Test
+    public void deleteAllPantryItemsRemovesEveryStoredItem() {
+        data.savePantryItem(null, "Muối", "", "", "Gia vị", null, "", null);
+        data.savePantryItem(null, "Gạo", "2", "KG", "Ngũ cốc", null, "Tủ khô", null);
+
+        assertEquals(2, data.getPantryItems().size());
+        assertEquals(2, data.deleteAllPantryItems());
+        assertTrue(data.getPantryItems().isEmpty());
+    }
+
+    @Test
+    public void pantryAvailabilityChangesAutomaticallyWithExpiryDate() {
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 12);
+        long now = today.getTimeInMillis();
+        Calendar expired = (Calendar) today.clone();
+        expired.add(Calendar.DAY_OF_YEAR, -1);
+        Calendar expiring = (Calendar) today.clone();
+        expiring.add(Calendar.DAY_OF_YEAR, 3);
+        Calendar usable = (Calendar) today.clone();
+        usable.add(Calendar.DAY_OF_YEAR, 4);
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
+
+        assertEquals("EXPIRED", PantryViewModel.expiryStateForDate(format.format(expired.getTime()), now));
+        assertEquals("EXPIRING", PantryViewModel.expiryStateForDate(format.format(expiring.getTime()), now));
+        assertEquals("", PantryViewModel.expiryStateForDate(format.format(usable.getTime()), now));
+        assertEquals("", PantryViewModel.expiryStateForDate(null, now));
     }
 
     private static void assertIllegalArgument(Runnable operation) {
