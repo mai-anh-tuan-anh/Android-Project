@@ -186,7 +186,9 @@ public class MainActivity extends AppCompatActivity {
             shoppingDraftUnitId = state.getString(STATE_SHOPPING_UNIT_ID, "");
             shoppingDraftCategory = state.getString(STATE_SHOPPING_CATEGORY, ShoppingCategoryCatalog.OTHER);
             shoppingFormStatus = state.getString(STATE_SHOPPING_STATUS, ShoppingViewModel.NEED_TO_BUY);
-            shoppingStatusFilter = state.getString(STATE_SHOPPING_FILTER);
+            String restoredShoppingFilter = state.getString(STATE_SHOPPING_FILTER);
+            shoppingStatusFilter = ShoppingViewModel.AVAILABLE.equals(restoredShoppingFilter)
+                    ? ShoppingViewModel.AVAILABLE : ShoppingViewModel.NEED_TO_BUY;
             try {
                 shoppingReturnScreen = Screen.valueOf(state.getString(STATE_SHOPPING_RETURN_SCREEN,
                         Screen.MEAL_PLAN.name()));
@@ -734,7 +736,7 @@ public class MainActivity extends AppCompatActivity {
         params.rightMargin = dp(8);
         parent.addView(chip, params);
         chip.setOnClickListener(v -> {
-            shoppingStatusFilter = status.equals(shoppingStatusFilter) ? null : status;
+            shoppingStatusFilter = status;
             render();
         });
     }
@@ -773,8 +775,10 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(card, cardParams);
         card.setOnClickListener(v -> openShoppingItemForm(item.id));
         check.setOnClickListener(v -> {
-            shoppingViewModel.setStatus(item.id, available
-                    ? ShoppingViewModel.NEED_TO_BUY : ShoppingViewModel.AVAILABLE);
+            String newStatus = available
+                    ? ShoppingViewModel.NEED_TO_BUY : ShoppingViewModel.AVAILABLE;
+            shoppingViewModel.setStatus(item.id, newStatus);
+            shoppingStatusFilter = newStatus;
             render();
         });
         card.setOnLongClickListener(v -> {
@@ -803,7 +807,7 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton("Giữ danh sách", null)
                 .setPositiveButton("Xóa toàn bộ", (dialog, which) -> {
                     shoppingViewModel.clearItems();
-                    shoppingStatusFilter = null;
+                    shoppingStatusFilter = ShoppingViewModel.NEED_TO_BUY;
                     render();
                 })
                 .show();
@@ -935,7 +939,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Vui lòng nhập tên, số lượng hợp lệ và đơn vị.", Toast.LENGTH_SHORT).show();
             return;
         }
-        shoppingStatusFilter = null;
+        shoppingStatusFilter = shoppingFormStatus;
         screen = Screen.SHOPPING;
         render();
     }
@@ -1040,7 +1044,7 @@ public class MainActivity extends AppCompatActivity {
         ShoppingViewModel.PlanUpdate update = returnScreen == Screen.MEAL_PLAN
                 ? shoppingViewModel.checkForPlanChanges() : null;
         shoppingReturnScreen = returnScreen == Screen.SHOPPING ? Screen.MEAL_PLAN : returnScreen;
-        shoppingStatusFilter = null;
+        shoppingStatusFilter = ShoppingViewModel.NEED_TO_BUY;
         screen = Screen.SHOPPING;
         render();
         if (update != null) showShoppingPlanUpdate(update);
