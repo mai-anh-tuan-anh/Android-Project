@@ -750,7 +750,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item) {
         LinearLayout card = new LinearLayout(this);
-        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
         card.setBackground(roundRect(WHITE, BORDER, 16));
         LinearLayout details = vertical();
@@ -761,19 +761,26 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, -2);
         amountParams.topMargin = dp(5);
         details.addView(amount, amountParams);
-        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView check = text(ShoppingViewModel.NEED_TO_BUY.equals(item.status) ? "" : "✓", 22,
-                ShoppingViewModel.NEED_TO_BUY.equals(item.status) ? GREEN : WHITE, true);
-        check.setGravity(Gravity.CENTER);
-        check.setBackground(roundRect(ShoppingViewModel.NEED_TO_BUY.equals(item.status)
-                ? WHITE : GREEN, GREEN, 9));
-        check.setContentDescription("Chọn trạng thái. Hiện tại: " + state);
-        card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        card.addView(details, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout statusActions = new LinearLayout(this);
+        statusActions.setOrientation(LinearLayout.HORIZONTAL);
+        statusActions.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams statusActionsParams = new LinearLayout.LayoutParams(-1, dp(42));
+        statusActionsParams.topMargin = dp(10);
+        if (ShoppingViewModel.NEED_TO_BUY.equals(item.status)) {
+            addShoppingStatusAction(statusActions, "Đã có", ShoppingViewModel.AVAILABLE, item.id);
+            addShoppingStatusAction(statusActions, "Đã mua", ShoppingViewModel.PURCHASED, item.id);
+        } else {
+            TextView current = text(state, 13, GREEN, true);
+            current.setGravity(Gravity.CENTER_VERTICAL);
+            statusActions.addView(current, new LinearLayout.LayoutParams(0, -1, 1));
+            addShoppingStatusAction(statusActions, "Chuyển về Cần mua", ShoppingViewModel.NEED_TO_BUY, item.id);
+        }
+        card.addView(statusActions, statusActionsParams);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.topMargin = dp(12);
         parent.addView(card, cardParams);
         card.setOnClickListener(v -> openShoppingItemForm(item.id));
-        check.setOnClickListener(v -> showShoppingStatusPicker(item));
         card.setOnLongClickListener(v -> {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Xóa nguyên liệu?")
@@ -787,30 +794,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void addShoppingStatusAction(LinearLayout parent, String label, String status, String itemId) {
+        TextView action = text(label, 13, GREEN, true);
+        action.setGravity(Gravity.CENTER);
+        action.setPadding(dp(12), 0, dp(12), 0);
+        action.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -1);
+        params.rightMargin = dp(8);
+        parent.addView(action, params);
+        action.setOnClickListener(v -> {
+            shoppingViewModel.setStatus(itemId, status);
+            render();
+        });
+    }
+
     private String shoppingStatusLabel(String status) {
         if (ShoppingViewModel.AVAILABLE.equals(status)) return "Đã có";
         if (ShoppingViewModel.PURCHASED.equals(status)) return "Đã mua";
         return "Cần mua";
-    }
-
-    private void showShoppingStatusPicker(PersonalDataDbHelper.ShoppingItem item) {
-        String[] labels = {"Cần mua", "Đã có — đang có sẵn ở nhà", "Đã mua — đã mua trong lần đi chợ này"};
-        String[] statuses = {ShoppingViewModel.NEED_TO_BUY, ShoppingViewModel.AVAILABLE,
-                ShoppingViewModel.PURCHASED};
-        int selected = 0;
-        for (int i = 0; i < statuses.length; i++) {
-            if (statuses[i].equals(item.status)) selected = i;
-        }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Trạng thái nguyên liệu")
-                .setMessage("Đã có: nguyên liệu hiện có ở nhà, không cần mua.\nĐã mua: đã mua nguyên liệu trong lần đi chợ này.")
-                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
-                    shoppingViewModel.setStatus(item.id, statuses[which]);
-                    dialog.dismiss();
-                    render();
-                })
-                .setNegativeButton("Đóng", null)
-                .show();
     }
 
     private void confirmClearShoppingList(int itemCount) {
