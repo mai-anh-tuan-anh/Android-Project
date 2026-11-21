@@ -208,6 +208,60 @@ public class PersonalDataDbHelperTest {
         assertEquals(999, data.getMealPlanRecipes().get(0).servings);
     }
 
+    @Test
+    public void shoppingItemMovesBetweenNeedToBuyAndAvailableStates() {
+        data.saveShoppingItem(null, "Cà chua", "2", "quả", "Rau củ", "NEED_TO_BUY");
+
+        PersonalDataDbHelper.ShoppingItem item = data.getShoppingItems().get(0);
+        assertEquals("NEED_TO_BUY", item.status);
+        data.setShoppingItemStatus(item.id, "AVAILABLE");
+        assertEquals("AVAILABLE", data.getShoppingItems().get(0).status);
+        data.setShoppingItemStatus(item.id, "NEED_TO_BUY");
+        assertEquals("NEED_TO_BUY", data.getShoppingItems().get(0).status);
+    }
+
+    @Test
+    public void pantrySeparatesUnknownQuantityFromOutOfStockAndStoresPurchaseDate() {
+        assertTrue(data.savePantryItem(null, "Muối", "", "", "Gia vị", null, "Tủ bếp",
+                "IN_STOCK", "2026-11-20"));
+        PersonalDataDbHelper.PantryItem item = data.getPantryItems().get(0);
+        assertEquals("IN_STOCK", item.stockStatus);
+        assertEquals(null, item.amountDecimal);
+        assertEquals("2026-11-20", item.purchaseDate);
+
+        assertTrue(data.savePantryItem(item.id, "Muối", "2", "G", "Gia vị", null, "Tủ bếp",
+                "OUT_OF_STOCK", "2026-11-20"));
+        item = data.getPantryItem(item.id);
+        assertEquals("OUT_OF_STOCK", item.stockStatus);
+        assertEquals(null, item.amountDecimal);
+        assertEquals("", item.unitId);
+        assertEquals("2026-11-20", item.purchaseDate);
+    }
+
+    @Test
+    public void pantrySchemaNineMigrationPreservesExistingRows() {
+        data.close();
+        data = null;
+        context.deleteDatabase(TEST_DATABASE);
+        android.database.sqlite.SQLiteDatabase legacy = context.openOrCreateDatabase(
+                TEST_DATABASE, Context.MODE_PRIVATE, null);
+        legacy.execSQL("CREATE TABLE PantryItem (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
+                "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
+                "storageLocation TEXT NOT NULL DEFAULT '', updatedAt INTEGER NOT NULL)");
+        legacy.execSQL("INSERT INTO PantryItem(itemId,name,amountDecimal,unitId,category,storageLocation,updatedAt) " +
+                "VALUES('pantry-a','Gạo','2','KG','Ngũ cốc','Tủ khô',1)");
+        legacy.setVersion(8);
+        legacy.close();
+
+        data = new PersonalDataDbHelper(context, TEST_DATABASE);
+        PersonalDataDbHelper.PantryItem migrated = data.getPantryItem("pantry-a");
+        assertTrue(migrated != null);
+        assertEquals("Gạo", migrated.name);
+        assertEquals("IN_STOCK", migrated.stockStatus);
+        assertEquals(null, migrated.purchaseDate);
+        assertEquals("2", migrated.amountDecimal);
+    }
+
     private static void assertIllegalArgument(Runnable operation) {
         try {
             operation.run();
