@@ -662,8 +662,11 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
         progressParams.topMargin = dp(24);
         page.addView(progress, progressParams);
-        addText(page, availableCount + "/" + items.size() + " nguyên liệu đã có", 14, MUTED,
-                false, 0, 8, 0, 0);
+        int[] availableCountState = {availableCount};
+        TextView progressSummary = text(availableCount + "/" + items.size() + " nguyên liệu đã có", 14, MUTED, false);
+        LinearLayout.LayoutParams progressSummaryParams = new LinearLayout.LayoutParams(-1, -2);
+        progressSummaryParams.topMargin = dp(8);
+        page.addView(progressSummary, progressSummaryParams);
 
         LinearLayout statusRow = new LinearLayout(this);
         statusRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -694,7 +697,7 @@ public class MainActivity extends AppCompatActivity {
             if (group.getValue().isEmpty()) continue;
             addText(content, group.getKey(), 20, TEXT, true, 0, 0, 0, 0);
             for (PersonalDataDbHelper.ShoppingItem item : group.getValue()) {
-                addShoppingItemRow(content, item);
+                addShoppingItemRow(content, item, progress, progressSummary, availableCountState, items.size());
             }
         }
         if (shoppingStatusFilter != null && filteredShoppingCount(items) == 0) {
@@ -749,7 +752,9 @@ public class MainActivity extends AppCompatActivity {
         return count;
     }
 
-    private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item) {
+    private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item,
+                                    android.widget.ProgressBar progress, TextView progressSummary,
+                                    int[] availableCount, int totalCount) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
@@ -764,6 +769,7 @@ public class MainActivity extends AppCompatActivity {
         details.addView(amount, amountParams);
         card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
         boolean available = ShoppingViewModel.AVAILABLE.equals(item.status);
+        boolean[] availableState = {available};
         TextView check = text(available ? "✓" : "", 22, available ? WHITE : GREEN, true);
         check.setGravity(Gravity.CENTER);
         check.setBackground(roundRect(available ? GREEN : WHITE, GREEN, 10));
@@ -775,11 +781,20 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(card, cardParams);
         card.setOnClickListener(v -> openShoppingItemForm(item.id));
         check.setOnClickListener(v -> {
-            String newStatus = available
-                    ? ShoppingViewModel.NEED_TO_BUY : ShoppingViewModel.AVAILABLE;
+            boolean nowAvailable = !availableState[0];
+            String newStatus = nowAvailable ? ShoppingViewModel.AVAILABLE : ShoppingViewModel.NEED_TO_BUY;
             shoppingViewModel.setStatus(item.id, newStatus);
-            shoppingStatusFilter = newStatus;
-            render();
+            availableState[0] = nowAvailable;
+            availableCount[0] += nowAvailable ? 1 : -1;
+            progress.setProgress(availableCount[0]);
+            progressSummary.setText(availableCount[0] + "/" + totalCount + " nguyên liệu đã có");
+            amount.setText(item.amount + " " + KitchenUnitCatalog.label(item.unit) + " · "
+                    + shoppingStatusLabel(newStatus));
+            check.setText(nowAvailable ? "✓" : "");
+            check.setTextColor(nowAvailable ? WHITE : GREEN);
+            check.setBackground(roundRect(nowAvailable ? GREEN : WHITE, GREEN, 10));
+            check.setContentDescription(nowAvailable ? "Đánh dấu cần mua: " + item.name
+                    : "Đánh dấu đã có: " + item.name);
         });
         card.setOnLongClickListener(v -> {
             new androidx.appcompat.app.AlertDialog.Builder(this)
