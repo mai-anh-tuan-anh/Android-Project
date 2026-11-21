@@ -1,7 +1,7 @@
 # Bếp nhà · Đề xuất luồng và giao diện cho ba ưu tiên offline
 
 **Ngày:** 21/11/2026  
-**Trạng thái:** Đề xuất để nhóm xem xét; chưa thay thế prototype 28 màn đã duyệt và chưa phải yêu cầu code.  
+**Trạng thái:** Hai phần do Người 3 phụ trách (Tủ nguyên liệu và Nhật ký lần nấu) đã được người dùng chọn để triển khai cục bộ trong nhánh hiện tại. Đề xuất “Tối nay nấu gì?” vẫn do Người 1 phụ trách và ngoài phạm vi. Các wireframe dưới đây chưa thay thế prototype 28 màn đã duyệt; schema và tích hợp liên module vẫn cần review.
 **Phạm vi:** Android, dữ liệu cá nhân lưu trên thiết bị; không cần đăng nhập/mạng để đọc và sửa dữ liệu cục bộ.
 
 Tài liệu này cụ thể hóa ba ưu tiên đã được người dùng yêu cầu nghiên cứu. Màn 01–28 hiện có vẫn là nguồn thiết kế đã duyệt. Màn 29–33 và các điểm chuyển mới dưới đây là đề xuất; chỉ sau khi nhóm đồng ý mới cập nhật prototype chính thức và kế hoạch module. Không thêm tab đáy thứ năm.
@@ -14,7 +14,7 @@ Tài liệu này cụ thể hóa ba ưu tiên đã được người dùng yêu 
 | Gợi ý “Tối nay nấu gì?” | Người 1 — luồng và xếp hạng Module 8 | Người 3 cung cấp pantry/dữ liệu cá nhân phù hợp; Người 2 cung cấp công thức đã tải | Màn 23/24, mở sang màn 07 hoặc 18/19 |
 | Nhật ký lần nấu | Người 3 — mở rộng Module 5 và lưu cục bộ | Người 2 cung cấp bước nấu và điểm chuyển hoàn thành Module 4; người điều phối schema review SQLite | Màn 17; điểm vào tùy chọn từ màn 12 |
 
-Phân vai này chỉ áp dụng cho các đề xuất, không đổi phân công hiện hành chín module. Mã/schema/navigation dùng chung cần review theo quy tắc nhóm.
+Phân vai này chỉ áp dụng cho các đề xuất, không đổi phân công hiện hành chín module. Người dùng đã chọn triển khai hai phần Người 3; việc đó không tự thay đổi phân công hoặc hợp đồng schema/navigation dùng chung. Mã/schema/navigation dùng chung vẫn cần review theo quy tắc nhóm.
 
 ## 2. Đồng bộ với hệ giao diện hiện tại
 
@@ -72,7 +72,8 @@ Rau củ
 
 - Thẻ có tên, lượng/đơn vị nếu biết, ngày hết hạn nếu người dùng nhập và nút sửa. Nhãn hết hạn dùng màu cảnh báo hiện có; ngày chưa biết thì không suy ra.
 - Chip lọc giữ từ khóa tìm kiếm. Trạng thái rỗng: `Tủ nguyên liệu đang trống`, lời giải thích ngắn và CTA `Thêm nguyên liệu`.
-- Ngưỡng “sắp hết hạn” chưa chốt. Bản đầu có thể chỉ hiện nhãn trong app; thông báo hệ thống là tùy chọn và cần quyết định riêng.
+- **Đã triển khai trong nhánh Người 3:** danh sách có tìm kiếm tên/nhóm/vị trí, chip lọc `Tất cả`, `Sắp hết hạn`, `Hết hạn`; thẻ hiển thị lượng/đơn vị, nhóm, hạn và vị trí; có thêm/sửa/xóa.
+- **Mốc tạm dùng trong code:** `Sắp hết hạn` là từ hôm nay đến hết 3 ngày lịch tới; ngày trước hôm nay là `Hết hạn`. Đây là lựa chọn vận hành để bộ lọc có hành vi xác định, chưa phải tiêu chuẩn nghiệp vụ được cả nhóm phê duyệt. Chưa có thông báo hệ thống.
 
 ### Màn đề xuất 30 — Thêm/Sửa nguyên liệu
 
@@ -100,7 +101,7 @@ Nơi cất (không bắt buộc)
 - Cùng `ingredientId`, `unitId` và quy tắc đơn vị Modules 3/7/8. Tên tự do chưa ánh xạ chỉ dùng để hiển thị/tìm.
 - Chỉ so lượng khi cùng `ingredientId` và đơn vị tương thích. Thiếu lượng hoặc đơn vị không tương thích thì báo chưa đủ dữ liệu/đối chiếu có-không; không suy đoán.
 - Không tự giảm lượng sau khi nấu. Tương tác Module 7 chỉ bù trừ pantry khi hợp đồng lượng/đơn vị đã duyệt; hiển thị rõ `Đã có trong tủ: X` và `Cần mua: Y`, không tự đổi quy tắc hai trạng thái mua sắm.
-- Ngưỡng ngày, nhắc hạn, gộp nhiều dòng cùng nguyên liệu và hành vi bù trừ cần nhóm chốt trước khi code.
+- Dữ liệu hiện nhập tên tự do và để `ingredientId` trống vì chưa có kho nguyên liệu chuẩn. Không gộp các dòng có tên giống nhau, không tự ghép với công thức và chưa bù trừ Module 7. Cần nhóm chốt khóa nguyên liệu, nhắc hạn, gộp dòng và hành vi bù trừ trước khi tích hợp tự động.
 
 ## 4. Ưu tiên 2 — Gợi ý “Tối nay nấu gì?” offline
 
@@ -236,13 +237,14 @@ Bạn đánh giá món này
 - Nếu mở từ màn 12, điền sẵn ngày, khẩu phần và thời gian phiên nếu có; từ màn 17 dùng ngày hiện tại và khẩu phần hiện tại. Cho phép sửa trước khi lưu.
 - Thời lượng, đánh giá, điều chỉnh và ảnh không bắt buộc. Không bắt nhập lại công thức/bước.
 - Chỉ xin quyền ảnh lúc người dùng chọn ảnh; lưu ảnh trong bộ nhớ nội bộ app. Xóa bản ghi phải dọn file tương ứng an toàn.
-- Lưu xong quay về nhật ký của món đó và báo xác nhận ngắn; không tự chuyển tab.
+- **Đã triển khai trong nhánh Người 3:** từ màn 17 mở nhật ký của đúng món; xem trước hai lần gần nhất; thêm/sửa/xóa từng lần; lưu ngày, khẩu phần, thời gian tùy chọn, đánh giá tùy chọn, điều chỉnh và ảnh cục bộ. Lưu xong quay về nhật ký của món đó; không tự chuyển tab.
+- Ảnh được sao chép vào vùng riêng tư của app, giới hạn hiện tại 10 MiB mỗi ảnh và xóa cùng bản ghi/ảnh được thay. Giới hạn này là chính sách triển khai hiện tại, chưa phải quyết định chung về retention/backup.
 
 ### Dữ liệu và ranh giới
 
 - Bản ghi đề xuất `CookingLog`: `logId`, `recipeId`, `cookedAt`, `servings`, `actualDurationMinutes` nullable, `rating` nullable, `adjustmentNote` nullable, `photoLocalPath` nullable, `createdAt`, `updatedAt`.
 - Nhật ký không ghi đè công thức, bước nấu hoặc ghi chú chung. Chỉ lưu trên thiết bị; không đồng bộ Firebase trong phạm vi offline.
-- Cần nhóm chốt snapshot phiên bản công thức, thang đánh giá, giới hạn ảnh, xóa bản ghi, backup và việc tự mở form từ Module 4.
+- Nhật ký hiện gắn `recipeId` cùng snapshot tiêu đề/ảnh sẵn có; chưa lưu snapshot phiên bản công thức. Chưa có backup, đồng bộ hoặc sự kiện tự động từ Module 4; điểm nối đó cần Người 2 và nhóm thống nhất.
 
 ## 6. Responsive và tiêu chí hoàn thiện thiết kế
 
@@ -251,11 +253,11 @@ Bạn đánh giá món này
 - Đặc tả trạng thái rỗng, không có kết quả, thiếu lượng/ngày, hết hạn, công thức chưa tải local, không có món phù hợp, nhật ký trống, lỗi lưu/xóa và quyền ảnh bị từ chối.
 - Sau khi nhóm duyệt, cập nhật danh mục màn/luồng trong `THIET_KE.md`, tạo mockup/PNG cùng hệ màu/font/spacing và kiểm tra viewport nhỏ/lớn/IME. Trước khi duyệt, đây là wireframe văn bản, không phải thay đổi prototype 28 màn.
 
-## 7. Cần thống nhất trước khi code
+## 7. Cần thống nhất trước khi tích hợp và hoàn thiện
 
-1. Ba ưu tiên có nằm trong phạm vi hiện tại hay là hướng phát triển sau khi chín module hoàn thành?
-2. Ngưỡng “sắp hết hạn” và có cần thông báo cục bộ không?
-3. Cách xử lý nhiều dòng pantry cùng nguyên liệu/đơn vị và bù trừ Module 7?
-4. Có cho dùng món chưa nấu gần đây làm tiêu chí phụ khi xếp hạng, hay giữ nguyên thứ tự Module 8 hiện hành?
-5. Nhật ký có lưu snapshot phiên bản công thức không; giới hạn ảnh và điểm vào tự động từ Module 4 ra sao?
+1. Người điều phối schema review migration SQLite mới (schema 8) và hợp đồng khóa trước khi merge.
+2. Xác nhận mốc “sắp hết hạn” 3 ngày tạm dùng và có cần thông báo cục bộ không.
+3. Người 2 cung cấp ingredientId/danh mục nguyên liệu và phối hợp quy tắc gộp/bù trừ Module 7.
+4. Người 2 xác nhận điểm vào từ Module 4; nhóm quyết định có cần snapshot phiên bản công thức, backup và retention ảnh/nhật ký không.
+5. Hạng mục “Tối nay nấu gì?” vẫn chờ Người 1 triển khai theo phần phân công; không thuộc thay đổi hiện tại.
 

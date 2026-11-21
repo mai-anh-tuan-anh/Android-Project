@@ -72,9 +72,9 @@ Mở PDF bằng trình đọc hỗ trợ liên kết nội bộ. Chạm các nú
 - Dùng chung thẻ món, thẻ nổi bật, thẻ danh mục, ô tìm kiếm, chip lọc/nguyên liệu, dòng nguyên liệu, checklist, khối bước nấu, bộ đếm khẩu phần, đồng hồ, chỉ báo tiến độ, thanh tiêu đề/điều hướng, bảng trượt, xác nhận, thông báo, trạng thái trống/đang tải/offline.
 - Các ảnh món được tạo bằng ImageGen tích hợp từ một lưới ảnh 3 × 3. Nội dung ảnh gồm phở bò, bún chả, canh chua cá, gà chiên nước mắm, cơm rang dưa bò, mì Ý sốt bò bằm, salad, pancake và cảnh sơ chế cà chua. Phong cách ảnh ẩm thực editorial, ánh sáng cửa sổ, không chữ hoặc nhãn hiệu. Ảnh, định lượng và thời gian trong mockup dùng minh họa giao diện.
 
-## Đề xuất mở rộng offline — chưa thuộc prototype đã duyệt
+## Đề xuất mở rộng offline — prototype 28 màn vẫn là chuẩn hiện hành
 
-Ba đề xuất — Tủ nguyên liệu/hạn sử dụng, gợi ý “Tối nay nấu gì?” offline và Nhật ký lần nấu — có luồng, wireframe văn bản, điểm vào, chủ sở hữu đề xuất và ranh giới dữ liệu riêng trong [DE_XUAT_TINH_NANG_OFFLINE.md](DE_XUAT_TINH_NANG_OFFLINE.md). Chúng giữ hệ màu/khoảng cách/thẻ hiện có và không thêm tab điều hướng. Tài liệu này **không** đổi danh mục hoặc ảnh màn 01–28; cần nhóm duyệt trước khi thêm mockup đồ họa, prototype hay triển khai code.
+Ba hạng mục — Tủ nguyên liệu/hạn sử dụng, gợi ý “Tối nay nấu gì?” offline và Nhật ký lần nấu — có luồng, wireframe văn bản, điểm vào, chủ sở hữu đề xuất và ranh giới dữ liệu riêng trong [DE_XUAT_TINH_NANG_OFFLINE.md](DE_XUAT_TINH_NANG_OFFLINE.md). Người dùng đã yêu cầu triển khai hai hạng mục Người 3 (Tủ nguyên liệu và Nhật ký lần nấu) ở mức lưu cục bộ; “Tối nay nấu gì?” vẫn thuộc Người 1. Việc triển khai không thay thế prototype 28 màn, không thêm tab điều hướng và chưa đồng nghĩa nhóm đã duyệt wireframe thành thiết kế chính thức. Giao diện mới phải tiếp tục đối chiếu hệ màu, khoảng cách, thẻ và hành vi responsive hiện có.
 
 ## Giả định cần xác nhận khi đặc tả
 

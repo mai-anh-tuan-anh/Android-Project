@@ -8,6 +8,9 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.text.Normalizer;
+import java.math.BigDecimal;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,7 +20,7 @@ import java.util.Set;
 /** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 7;
+    private static final int DB_VERSION = 8;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
@@ -46,6 +49,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE LocalMeta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
         createMealPlanTables(db);
         createShoppingTables(db);
+        createOfflinePersonalFeatureTables(db);
     }
 
     @Override
@@ -62,6 +66,20 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         if (oldVersion >= 4 && oldVersion < 7) {
             migrateShoppingStatusesToTwoStates(db);
         }
+        if (oldVersion < 8) createOfflinePersonalFeatureTables(db);
+    }
+
+    private static void createOfflinePersonalFeatureTables(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE PantryItem (itemId TEXT PRIMARY KEY, ingredientId TEXT, name TEXT NOT NULL, " +
+                "amountDecimal TEXT, unitId TEXT, category TEXT NOT NULL DEFAULT 'Khác', expiryDate TEXT, " +
+                "storageLocation TEXT NOT NULL DEFAULT '', updatedAt INTEGER NOT NULL)");
+        db.execSQL("CREATE INDEX PantryItem_expiry_idx ON PantryItem(expiryDate)");
+        db.execSQL("CREATE TABLE CookingLog (logId TEXT PRIMARY KEY, recipeId TEXT NOT NULL, title TEXT NOT NULL, " +
+                "imageRes TEXT NOT NULL, cookedAt INTEGER NOT NULL, servings INTEGER NOT NULL " +
+                "CHECK(servings BETWEEN 1 AND 999), actualDurationMinutes INTEGER, rating INTEGER " +
+                "CHECK(rating IS NULL OR rating BETWEEN 1 AND 5), adjustmentNote TEXT NOT NULL DEFAULT '', " +
+                "photoLocalPath TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)");
+        db.execSQL("CREATE INDEX CookingLog_recipe_date_idx ON CookingLog(recipeId,cookedAt DESC)");
     }
 
     private static void createShoppingTables(SQLiteDatabase db) {
@@ -482,6 +500,148 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         getWritableDatabase().update("ShoppingList", values, "listId=1", null);
     }
 
+    List<PantryItem> getPantryItems() {
+        List<PantryItem> items = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,updatedAt " +
+                        "FROM PantryItem ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, expiryDate, name COLLATE NOCASE, rowid", null)) {
+            while (cursor.moveToNext()) {
+                items.add(new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                        cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
+                        cursor.getString(6), cursor.getString(7), cursor.getLong(8)));
+            }
+        }
+        return items;
+    }
+
+    PantryItem getPantryItem(String itemId) {
+        if (itemId == null) return null;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,updatedAt " +
+                        "FROM PantryItem WHERE itemId=?", new String[]{itemId})) {
+            if (!cursor.moveToFirst()) return null;
+            return new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                    cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
+                    cursor.getString(6), cursor.getString(7), cursor.getLong(8));
+        }
+    }
+
+    boolean savePantryItem(String itemId, String name, String amount, String unitId,
+                           String category, String expiryDate, String storageLocation) {
+        String cleanName = cleanDisplayValue(name);
+        if (cleanName.isEmpty() || category == null || category.trim().isEmpty()) return false;
+        String cleanAmount = amount == null ? "" : amount.trim().replace(',', '.');
+        String cleanUnit = unitId == null ? "" : unitId.trim();
+        if (!cleanAmount.isEmpty()) {
+            try {
+                BigDecimal parsed = new BigDecimal(cleanAmount);
+                if (parsed.signum() < 0 || cleanUnit.isEmpty()) return false;
+                cleanAmount = parsed.stripTrailingZeros().toPlainString();
+            } catch (NumberFormatException invalidAmount) {
+                return false;
+            }
+        } else {
+            cleanAmount = null;
+            cleanUnit = "";
+        }
+        String cleanExpiry = expiryDate == null || expiryDate.trim().isEmpty() ? null : expiryDate.trim();
+        if (cleanExpiry != null && !isValidIsoDate(cleanExpiry)) return false;
+
+        ContentValues values = new ContentValues();
+        values.put("itemId", itemId == null ? java.util.UUID.randomUUID().toString() : itemId);
+        values.putNull("ingredientId");
+        values.put("name", cleanName);
+        if (cleanAmount == null) values.putNull("amountDecimal"); else values.put("amountDecimal", cleanAmount);
+        values.put("unitId", cleanUnit);
+        values.put("category", category.trim());
+        if (cleanExpiry == null) values.putNull("expiryDate"); else values.put("expiryDate", cleanExpiry);
+        values.put("storageLocation", cleanDisplayValue(storageLocation));
+        values.put("updatedAt", System.currentTimeMillis());
+        SQLiteDatabase db = getWritableDatabase();
+        if (itemId != null && getPantryItem(itemId) == null) return false;
+        db.insertWithOnConflict("PantryItem", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        return true;
+    }
+
+    boolean deletePantryItem(String itemId) {
+        return getWritableDatabase().delete("PantryItem", "itemId=?", new String[]{itemId}) > 0;
+    }
+
+    List<CookingLog> getCookingLogs(String recipeId) {
+        List<CookingLog> logs = new ArrayList<>();
+        if (recipeId == null) return logs;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
+                        "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog " +
+                        "WHERE recipeId=? ORDER BY cookedAt DESC,createdAt DESC", new String[]{recipeId})) {
+            while (cursor.moveToNext()) logs.add(readCookingLog(cursor));
+        }
+        return logs;
+    }
+
+    CookingLog getCookingLog(String logId) {
+        if (logId == null) return null;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
+                        "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog WHERE logId=?",
+                new String[]{logId})) {
+            return cursor.moveToFirst() ? readCookingLog(cursor) : null;
+        }
+    }
+
+    private CookingLog readCookingLog(Cursor cursor) {
+        return new CookingLog(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
+                cursor.getLong(4), cursor.getInt(5), cursor.isNull(6) ? null : cursor.getInt(6),
+                cursor.isNull(7) ? null : cursor.getInt(7), cursor.getString(8), cursor.getString(9),
+                cursor.getLong(10), cursor.getLong(11));
+    }
+
+    boolean saveCookingLog(String logId, MainActivity.RecipePreview recipe, long cookedAt, int servings,
+                           Integer actualDurationMinutes, Integer rating, String adjustmentNote, String photoLocalPath) {
+        if (recipe == null || recipe.id == null || recipe.id.trim().isEmpty()) return false;
+        if (servings < 1 || servings > 999 || (actualDurationMinutes != null && actualDurationMinutes < 1)
+                || (rating != null && (rating < 1 || rating > 5))) return false;
+        String id = logId == null ? java.util.UUID.randomUUID().toString() : logId;
+        long now = System.currentTimeMillis();
+        ContentValues values = new ContentValues();
+        values.put("logId", id);
+        values.put("recipeId", recipe.id);
+        values.put("title", recipe.title);
+        values.put("imageRes", recipe.imageName);
+        values.put("cookedAt", cookedAt);
+        values.put("servings", servings);
+        if (actualDurationMinutes == null) values.putNull("actualDurationMinutes");
+        else values.put("actualDurationMinutes", actualDurationMinutes);
+        if (rating == null) values.putNull("rating"); else values.put("rating", rating);
+        values.put("adjustmentNote", cleanDisplayValue(adjustmentNote));
+        values.put("photoLocalPath", photoLocalPath == null ? "" : photoLocalPath);
+        if (logId == null) values.put("createdAt", now);
+        else {
+            CookingLog existing = getCookingLog(logId);
+            if (existing == null) return false;
+            values.put("createdAt", existing.createdAt);
+        }
+        values.put("updatedAt", now);
+        getWritableDatabase().insertWithOnConflict("CookingLog", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        return true;
+    }
+
+    boolean deleteCookingLog(String logId) {
+        return getWritableDatabase().delete("CookingLog", "logId=?", new String[]{logId}) > 0;
+    }
+
+    private static String cleanDisplayValue(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+    }
+
+    private static boolean isValidIsoDate(String value) {
+        if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}")) return false;
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT);
+        format.setLenient(false);
+        ParsePosition position = new ParsePosition(0);
+        return format.parse(value, position) != null && position.getIndex() == value.length();
+    }
+
     private static void validateServings(int servings) {
         if (servings < 1 || servings > 999) {
             throw new IllegalArgumentException("servings must be between 1 and 999");
@@ -511,6 +671,61 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
             this.unit = unit;
             this.status = status;
             this.category = category;
+        }
+    }
+
+    static final class PantryItem {
+        final String id;
+        final String ingredientId;
+        final String name;
+        final String amountDecimal;
+        final String unitId;
+        final String category;
+        final String expiryDate;
+        final String storageLocation;
+        final long updatedAt;
+        PantryItem(String id, String ingredientId, String name, String amountDecimal, String unitId,
+                   String category, String expiryDate, String storageLocation, long updatedAt) {
+            this.id = id;
+            this.ingredientId = ingredientId;
+            this.name = name;
+            this.amountDecimal = amountDecimal;
+            this.unitId = unitId;
+            this.category = category;
+            this.expiryDate = expiryDate;
+            this.storageLocation = storageLocation;
+            this.updatedAt = updatedAt;
+        }
+    }
+
+    static final class CookingLog {
+        final String id;
+        final String recipeId;
+        final String title;
+        final String imageRes;
+        final long cookedAt;
+        final int servings;
+        final Integer actualDurationMinutes;
+        final Integer rating;
+        final String adjustmentNote;
+        final String photoLocalPath;
+        final long createdAt;
+        final long updatedAt;
+        CookingLog(String id, String recipeId, String title, String imageRes, long cookedAt, int servings,
+                   Integer actualDurationMinutes, Integer rating, String adjustmentNote, String photoLocalPath,
+                   long createdAt, long updatedAt) {
+            this.id = id;
+            this.recipeId = recipeId;
+            this.title = title;
+            this.imageRes = imageRes;
+            this.cookedAt = cookedAt;
+            this.servings = servings;
+            this.actualDurationMinutes = actualDurationMinutes;
+            this.rating = rating;
+            this.adjustmentNote = adjustmentNote;
+            this.photoLocalPath = photoLocalPath;
+            this.createdAt = createdAt;
+            this.updatedAt = updatedAt;
         }
     }
 

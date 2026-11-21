@@ -1,6 +1,9 @@
 package com.example.myapplication;
 
 import android.app.Application;
+import android.net.Uri;
+
+import java.io.File;
 
 import java.util.List;
 
@@ -8,6 +11,7 @@ import java.util.List;
 final class PersonalDataRepository {
     private static PersonalDataRepository instance;
     private final PersonalDataDbHelper database;
+    private final CookingJournalPhotoStore photoStore;
 
     static synchronized PersonalDataRepository getInstance(Application application) {
         if (instance == null) instance = new PersonalDataRepository(application);
@@ -16,6 +20,7 @@ final class PersonalDataRepository {
 
     private PersonalDataRepository(Application application) {
         database = new PersonalDataDbHelper(application.getApplicationContext());
+        photoStore = new CookingJournalPhotoStore(application.getApplicationContext());
     }
 
     void seedDesignPreviewIfNeeded(List<MainActivity.RecipePreview> recipes) {
@@ -55,4 +60,21 @@ final class PersonalDataRepository {
     void clearShoppingItems() { database.clearShoppingItems(); }
     String getShoppingPlanSnapshot() { return database.getShoppingPlanSnapshot(); }
     void saveShoppingPlanSnapshot(String snapshot) { database.saveShoppingPlanSnapshot(snapshot); }
+    List<PersonalDataDbHelper.PantryItem> getPantryItems() { return database.getPantryItems(); }
+    PersonalDataDbHelper.PantryItem getPantryItem(String id) { return database.getPantryItem(id); }
+    boolean savePantryItem(String id, String name, String amount, String unit, String category,
+                           String expiryDate, String storageLocation) {
+        return database.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation);
+    }
+    boolean deletePantryItem(String id) { return database.deletePantryItem(id); }
+    List<PersonalDataDbHelper.CookingLog> getCookingLogs(String recipeId) { return database.getCookingLogs(recipeId); }
+    PersonalDataDbHelper.CookingLog getCookingLog(String id) { return database.getCookingLog(id); }
+    boolean saveCookingLog(String id, MainActivity.RecipePreview recipe, long cookedAt, int servings,
+                           Integer duration, Integer rating, String adjustment, String photoPath) {
+        return database.saveCookingLog(id, recipe, cookedAt, servings, duration, rating, adjustment, photoPath);
+    }
+    boolean deleteCookingLog(String id) { return database.deleteCookingLog(id); }
+    CookingJournalPhotoStore.CopyResult saveCookingLogPhoto(Uri uri) { return photoStore.copy(uri); }
+    File getCookingLogPhoto(String filename) { return photoStore.resolve(filename); }
+    void deleteCookingLogPhoto(String filename) { photoStore.delete(filename); }
 }
