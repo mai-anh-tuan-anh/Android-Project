@@ -17,7 +17,7 @@ import java.util.Set;
 /** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
 final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
-    private static final int DB_VERSION = 6;
+    private static final int DB_VERSION = 7;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
@@ -59,6 +59,9 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         if (oldVersion >= 4 && oldVersion < 6) {
             db.execSQL("ALTER TABLE ShoppingList ADD COLUMN planSnapshot TEXT NOT NULL DEFAULT ''");
         }
+        if (oldVersion >= 4 && oldVersion < 7) {
+            migrateShoppingStatusesToTwoStates(db);
+        }
     }
 
     private static void createShoppingTables(SQLiteDatabase db) {
@@ -68,9 +71,24 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE ShoppingListItem (itemId TEXT PRIMARY KEY, listId INTEGER NOT NULL DEFAULT 1, " +
                 "ingredientId TEXT, name TEXT NOT NULL, amount TEXT NOT NULL, unit TEXT NOT NULL, " +
                 "category TEXT NOT NULL DEFAULT 'Khác', " +
-                "status TEXT NOT NULL CHECK(status IN ('NEED_TO_BUY','AVAILABLE','PURCHASED')), " +
+                "status TEXT NOT NULL CHECK(status IN ('NEED_TO_BUY','AVAILABLE')), " +
                 "position INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
                 "FOREIGN KEY(listId) REFERENCES ShoppingList(listId) ON DELETE CASCADE)");
+    }
+
+    private static void migrateShoppingStatusesToTwoStates(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE ShoppingListItem_v7 (itemId TEXT PRIMARY KEY, listId INTEGER NOT NULL DEFAULT 1, " +
+                "ingredientId TEXT, name TEXT NOT NULL, amount TEXT NOT NULL, unit TEXT NOT NULL, " +
+                "category TEXT NOT NULL DEFAULT 'Khác', " +
+                "status TEXT NOT NULL CHECK(status IN ('NEED_TO_BUY','AVAILABLE')), " +
+                "position INTEGER NOT NULL, updatedAt INTEGER NOT NULL, " +
+                "FOREIGN KEY(listId) REFERENCES ShoppingList(listId) ON DELETE CASCADE)");
+        db.execSQL("INSERT INTO ShoppingListItem_v7(itemId,listId,ingredientId,name,amount,unit,category,status,position,updatedAt) " +
+                "SELECT itemId,listId,ingredientId,name,amount,unit,category, " +
+                "CASE WHEN status='NEED_TO_BUY' THEN 'NEED_TO_BUY' ELSE 'AVAILABLE' END,position,updatedAt " +
+                "FROM ShoppingListItem");
+        db.execSQL("DROP TABLE ShoppingListItem");
+        db.execSQL("ALTER TABLE ShoppingListItem_v7 RENAME TO ShoppingListItem");
     }
 
     private static void createMealPlanTables(SQLiteDatabase db) {
@@ -390,7 +408,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
                 || unit == null || unit.trim().isEmpty() || category == null || category.trim().isEmpty()) {
             throw new IllegalArgumentException("shopping item fields cannot be empty");
         }
-        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status) && !"PURCHASED".equals(status)) {
+        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status)) {
             throw new IllegalArgumentException("invalid shopping item status");
         }
         SQLiteDatabase db = getWritableDatabase();
@@ -427,7 +445,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     void setShoppingItemStatus(String itemId, String status) {
-        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status) && !"PURCHASED".equals(status)) {
+        if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status)) {
             throw new IllegalArgumentException("invalid shopping item status");
         }
         ContentValues values = new ContentValues();

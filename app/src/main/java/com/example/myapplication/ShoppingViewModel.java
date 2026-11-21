@@ -20,7 +20,6 @@ import org.json.JSONObject;
 public final class ShoppingViewModel extends AndroidViewModel {
     static final String NEED_TO_BUY = "NEED_TO_BUY";
     static final String AVAILABLE = "AVAILABLE";
-    static final String PURCHASED = "PURCHASED";
 
     private final PersonalDataRepository repository;
 
@@ -185,6 +184,6 @@ public final class ShoppingViewModel extends AndroidViewModel {
     }
 
     private boolean isValidStatus(String status) {
-        return NEED_TO_BUY.equals(status) || AVAILABLE.equals(status) || PURCHASED.equals(status);
+        return NEED_TO_BUY.equals(status) || AVAILABLE.equals(status);
     }
 }

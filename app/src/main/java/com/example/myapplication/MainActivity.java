@@ -647,20 +647,20 @@ public class MainActivity extends AppCompatActivity {
         summaryParams.topMargin = dp(14);
         page.addView(summary, summaryParams);
 
-        int purchasedCount = 0;
+        int availableCount = 0;
         for (PersonalDataDbHelper.ShoppingItem item : items) {
-            if (ShoppingViewModel.PURCHASED.equals(item.status)) purchasedCount++;
+            if (ShoppingViewModel.AVAILABLE.equals(item.status)) availableCount++;
         }
         android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
                 android.R.attr.progressBarStyleHorizontal);
         progress.setMax(Math.max(1, items.size()));
-        progress.setProgress(purchasedCount);
+        progress.setProgress(availableCount);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(GREEN));
         progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(BORDER));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
         progressParams.topMargin = dp(24);
         page.addView(progress, progressParams);
-        addText(page, purchasedCount + "/" + items.size() + " nguyên liệu đã mua", 14, MUTED,
+        addText(page, availableCount + "/" + items.size() + " nguyên liệu đã có", 14, MUTED,
                 false, 0, 8, 0, 0);
 
         LinearLayout statusRow = new LinearLayout(this);
@@ -668,7 +668,6 @@ public class MainActivity extends AppCompatActivity {
         statusRow.setOrientation(LinearLayout.HORIZONTAL);
         addShoppingFilterChip(statusRow, "Cần mua", ShoppingViewModel.NEED_TO_BUY);
         addShoppingFilterChip(statusRow, "Đã có", ShoppingViewModel.AVAILABLE);
-        addShoppingFilterChip(statusRow, "Đã mua", ShoppingViewModel.PURCHASED);
         HorizontalScrollView statusScroll = new HorizontalScrollView(this);
         statusScroll.setHorizontalScrollBarEnabled(false);
         statusScroll.addView(statusRow, new HorizontalScrollView.LayoutParams(-2, -2));
@@ -750,7 +749,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item) {
         LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
         card.setBackground(roundRect(WHITE, BORDER, 16));
         LinearLayout details = vertical();
@@ -761,26 +760,23 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, -2);
         amountParams.topMargin = dp(5);
         details.addView(amount, amountParams);
-        card.addView(details, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout statusActions = new LinearLayout(this);
-        statusActions.setOrientation(LinearLayout.HORIZONTAL);
-        statusActions.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams statusActionsParams = new LinearLayout.LayoutParams(-1, dp(42));
-        statusActionsParams.topMargin = dp(10);
-        if (ShoppingViewModel.NEED_TO_BUY.equals(item.status)) {
-            addShoppingStatusAction(statusActions, "Đã có", ShoppingViewModel.AVAILABLE, item.id);
-            addShoppingStatusAction(statusActions, "Đã mua", ShoppingViewModel.PURCHASED, item.id);
-        } else {
-            TextView current = text(state, 13, GREEN, true);
-            current.setGravity(Gravity.CENTER_VERTICAL);
-            statusActions.addView(current, new LinearLayout.LayoutParams(0, -1, 1));
-            addShoppingStatusAction(statusActions, "Chuyển về Cần mua", ShoppingViewModel.NEED_TO_BUY, item.id);
-        }
-        card.addView(statusActions, statusActionsParams);
+        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
+        boolean available = ShoppingViewModel.AVAILABLE.equals(item.status);
+        TextView check = text(available ? "✓" : "", 22, available ? WHITE : GREEN, true);
+        check.setGravity(Gravity.CENTER);
+        check.setBackground(roundRect(available ? GREEN : WHITE, GREEN, 10));
+        check.setContentDescription(available ? "Đánh dấu cần mua: " + item.name
+                : "Đánh dấu đã có: " + item.name);
+        card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
         cardParams.topMargin = dp(12);
         parent.addView(card, cardParams);
         card.setOnClickListener(v -> openShoppingItemForm(item.id));
+        check.setOnClickListener(v -> {
+            shoppingViewModel.setStatus(item.id, available
+                    ? ShoppingViewModel.NEED_TO_BUY : ShoppingViewModel.AVAILABLE);
+            render();
+        });
         card.setOnLongClickListener(v -> {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Xóa nguyên liệu?")
@@ -794,23 +790,8 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void addShoppingStatusAction(LinearLayout parent, String label, String status, String itemId) {
-        TextView action = text(label, 13, GREEN, true);
-        action.setGravity(Gravity.CENTER);
-        action.setPadding(dp(12), 0, dp(12), 0);
-        action.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -1);
-        params.rightMargin = dp(8);
-        parent.addView(action, params);
-        action.setOnClickListener(v -> {
-            shoppingViewModel.setStatus(itemId, status);
-            render();
-        });
-    }
-
     private String shoppingStatusLabel(String status) {
         if (ShoppingViewModel.AVAILABLE.equals(status)) return "Đã có";
-        if (ShoppingViewModel.PURCHASED.equals(status)) return "Đã mua";
         return "Cần mua";
     }
 
@@ -882,9 +863,8 @@ public class MainActivity extends AppCompatActivity {
         statuses.setGravity(Gravity.CENTER_VERTICAL);
         addShoppingFormStatus(statuses, "Cần mua", ShoppingViewModel.NEED_TO_BUY);
         addShoppingFormStatus(statuses, "Đã có", ShoppingViewModel.AVAILABLE);
-        addShoppingFormStatus(statuses, "Đã mua", ShoppingViewModel.PURCHASED);
         fields.addView(statuses);
-        TextView statusHint = text("Đã có nghĩa là đang có sẵn ở nhà. Đã mua nghĩa là bạn đã mua trong lần đi chợ này.",
+        TextView statusHint = text("Đã có nghĩa là nguyên liệu hiện đang có sẵn ở nhà.",
                 13, MUTED, false);
         statusHint.setLineSpacing(dp(3), 1f);
         LinearLayout.LayoutParams statusHintParams = new LinearLayout.LayoutParams(-1, -2);
