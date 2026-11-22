@@ -228,6 +228,13 @@ public class MainActivityStateTest {
                 activity.onPersonalOpenCollections();
                 assertEquals(MainActivity.Screen.COLLECTION_LIST, getFieldUnchecked(activity, "screen"));
                 assertTrue(containsText(fragment.getView(), "Các bộ sưu tập bạn đã tạo."));
+                activity.onPersonalCreateCollection();
+                assertEquals(MainActivity.Screen.COLLECTION_FORM, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Chọn món để thêm"));
+                activity.onPersonalOpenNote(com.example.myapplication.domain.catalog.PreviewRecipeCatalog
+                        .designRecipes().get(0));
+                assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Ghi chú sau khi nấu"));
             });
         }
     }

@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
@@ -17,6 +18,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.Insets;
@@ -29,18 +31,30 @@ import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.RecipeCollection;
+import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+import com.example.myapplication.domain.model.CookingLogEntry;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import java.text.Normalizer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Owns the local-library landing page and favorites screen. */
+/** Owns Module 5 library, favorites, collection list/detail, and collection form screens. */
 public final class PersonalDataFragment extends Fragment {
   private static final String ARG_SECTION = "personal.section";
+  private static final String ARG_COLLECTION_ID = "personal.collectionId";
+  private static final String ARG_NOTE_RECIPE_ID = "personal.noteRecipeId";
   private static final String STATE_SECTION = "personal.fragment.section";
   private static final String STATE_QUERY = "personal.fragment.query";
-  private static final String LIBRARY = "LIBRARY", FAVORITES = "FAVORITES", COLLECTIONS = "COLLECTIONS";
+  private static final String STATE_DETAIL_QUERY = "personal.fragment.collectionQuery";
+  private static final String STATE_FORM_QUERY = "personal.fragment.collectionFormQuery";
+  private static final String STATE_COLLECTION_ID = "personal.fragment.collectionId";
+  private static final String STATE_NOTE_RECIPE_ID = "personal.fragment.noteRecipeId";
+  private static final String LIBRARY = "LIBRARY", FAVORITES = "FAVORITES", COLLECTIONS = "COLLECTIONS",
+      COLLECTION = "COLLECTION", COLLECTION_FORM = "COLLECTION_FORM";
+  private static final String NOTE = "NOTE";
   private static final int CREAM = Color.rgb(250, 249, 246),
       GREEN = Color.rgb(50, 108, 79),
       PALE_GREEN = Color.rgb(232, 242, 233),
@@ -56,11 +70,23 @@ public final class PersonalDataFragment extends Fragment {
 
     void onPersonalCreateCollection();
 
+    void onPersonalEditCollection(long collectionId);
+
+    void onPersonalDeleteCollection(long collectionId);
+
+    void onPersonalCollectionSaved(long collectionId);
+
     void onPersonalOpenCollection(long collectionId);
 
     void onPersonalOpenRecipe(Recipe recipe);
 
     void onPersonalOpenNote(Recipe recipe);
+
+    Recipe onPersonalResolveRecipe(String recipeId);
+
+    void onPersonalOpenRecipeLogs(String recipeId);
+
+    void onPersonalCreateCookingLog(String recipeId);
 
     void onPersonalOpenJournal();
 
@@ -74,22 +100,42 @@ public final class PersonalDataFragment extends Fragment {
   private Host host;
   private String section = LIBRARY;
   private String searchQuery = "";
+  private String collectionDetailQuery = "";
+  private String collectionFormQuery = "";
+  private long collectionId = -1L;
+  private String noteRecipeId;
   private LinearLayout root;
+  private EditText collectionNameInput;
+  private TextView collectionError;
+  private TextView collectionSaveButton;
+  private LinearLayout collectionRecipeResults;
+  private LinearLayout collectionFormRecipeRows;
+  private EditText noteInput;
+  private LinearLayout noteSavedBanner;
 
   public static PersonalDataFragment newInstance(boolean favorites) {
     return newInstance(favorites ? FAVORITES : LIBRARY);
   }
 
   public static PersonalDataFragment newInstance(String section) {
+    return newInstance(section, -1L, null);
+  }
+
+  public static PersonalDataFragment newInstance(String section, long collectionId, String noteRecipeId) {
     PersonalDataFragment f = new PersonalDataFragment();
     Bundle b = new Bundle();
     b.putString(ARG_SECTION, section);
+    b.putLong(ARG_COLLECTION_ID, collectionId);
+    b.putString(ARG_NOTE_RECIPE_ID, noteRecipeId);
     f.setArguments(b);
     return f;
   }
 
-  public void showSection(String section) {
+  public void showScreen(String section, long collectionId, String noteRecipeId) {
+    if (this.collectionId != collectionId) collectionDetailQuery = "";
     this.section = section;
+    this.collectionId = collectionId;
+    this.noteRecipeId = noteRecipeId;
     render();
   }
 
@@ -107,13 +153,25 @@ public final class PersonalDataFragment extends Fragment {
     if (state != null) {
       section = state.getString(STATE_SECTION, LIBRARY);
       searchQuery = state.getString(STATE_QUERY, "");
-    } else if (getArguments() != null) section = getArguments().getString(ARG_SECTION, LIBRARY);
+      collectionDetailQuery = state.getString(STATE_DETAIL_QUERY, "");
+      collectionFormQuery = state.getString(STATE_FORM_QUERY, "");
+      collectionId = state.getLong(STATE_COLLECTION_ID, -1L);
+      noteRecipeId = state.getString(STATE_NOTE_RECIPE_ID);
+    } else if (getArguments() != null) {
+      section = getArguments().getString(ARG_SECTION, LIBRARY);
+      collectionId = getArguments().getLong(ARG_COLLECTION_ID, -1L);
+      noteRecipeId = getArguments().getString(ARG_NOTE_RECIPE_ID);
+    }
   }
 
   @Override
   public void onSaveInstanceState(@NonNull Bundle out) {
     out.putString(STATE_SECTION, section);
     out.putString(STATE_QUERY, searchQuery);
+    out.putString(STATE_DETAIL_QUERY, collectionDetailQuery);
+    out.putString(STATE_FORM_QUERY, collectionFormQuery);
+    out.putLong(STATE_COLLECTION_ID, collectionId);
+    out.putString(STATE_NOTE_RECIPE_ID, noteRecipeId);
     super.onSaveInstanceState(out);
   }
 
@@ -142,10 +200,36 @@ public final class PersonalDataFragment extends Fragment {
             getViewLifecycleOwner(),
             stateValue -> {
               if (stateValue != null && !stateValue.loading) {
+                if (NOTE.equals(section)) return;
                 if (FAVORITES.equals(section) && searchInputFocused()) return;
                 render();
               }
             });
+    viewModel.collectionSaveResult().observe(getViewLifecycleOwner(), result -> {
+      if (result == null) return;
+      viewModel.clearCollectionSaveResult();
+      if (!COLLECTION_FORM.equals(section)) return;
+      if (result.collectionId != null) host.onPersonalCollectionSaved(result.collectionId);
+      else {
+        collectionError.setText(result.error == null ? "Không thể lưu bộ sưu tập." : result.error);
+        collectionNameInput.setBackground(roundRect(WHITE, Color.rgb(169, 54, 54), 14));
+        updateCollectionSaveButton(false);
+      }
+    });
+    viewModel.noteSaveResult().observe(getViewLifecycleOwner(), result -> {
+      if (result == null) return;
+      viewModel.clearNoteSaveResult();
+      if (result.success && NOTE.equals(section) && noteSavedBanner != null) {
+        noteSavedBanner.setVisibility(View.VISIBLE);
+      } else if (!result.success) {
+        android.widget.Toast.makeText(requireContext(),
+            result.error == null ? "Không thể lưu ghi chú." : result.error,
+            android.widget.Toast.LENGTH_SHORT).show();
+      }
+    });
+    journalViewModel.journalState().observe(getViewLifecycleOwner(), stateValue -> {
+      if (stateValue != null && !stateValue.loading && NOTE.equals(section) && !noteInputFocused()) render();
+    });
     render();
     return root;
   }
@@ -160,7 +244,14 @@ public final class PersonalDataFragment extends Fragment {
     root.removeAllViews();
     if (FAVORITES.equals(section)) renderFavorites();
     else if (COLLECTIONS.equals(section)) renderCollections();
+    else if (COLLECTION.equals(section)) renderCollection();
+    else if (COLLECTION_FORM.equals(section)) renderCollectionForm();
+    else if (NOTE.equals(section)) renderNote();
     else renderLibrary();
+  }
+
+  private boolean noteInputFocused() {
+    return noteInput != null && noteInput.hasFocus();
   }
 
   private void renderLibrary() {
@@ -278,6 +369,437 @@ public final class PersonalDataFragment extends Fragment {
     else populateFavorites(content, favorites);
     page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+  }
+
+  private void renderCollection() {
+    RecipeCollection selected = findCollection(collectionId);
+    if (selected == null) {
+      host.onPersonalOpenCollections();
+      return;
+    }
+    LinearLayout page = vertical();
+    page.setPadding(dp(24), dp(8), dp(24), dp(24));
+    addBackTitle(page, "Bộ sưu tập");
+    LinearLayout titleLine = new LinearLayout(requireContext());
+    titleLine.setGravity(Gravity.CENTER_VERTICAL);
+    TextView name = text(selected.name, 19, TEXT, true);
+    titleLine.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+    LinearLayout delete = collectionActionButton("Xóa", R.drawable.ic_delete_outline,
+        Color.rgb(169, 54, 54), WHITE, () -> confirmDeleteCollection(selected));
+    delete.setContentDescription("Xóa bộ sưu tập");
+    titleLine.addView(delete, new LinearLayout.LayoutParams(-2, dp(48)));
+    LinearLayout edit = collectionActionButton("Chỉnh sửa", R.drawable.ic_edit_outline,
+        GREEN, PALE_GREEN, () -> host.onPersonalEditCollection(selected.id));
+    edit.setContentDescription("Chỉnh sửa bộ sưu tập");
+    LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(-2, dp(48));
+    editParams.setMarginStart(dp(8));
+    titleLine.addView(edit, editParams);
+    page.addView(titleLine);
+    addText(page, selected.recipeCount + " món", 14, MUTED, false, 0, 8, 0, 24);
+
+    ScrollView scroll = new ScrollView(requireContext());
+    LinearLayout content = vertical();
+    scroll.addView(content);
+    List<Recipe> recipes = viewModel.getCollectionRecipes(collectionId);
+    if (recipes.isEmpty()) {
+      LinearLayout empty = vertical();
+      empty.setGravity(Gravity.CENTER);
+      ImageView folder = icon(R.drawable.ic_folder_outline, GREEN);
+      folder.setPadding(dp(24), dp(24), dp(24), dp(24));
+      folder.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
+      empty.addView(folder, new LinearLayout.LayoutParams(dp(84), dp(84)));
+      TextView emptyTitle = text("Bộ sưu tập đang trống", 22, TEXT, true);
+      emptyTitle.setGravity(Gravity.CENTER);
+      LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+      titleParams.topMargin = dp(18);
+      titleParams.bottomMargin = dp(8);
+      empty.addView(emptyTitle, titleParams);
+      TextView hint = text("Thêm món đã lưu vào bộ sưu tập này.", 14, MUTED, false);
+      hint.setGravity(Gravity.CENTER);
+      LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
+      hintParams.bottomMargin = dp(16);
+      empty.addView(hint, hintParams);
+      TextView add = button("Thêm món", true);
+      empty.addView(add, new LinearLayout.LayoutParams(-1, dp(49)));
+      add.setOnClickListener(v -> host.onPersonalEditCollection(collectionId));
+      content.addView(empty, new LinearLayout.LayoutParams(-1, -1));
+    } else {
+      FrameLayout search = createSearchBox(
+          collectionDetailQuery, "Tìm món trong bộ sưu tập", new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+              collectionDetailQuery = s.toString();
+              populateCollectionResults(recipes);
+            }
+            @Override public void afterTextChanged(Editable s) {}
+          });
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+      searchParams.bottomMargin = dp(14);
+      content.addView(search, searchParams);
+      collectionRecipeResults = vertical();
+      content.addView(collectionRecipeResults);
+      populateCollectionResults(recipes);
+    }
+    List<RecipeCollection> collections = viewModel.getCollections();
+    boolean hasOther = false;
+    for (RecipeCollection other : collections) {
+      if (other.id == collectionId) continue;
+      if (!hasOther) {
+        addText(content, "Bộ sưu tập khác", 19, TEXT, true, 0, 22, 0, 12);
+        hasOther = true;
+      }
+      addRelatedCollectionRow(content, other);
+    }
+    page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    TextView create = button("+     Tạo bộ sưu tập", true);
+    LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, dp(49));
+    createParams.topMargin = dp(18);
+    page.addView(create, createParams);
+    create.setOnClickListener(v -> host.onPersonalCreateCollection());
+    root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+  }
+
+  private void populateCollectionResults(List<Recipe> recipes) {
+    if (collectionRecipeResults == null) return;
+    collectionRecipeResults.removeAllViews();
+    String query = normalize(collectionDetailQuery);
+    List<Recipe> matches = new ArrayList<>();
+    for (Recipe recipe : recipes)
+      if (query.isEmpty() || normalize(recipe.title).contains(query)) matches.add(recipe);
+    if (matches.isEmpty()) {
+      TextView none = text("Không tìm thấy món trong bộ sưu tập.", 14, MUTED, false);
+      none.setGravity(Gravity.CENTER);
+      collectionRecipeResults.addView(none, new LinearLayout.LayoutParams(-1, dp(80)));
+      return;
+    }
+    addFavoriteGrid(collectionRecipeResults, matches);
+  }
+
+  private void addRelatedCollectionRow(LinearLayout parent, RecipeCollection collection) {
+    LinearLayout item = horizontalCard();
+    List<Recipe> recipes = viewModel.getCollectionRecipes(collection.id);
+    if (recipes.isEmpty()) {
+      ImageView folder = icon(R.drawable.ic_folder_outline, GREEN);
+      folder.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
+      item.addView(folder, new LinearLayout.LayoutParams(dp(52), dp(52)));
+    } else item.addView(recipeImage(recipes.get(0)), new LinearLayout.LayoutParams(dp(52), dp(52)));
+    LinearLayout labels = vertical();
+    labels.setPadding(dp(12), 0, 0, 0);
+    labels.addView(text(collection.name, 14, TEXT, true));
+    labels.addView(text(collection.recipeCount + " món đã lưu", 12, MUTED, false));
+    item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+    item.addView(text("›", 23, GREEN, false));
+    item.setOnClickListener(v -> host.onPersonalOpenCollection(collection.id));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
+    params.bottomMargin = dp(9);
+    parent.addView(item, params);
+  }
+
+  private void renderCollectionForm() {
+    LinearLayout page = vertical();
+    page.setPadding(dp(24), dp(8), dp(24), dp(12));
+    RecipeCollection editing = collectionId > 0 ? findCollection(collectionId) : null;
+    addBackTitle(page, "Tạo bộ sưu tập");
+    ScrollView scroll = new ScrollView(requireContext());
+    LinearLayout content = vertical();
+    scroll.addView(content);
+    addText(content, "Tên bộ sưu tập", 13, TEXT, true, 0, 20, 0, 10);
+    collectionNameInput = new EditText(requireContext());
+    collectionNameInput.setSingleLine(true);
+    collectionNameInput.setText(viewModel.getCollectionNameDraft());
+    collectionNameInput.setTextSize(16);
+    collectionNameInput.setTextColor(TEXT);
+    collectionNameInput.setPadding(dp(15), dp(8), dp(15), dp(8));
+    collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
+    collectionNameInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
+    content.addView(collectionNameInput, new LinearLayout.LayoutParams(-1, dp(49)));
+    collectionError = text("", 12, Color.rgb(169, 54, 54), false);
+    content.addView(collectionError);
+    addText(content, "Chọn món để thêm", 19, TEXT, true, 0, 34, 0, 18);
+    FrameLayout search = createSearchBox(collectionFormQuery, "Tìm món để thêm", new TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+        collectionFormQuery = s.toString();
+        populateCollectionFormRows();
+      }
+      @Override public void afterTextChanged(Editable s) {}
+    });
+    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+    searchParams.bottomMargin = dp(14);
+    content.addView(search, searchParams);
+    collectionFormRecipeRows = vertical();
+    content.addView(collectionFormRecipeRows);
+    populateCollectionFormRows();
+    page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    collectionSaveButton = button("Lưu bộ sưu tập", true);
+    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, dp(49));
+    saveParams.topMargin = dp(18);
+    page.addView(collectionSaveButton, saveParams);
+    collectionSaveButton.setOnClickListener(v -> saveCollectionForm());
+    collectionNameInput.addTextChangedListener(new TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+        viewModel.setCollectionNameDraft(s.toString());
+        updateCollectionSaveButton(!s.toString().trim().isEmpty());
+      }
+      @Override public void afterTextChanged(Editable s) {}
+    });
+    updateCollectionSaveButton(!viewModel.getCollectionNameDraft().trim().isEmpty());
+    root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+  }
+
+  private void renderNote() {
+    Recipe recipe = host.onPersonalResolveRecipe(noteRecipeId);
+    if (recipe == null) recipe = PreviewRecipeCatalog.designRecipes().get(0);
+    final Recipe selectedRecipe = recipe;
+    LinearLayout page = vertical();
+    page.setPadding(dp(24), dp(8), dp(24), dp(12));
+    ScrollView scroll = new ScrollView(requireContext());
+    LinearLayout content = vertical();
+    content.setPadding(0, 0, 0, dp(8));
+    scroll.addView(content);
+    addBackTitle(content, "Ghi chú cá nhân");
+
+    LinearLayout recipeRow = new LinearLayout(requireContext());
+    recipeRow.setGravity(Gravity.CENTER_VERTICAL);
+    recipeRow.setPadding(dp(8), dp(6), dp(12), dp(6));
+    recipeRow.setBackground(roundRect(WHITE, BORDER, 14));
+    recipeRow.addView(recipeImage(selectedRecipe), new LinearLayout.LayoutParams(dp(60), dp(52)));
+    LinearLayout labels = vertical();
+    labels.setPadding(dp(12), 0, 0, 0);
+    labels.addView(text(selectedRecipe.title, 14, TEXT, true));
+    labels.addView(text(selectedRecipe.duration + " · " + selectedRecipe.difficulty, 12, MUTED, false));
+    recipeRow.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+    recipeRow.addView(favoriteToggleButton(selectedRecipe), new LinearLayout.LayoutParams(dp(48), dp(48)));
+    LinearLayout.LayoutParams recipeParams = new LinearLayout.LayoutParams(-1, dp(64));
+    recipeParams.topMargin = dp(30);
+    content.addView(recipeRow, recipeParams);
+
+    addText(content, "Ghi chú sau khi nấu", 13, TEXT, true, 0, 48, 0, 16);
+    noteInput = new EditText(requireContext());
+    noteInput.setTag("personal-note-input");
+    noteInput.setText(viewModel.getNote(selectedRecipe.id));
+    noteInput.setTextSize(16);
+    noteInput.setTextColor(TEXT);
+    noteInput.setGravity(Gravity.TOP | Gravity.START);
+    noteInput.setPadding(dp(16), dp(14), dp(16), dp(14));
+    noteInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+        | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+    noteInput.setBackground(roundRect(WHITE, BORDER, 14));
+    int screenHeightDp = Math.round(getResources().getDisplayMetrics().heightPixels
+        / getResources().getDisplayMetrics().density);
+    int noteHeightDp = Math.max(160, Math.min(220, Math.round(screenHeightDp * 0.215f)));
+    content.addView(noteInput, new LinearLayout.LayoutParams(-1, dp(noteHeightDp)));
+    noteSavedBanner = createInfoBanner("Ghi chú đã lưu");
+    LinearLayout.LayoutParams bannerParams = new LinearLayout.LayoutParams(-1, dp(48));
+    bannerParams.topMargin = dp(24);
+    bannerParams.bottomMargin = dp(12);
+    content.addView(noteSavedBanner, bannerParams);
+    noteSavedBanner.setVisibility(View.GONE);
+
+    addCookingJournalPreview(content, selectedRecipe);
+    page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    TextView save = button("Lưu ghi chú", true);
+    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, dp(49));
+    saveParams.topMargin = dp(8);
+    page.addView(save, saveParams);
+    save.setOnClickListener(v -> {
+      viewModel.saveNote(selectedRecipe, noteInput.getText().toString());
+      noteInput.clearFocus();
+      InputMethodManager imm = (InputMethodManager) requireContext()
+          .getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+      if (imm != null) imm.hideSoftInputFromWindow(noteInput.getWindowToken(), 0);
+    });
+    root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+  }
+
+  private FrameLayout favoriteToggleButton(Recipe recipe) {
+    boolean favorite = viewModel.isFavorite(recipe.id);
+    FrameLayout button = new FrameLayout(requireContext());
+    button.setFocusable(true);
+    button.setClickable(true);
+    button.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
+    ImageView star = icon(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
+    button.addView(star, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+    button.setContentDescription((favorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
+    button.setOnClickListener(v -> {
+      boolean nowFavorite = !viewModel.isFavorite(recipe.id);
+      if (nowFavorite) viewModel.addFavorite(recipe);
+      else viewModel.removeFavorite(recipe.id);
+      star.setImageResource(nowFavorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline);
+      button.setContentDescription((nowFavorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
+    });
+    return button;
+  }
+
+  private void addCookingJournalPreview(LinearLayout parent, Recipe recipe) {
+    List<CookingLogEntry> logs = journalViewModel.getLogs(recipe.id);
+    LinearLayout heading = new LinearLayout(requireContext());
+    heading.setGravity(Gravity.CENTER_VERTICAL);
+    LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(-1, -2);
+    headingParams.topMargin = dp(24);
+    headingParams.bottomMargin = dp(6);
+    parent.addView(heading, headingParams);
+    heading.addView(text("Nhật ký nấu", 18, TEXT, true), new LinearLayout.LayoutParams(0, -2, 1));
+    TextView all = text("Xem tất cả ›", 12, GREEN, true);
+    heading.addView(all);
+    all.setOnClickListener(v -> host.onPersonalOpenRecipeLogs(recipe.id));
+    addText(parent, "Đã nấu " + logs.size() + " lần", 13, MUTED, false, 0, 0, 0, 0);
+    if (logs.isEmpty()) {
+      addText(parent, "Ghi lại trải nghiệm mỗi lần bạn nấu món này.", 13, MUTED, false, 0, 5, 0, 0);
+    } else {
+      for (int index = 0; index < Math.min(2, logs.size()); index++) {
+        CookingLogEntry log = logs.get(index);
+        LinearLayout card = vertical();
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+        card.setBackground(roundRect(WHITE, BORDER, 14));
+        String summary = formatDate(log.cookedAt) + " · " + log.servings + " người"
+            + (log.rating == null ? "" : " · " + ratingStars(log.rating));
+        card.addView(text(summary, 12, MUTED, true));
+        if (!log.adjustmentNote.isEmpty()) {
+          TextView note = text(log.adjustmentNote, 13, TEXT, false);
+          note.setMaxLines(2);
+          LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
+          noteParams.topMargin = dp(4);
+          card.addView(note, noteParams);
+        }
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.topMargin = dp(8);
+        parent.addView(card, cardParams);
+        card.setOnClickListener(v -> host.onPersonalOpenRecipeLogs(log.recipeId));
+      }
+    }
+    TextView addLog = button("+   Ghi lại lần nấu", false);
+    LinearLayout.LayoutParams logParams = new LinearLayout.LayoutParams(-1, dp(45));
+    logParams.topMargin = dp(10);
+    parent.addView(addLog, logParams);
+    addLog.setOnClickListener(v -> host.onPersonalCreateCookingLog(recipe.id));
+  }
+
+  private LinearLayout createInfoBanner(String value) {
+    LinearLayout banner = new LinearLayout(requireContext());
+    banner.setGravity(Gravity.CENTER_VERTICAL);
+    banner.setPadding(dp(14), dp(10), dp(14), dp(10));
+    banner.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 15));
+    banner.addView(text("ⓘ", 18, GREEN, false));
+    TextView content = text(value, 13, TEXT, true);
+    content.setPadding(dp(12), 0, 0, 0);
+    banner.addView(content);
+    return banner;
+  }
+
+  private String formatDate(long millis) {
+    return new SimpleDateFormat("dd/MM/yyyy", new Locale("vi", "VN")).format(new Date(millis));
+  }
+
+  private String ratingStars(int rating) {
+    StringBuilder stars = new StringBuilder();
+    for (int value = 1; value <= 5; value++) stars.append(value <= rating ? '★' : '☆');
+    return stars.toString();
+  }
+
+  private void populateCollectionFormRows() {
+    if (collectionFormRecipeRows == null) return;
+    collectionFormRecipeRows.removeAllViews();
+    String query = normalize(collectionFormQuery);
+    int matches = 0;
+    for (Recipe recipe : PreviewRecipeCatalog.designRecipes()) {
+      if (!query.isEmpty() && !normalize(recipe.title).contains(query)) continue;
+      addSelectableRecipeRow(collectionFormRecipeRows, recipe);
+      matches++;
+    }
+    if (matches == 0) {
+      TextView none = text("Không tìm thấy món phù hợp.", 14, MUTED, false);
+      none.setGravity(Gravity.CENTER);
+      collectionFormRecipeRows.addView(none, new LinearLayout.LayoutParams(-1, dp(72)));
+    }
+  }
+
+  private void addSelectableRecipeRow(LinearLayout parent, Recipe recipe) {
+    boolean selected = viewModel.isCollectionRecipeSelected(recipe.id);
+    LinearLayout item = horizontalCard();
+    ImageView image = recipeImage(recipe);
+    item.addView(image, new LinearLayout.LayoutParams(dp(52), dp(52)));
+    LinearLayout labels = vertical();
+    labels.setPadding(dp(12), 0, 0, 0);
+    labels.addView(text(recipe.title, 14, TEXT, true));
+    labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
+    item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView check = text(selected ? "✓" : "+", 21, selected ? WHITE : GREEN, false);
+    check.setGravity(Gravity.CENTER);
+    if (selected) check.setBackground(roundRect(GREEN, GREEN, 7));
+    item.addView(check, new LinearLayout.LayoutParams(dp(32), dp(32)));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
+    params.bottomMargin = dp(9);
+    parent.addView(item, params);
+    item.setOnClickListener(v -> {
+      viewModel.toggleCollectionRecipe(recipe.id);
+      populateCollectionFormRows();
+    });
+  }
+
+  private void saveCollectionForm() {
+    String name = collectionNameInput.getText().toString();
+    viewModel.setCollectionNameDraft(name);
+    viewModel.markCollectionSubmitAttempted();
+    Long editingId = collectionId > 0 ? collectionId : null;
+    if (name.trim().isEmpty()) {
+      collectionError.setText("Nhập tên bộ sưu tập.");
+      updateCollectionSaveButton(false);
+      return;
+    }
+    if (!viewModel.isLoaded()) {
+      collectionError.setText("Đang tải dữ liệu bộ sưu tập. Vui lòng thử lại.");
+      updateCollectionSaveButton(false);
+      return;
+    }
+    if (!viewModel.isCollectionNameAvailable(name, editingId)) {
+      collectionError.setText("Tên này đã được sử dụng.");
+      updateCollectionSaveButton(false);
+      return;
+    }
+    collectionError.setText("");
+    viewModel.saveCollectionForm(editingId, PreviewRecipeCatalog.designRecipes());
+  }
+
+  private void updateCollectionSaveButton(boolean enabled) {
+    if (collectionSaveButton == null) return;
+    collectionSaveButton.setEnabled(enabled);
+    collectionSaveButton.setTextColor(enabled ? WHITE : MUTED);
+    collectionSaveButton.setBackground(roundRect(enabled ? GREEN : PALE_GREEN, enabled ? GREEN : PALE_GREEN, 14));
+  }
+
+  private RecipeCollection findCollection(long id) {
+    for (RecipeCollection collection : viewModel.getCollections())
+      if (collection.id == id) return collection;
+    return null;
+  }
+
+  private LinearLayout collectionActionButton(String label, int iconId, int tint, int background,
+      Runnable action) {
+    LinearLayout button = new LinearLayout(requireContext());
+    button.setGravity(Gravity.CENTER);
+    button.setPadding(dp(10), 0, dp(10), 0);
+    button.setBackground(roundRect(background, background == WHITE ? BORDER : background, 14));
+    button.addView(icon(iconId, tint), new LinearLayout.LayoutParams(dp(18), dp(18)));
+    TextView caption = text(label, 12, tint, true);
+    LinearLayout.LayoutParams captionParams = new LinearLayout.LayoutParams(-2, -2);
+    captionParams.setMarginStart(dp(5));
+    button.addView(caption, captionParams);
+    button.setContentDescription(label + " bộ sưu tập");
+    button.setFocusable(true);
+    button.setOnClickListener(v -> action.run());
+    return button;
+  }
+
+  private void confirmDeleteCollection(RecipeCollection collection) {
+    new AlertDialog.Builder(requireContext())
+        .setTitle("Xóa bộ sưu tập?")
+        .setMessage("Bộ sưu tập “" + collection.name + "” và danh sách món trong đó sẽ bị xóa. Yêu thích và ghi chú của các món vẫn được giữ.")
+        .setNegativeButton("Hủy", null)
+        .setPositiveButton("Xóa", (dialog, which) -> host.onPersonalDeleteCollection(collection.id))
+        .show();
   }
 
   private void populateFavorites(LinearLayout content, List<Recipe> favorites) {
