@@ -151,6 +151,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText collectionNameInput;
     private TextView collectionError;
     private TextView collectionSaveButton;
+    private LinearLayout noteSavedBanner;
     private LinearLayout planPickerRows;
     private LinearLayout collectionRecipeResults;
     private LinearLayout collectionFormRecipeRows;
@@ -286,6 +287,39 @@ public class MainActivity extends AppCompatActivity {
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        personalDataViewModel.personalDataState().observe(this, state -> {
+            if (state == null || state.loading) return;
+            if (screen == Screen.COLLECTION_FORM) {
+                updateCollectionFormValidation();
+            } else if (screen == Screen.LIBRARY || screen == Screen.FAVORITES
+                    || screen == Screen.COLLECTION_LIST || screen == Screen.COLLECTION
+                    || screen == Screen.RECIPE_DETAIL) {
+                render();
+            }
+        });
+        personalDataViewModel.collectionSaveResult().observe(this, result -> {
+            if (result == null) return;
+            personalDataViewModel.clearCollectionSaveResult();
+            if (result.collectionId != null && screen == Screen.COLLECTION_FORM) {
+                selectedCollectionId = result.collectionId;
+                screen = Screen.COLLECTION;
+                render();
+            } else if (result.collectionId == null && screen == Screen.COLLECTION_FORM) {
+                collectionError.setText(result.error == null ? "Không thể lưu bộ sưu tập." : result.error);
+                collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
+                updateCollectionSaveButton(false);
+            }
+        });
+        personalDataViewModel.noteSaveResult().observe(this, result -> {
+            if (result == null) return;
+            personalDataViewModel.clearNoteSaveResult();
+            if (result.success && screen == Screen.NOTE && noteSavedBanner != null) {
+                noteSavedBanner.setVisibility(View.VISIBLE);
+            } else if (!result.success) {
+                Toast.makeText(this, result.error == null ? "Không thể lưu ghi chú." : result.error,
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
         pantryViewModel.pantryState().observe(this, state -> {
             if (state != null && !state.loading && screen == Screen.PANTRY) render();
         });
@@ -2901,15 +2935,14 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getDisplayMetrics().density);
         int noteHeightDp = Math.max(160, Math.min(220, Math.round(screenHeightDp * 0.215f)));
         content.addView(noteInput, new LinearLayout.LayoutParams(-1, dp(noteHeightDp)));
-        LinearLayout savedBanner = addInfoBanner(content, "Ghi chú đã lưu", 24);
-        savedBanner.setVisibility(View.GONE);
+        noteSavedBanner = addInfoBanner(content, "Ghi chú đã lưu", 24);
+        noteSavedBanner.setVisibility(View.GONE);
 
         addCookingJournalPreview(content, recipe);
 
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "Lưu ghi chú", true, () -> {
             personalDataViewModel.saveNote(recipe, noteInput.getText().toString());
-            savedBanner.setVisibility(View.VISIBLE);
             noteInput.clearFocus();
             android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
                     getSystemService(INPUT_METHOD_SERVICE);
@@ -4321,16 +4354,18 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        Long savedCollectionId = personalDataViewModel.saveCollectionForm(currentId, PreviewRecipeCatalog.designRecipes());
-        if (savedCollectionId == null) {
+        if (!personalDataViewModel.saveCollectionForm(currentId, PreviewRecipeCatalog.designRecipes())) {
+            if (!personalDataViewModel.isLoaded()) {
+                collectionError.setText("Đang tải dữ liệu bộ sưu tập. Vui lòng thử lại.");
+                collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
+                updateCollectionSaveButton(false);
+                return;
+            }
             collectionError.setText("Tên này đã được sử dụng.");
             collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
             updateCollectionSaveButton(false);
             return;
         }
-        selectedCollectionId = savedCollectionId;
-        screen = Screen.COLLECTION;
-        render();
     }
 
     private void updateCollectionFormValidation() {
@@ -4338,10 +4373,15 @@ public class MainActivity extends AppCompatActivity {
         personalDataViewModel.setCollectionNameDraft(name);
         boolean nonEmpty = !name.trim().isEmpty();
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        boolean available = nonEmpty && personalDataViewModel.isCollectionNameAvailable(name, currentId);
+        boolean dataLoaded = personalDataViewModel.isLoaded();
+        boolean available = nonEmpty && dataLoaded
+                && personalDataViewModel.isCollectionNameAvailable(name, currentId);
         if (personalDataViewModel.wasCollectionSubmitAttempted()) {
             if (!nonEmpty) {
                 collectionError.setText("");
+                collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
+            } else if (!dataLoaded) {
+                collectionError.setText("Đang tải dữ liệu bộ sưu tập. Vui lòng thử lại.");
                 collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
             } else if (!available) {
                 collectionError.setText("Tên này đã được sử dụng.");

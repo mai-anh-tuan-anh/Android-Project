@@ -6,6 +6,7 @@ import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.PantryIngredient;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
@@ -28,6 +29,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -389,6 +391,74 @@ public class MainActivityStateTest {
                 viewModel.refreshItems();
             });
             if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry item delete did not complete");
+        }
+    }
+
+    @Test
+    public void personalFavoritesAndHistoryUseCachedLiveDataAndAsyncPersistence() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<PersonalDataViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                PersonalDataViewModel viewModel = (PersonalDataViewModel) getFieldUnchecked(activity,
+                        "personalDataViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Personal data did not load");
+
+            PersonalDataViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-personal-" + System.nanoTime(), "Món cá nhân kiểm tra", "", "15 phút", "Dễ");
+            CountDownLatch favoriteReloaded = new CountDownLatch(1);
+            AtomicBoolean favoriteRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.addFavorite(recipe);
+                assertEquals(true, viewModel.isFavorite(recipe.id));
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) favoriteRefreshStarted.set(true);
+                    if (state != null && !state.loading && favoriteRefreshStarted.get()) {
+                        for (Recipe favorite : state.favorites) {
+                            if (recipe.id.equals(favorite.id)) favoriteReloaded.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!favoriteReloaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Favorite was not persisted");
+
+            CountDownLatch historyReloaded = new CountDownLatch(1);
+            AtomicBoolean historyRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.recordViewedRecipe(recipe);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) historyRefreshStarted.set(true);
+                    if (state != null && !state.loading && historyRefreshStarted.get()) {
+                        for (Recipe viewed : state.history) {
+                            if (recipe.id.equals(viewed.id)) historyReloaded.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!historyReloaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("View history was not persisted");
+
+            CountDownLatch removed = new CountDownLatch(1);
+            AtomicBoolean removeRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.removeFavorite(recipe.id);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) removeRefreshStarted.set(true);
+                    if (state != null && !state.loading && removeRefreshStarted.get()) {
+                        boolean found = false;
+                        for (Recipe favorite : state.favorites) found |= recipe.id.equals(favorite.id);
+                        if (!found) removed.countDown();
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Favorite removal was not persisted");
         }
     }
 

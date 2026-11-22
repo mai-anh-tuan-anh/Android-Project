@@ -28,7 +28,7 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
     @SuppressWarnings("unchecked")
     public <T extends ViewModel> T create(@NonNull Class<T> modelClass) {
         if (modelClass == PersonalDataViewModel.class) {
-            return (T) new PersonalDataViewModel(appContainer.personalDataRepository);
+            return (T) new PersonalDataViewModel(appContainer.personalDataRepository, appContainer.ioExecutor);
         }
         if (modelClass == MealPlanViewModel.class) {
             return (T) new MealPlanViewModel(appContainer.personalDataRepository, appContainer.ioExecutor);
