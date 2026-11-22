@@ -40,10 +40,10 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
             return (T) new PantryViewModel(appContainer.personalDataRepository, appContainer.ioExecutor);
         }
         if (modelClass == CookingJournalViewModel.class) {
-            return (T) new CookingJournalViewModel(appContainer.personalDataRepository);
+            return (T) new CookingJournalViewModel(appContainer.personalDataRepository, appContainer.ioExecutor);
         }
         if (modelClass == DiscoverSearchViewModel.class) {
-            return (T) new DiscoverSearchViewModel(appContainer.searchHistoryRepository);
+            return (T) new DiscoverSearchViewModel(appContainer.searchHistoryRepository, appContainer.ioExecutor);
         }
         if (modelClass == DiscoverViewModel.class) {
             return (T) new DiscoverViewModel();

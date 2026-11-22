@@ -15,7 +15,6 @@ import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -62,7 +61,6 @@ import java.util.Set;
 import java.util.Calendar;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.io.File;
 import java.text.Normalizer;
 
 /** Local personal data, meal planning, shopping, pantry, and cooking journal. */
@@ -152,6 +150,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView collectionError;
     private TextView collectionSaveButton;
     private LinearLayout noteSavedBanner;
+    private EditText personalNoteInput;
+    private EditText discoverSearchInput;
     private LinearLayout planPickerRows;
     private LinearLayout collectionRecipeResults;
     private LinearLayout collectionFormRecipeRows;
@@ -287,6 +287,55 @@ public class MainActivity extends AppCompatActivity {
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        searchViewModel.recentSearchState().observe(this, state -> {
+            if (state != null && !state.loading && screen == Screen.SEARCH
+                    && (discoverSearchInput == null || !discoverSearchInput.hasFocus())) render();
+        });
+        cookingJournalViewModel.journalState().observe(this, state -> {
+            if (state == null || state.loading) return;
+            cookingJournalAllLogs = state.logs;
+            if ((screen == Screen.NOTE && (personalNoteInput == null || !personalNoteInput.hasFocus()))
+                    || screen == Screen.COOKING_JOURNAL
+                    || screen == Screen.COOKING_LOGS) render();
+        });
+        cookingJournalViewModel.mutationResult().observe(this, result -> {
+            if (result == null) return;
+            cookingJournalViewModel.clearMutationResult();
+            if (CookingJournalViewModel.MutationResult.PHOTO.equals(result.operation)) {
+                if (result.success) {
+                    if (screen == Screen.COOKING_LOG_FORM) {
+                        if (!originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) {
+                            cookingJournalViewModel.deletePhoto(cookingLogPhotoPath);
+                        }
+                        cookingLogPhotoPath = result.filename;
+                        render();
+                    } else {
+                        cookingJournalViewModel.deletePhoto(result.filename);
+                    }
+                } else if (!result.success) {
+                    Toast.makeText(this, result.message == null ? "Không thể lưu ảnh đã chọn." : result.message,
+                            Toast.LENGTH_SHORT).show();
+                }
+            } else if (CookingJournalViewModel.MutationResult.SAVE.equals(result.operation)) {
+                if (result.success && screen == Screen.COOKING_LOG_FORM) {
+                    if (!originalCookingLogPhotoPath.isEmpty()
+                            && !originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) {
+                        cookingJournalViewModel.deletePhoto(originalCookingLogPhotoPath);
+                    }
+                    originalCookingLogPhotoPath = cookingLogPhotoPath;
+                    editingCookingLogId = null;
+                    screen = cookingLogFormReturnScreen;
+                    render();
+                    Toast.makeText(this, "Đã lưu lần nấu.", Toast.LENGTH_SHORT).show();
+                } else if (!result.success) {
+                    Toast.makeText(this, result.message == null ? "Không thể lưu lần nấu." : result.message,
+                            Toast.LENGTH_SHORT).show();
+                }
+            } else if (!result.success) {
+                Toast.makeText(this, result.message == null ? "Không thể cập nhật nhật ký nấu." : result.message,
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
         personalDataViewModel.personalDataState().observe(this, state -> {
             if (state == null || state.loading) return;
             if (screen == Screen.COLLECTION_FORM) {
@@ -364,21 +413,13 @@ public class MainActivity extends AppCompatActivity {
         });
         cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
-            PhotoSaveResult result = cookingJournalViewModel.savePhoto(uri.toString());
-            String copied = result.filename;
-            if (copied != null) {
-                if (!originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) cookingJournalViewModel.deletePhoto(cookingLogPhotoPath);
-                cookingLogPhotoPath = copied;
-                render();
-            } else {
-                Toast.makeText(this, result.tooLarge ? "Ảnh cần nhỏ hơn 10 MB." : "Không thể lưu ảnh đã chọn.",
-                        Toast.LENGTH_SHORT).show();
-            }
+            cookingJournalViewModel.savePhotoAsync(uri.toString());
         });
         personalDataViewModel.seedDesignPreviewIfNeeded(PreviewRecipeCatalog.designRecipes());
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
         restoreOfflineFeatureState(savedInstanceState);
+        cookingJournalViewModel.refresh();
         if (screen == Screen.PANTRY) pantryViewModel.refreshItems();
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) mealPlanViewModel.refresh();
         if (screen == Screen.SHOPPING) shoppingViewModel.refreshItems();
@@ -901,6 +942,7 @@ public class MainActivity extends AppCompatActivity {
         searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
         EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 44);
+        discoverSearchInput = searchInput;
         searchInput.setHint("Tìm công thức, nguyên liệu...");
         searchInput.setBackgroundColor(Color.TRANSPARENT);
         searchInput.setPadding(dp(10), 0, dp(10), 0);
@@ -2928,6 +2970,7 @@ public class MainActivity extends AppCompatActivity {
 
         addText(content, "Ghi chú sau khi nấu", 13, TEXT, true, 0, 48, 0, 16);
         EditText noteInput = editField(personalDataViewModel.getNote(recipe.id), 16, -1);
+        personalNoteInput = noteInput;
         noteInput.setGravity(Gravity.TOP | Gravity.START);
         noteInput.setPadding(dp(16), dp(14), dp(16), dp(14));
         noteInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -3400,6 +3443,7 @@ public class MainActivity extends AppCompatActivity {
         cookingLogRecipeId = recipeId;
         cookingLogReturnScreen = returnScreen;
         screen = Screen.COOKING_LOGS;
+        cookingJournalViewModel.refresh();
         render();
     }
 
@@ -3407,6 +3451,7 @@ public class MainActivity extends AppCompatActivity {
         cookingLogRecipeId = null;
         cookingLogReturnScreen = returnScreen;
         screen = Screen.COOKING_JOURNAL;
+        cookingJournalViewModel.refresh();
         render();
     }
 
@@ -3683,8 +3728,8 @@ public class MainActivity extends AppCompatActivity {
         card.setPadding(dp(10), dp(10), dp(10), dp(10));
         card.setBackground(roundRect(WHITE, BORDER, 16));
         ImageView photo = new ImageView(this);
-        File imageFile = cookingJournalViewModel.getPhoto(log.photoLocalPath);
-        if (imageFile != null && imageFile.isFile()) photo.setImageBitmap(decodeCookingPhoto(imageFile, dp(64), dp(64)));
+        android.graphics.Bitmap imageBitmap = cookingJournalViewModel.getPhotoBitmap(log.photoLocalPath);
+        if (imageBitmap != null) photo.setImageBitmap(imageBitmap);
         else photo.setImageResource(recipeDrawable(log.recipeId));
         photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
         photo.setBackground(roundRect(BORDER, BORDER, 12));
@@ -3820,8 +3865,8 @@ public class MainActivity extends AppCompatActivity {
         });
         if (!cookingLogPhotoPath.isEmpty()) {
             ImageView preview = new ImageView(this);
-            File photo = cookingJournalViewModel.getPhoto(cookingLogPhotoPath);
-            if (photo != null && photo.isFile()) preview.setImageBitmap(decodeCookingPhoto(photo, dp(800), dp(320)));
+            android.graphics.Bitmap photo = cookingJournalViewModel.getPhotoBitmap(cookingLogPhotoPath);
+            if (photo != null) preview.setImageBitmap(photo);
             preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
             preview.setBackground(roundRect(BORDER, BORDER, 14));
             preview.setClipToOutline(true);
@@ -3913,16 +3958,7 @@ public class MainActivity extends AppCompatActivity {
         if (!cookingJournalViewModel.save(editingCookingLogId, recipe, cookingLogCookedAt,
                 cookingLogServings, duration, cookingLogRating, cookingLogAdjustment, cookingLogPhotoPath)) {
             Toast.makeText(this, "Không thể lưu lần nấu. Vui lòng kiểm tra thông tin.", Toast.LENGTH_SHORT).show();
-            return;
         }
-        if (!originalCookingLogPhotoPath.isEmpty() && !originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) {
-            cookingJournalViewModel.deletePhoto(originalCookingLogPhotoPath);
-        }
-        originalCookingLogPhotoPath = cookingLogPhotoPath;
-        editingCookingLogId = null;
-        screen = cookingLogFormReturnScreen;
-        render();
-        Toast.makeText(this, "Đã lưu lần nấu.", Toast.LENGTH_SHORT).show();
     }
 
     private void confirmDeleteCookingLog(CookingLogEntry log) {
@@ -3932,21 +3968,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Xóa", (dialog, which) -> {
                     cookingJournalViewModel.delete(log.id);
                     cookingJournalViewModel.deletePhoto(log.photoLocalPath);
-                    render();
                 }).show();
-    }
-
-    private android.graphics.Bitmap decodeCookingPhoto(File file, int requestedWidth, int requestedHeight) {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        while (bounds.outWidth / options.inSampleSize > requestedWidth * 2
-                || bounds.outHeight / options.inSampleSize > requestedHeight * 2) {
-            options.inSampleSize *= 2;
-        }
-        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
     }
 
     private void deleteCookingLogPhoto(String filename) {
@@ -4420,6 +4442,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openRecipeNote(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
+        cookingJournalViewModel.refresh();
         noteReturnScreen = screen;
         noteRecipeId = recipe.id;
         screen = Screen.NOTE;

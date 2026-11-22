@@ -1,6 +1,8 @@
 package com.example.myapplication.presentation.discover;
 
 import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 
 import com.example.myapplication.domain.catalog.IngredientSuggestionMatcher;
 import com.example.myapplication.domain.model.Recipe;
@@ -15,6 +17,7 @@ import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Presentation state and business filtering actions for Module 2 (Search and Filter).
@@ -26,6 +29,9 @@ public final class DiscoverSearchViewModel extends ViewModel {
     private static final long RECENT_SEARCH_TTL_MS = 60L * 60L * 1000L;
 
     private final SearchHistoryRepository searchHistoryRepository;
+    private final Executor ioExecutor;
+    private final MutableLiveData<RecentSearchState> recentSearchState = new MutableLiveData<>(
+            new RecentSearchState(Collections.emptyList(), true));
     private final List<String> recentSearches = new ArrayList<>();
     private final java.util.Map<String, Long> recentSearchTimes = new java.util.LinkedHashMap<>();
 
@@ -47,14 +53,25 @@ public final class DiscoverSearchViewModel extends ViewModel {
     private final Set<String> selectedCookingIngredients = new LinkedHashSet<>();
 
     public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository) {
+        this(searchHistoryRepository, Runnable::run);
+    }
+
+    public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository, Executor ioExecutor) {
         this.searchHistoryRepository = searchHistoryRepository;
-        loadRecentSearches();
+        this.ioExecutor = ioExecutor;
+        ioExecutor.execute(this::loadRecentSearches);
     }
 
     private void loadRecentSearches() {
-        recentSearches.clear();
-        recentSearchTimes.clear();
-        String raw = searchHistoryRepository.readSerializedSearchHistory();
+        String raw;
+        try {
+            raw = searchHistoryRepository.readSerializedSearchHistory();
+        } catch (RuntimeException error) {
+            recentSearchState.postValue(new RecentSearchState(recentSearches, false));
+            return;
+        }
+        List<String> loadedQueries = new ArrayList<>();
+        java.util.Map<String, Long> loadedTimes = new java.util.LinkedHashMap<>();
         long now = System.currentTimeMillis();
         boolean changed = false;
         if (raw != null && !raw.trim().isEmpty()) {
@@ -65,28 +82,38 @@ public final class DiscoverSearchViewModel extends ViewModel {
                     long timestamp = Long.parseLong(entry.substring(0, separator));
                     String query = entry.substring(separator + 1).trim();
                     if (!query.isEmpty() && now >= timestamp
-                            && now - timestamp < RECENT_SEARCH_TTL_MS && !recentSearches.contains(query)) {
-                        recentSearches.add(query);
-                        recentSearchTimes.put(query, timestamp);
+                            && now - timestamp < RECENT_SEARCH_TTL_MS && !loadedQueries.contains(query)) {
+                        loadedQueries.add(query);
+                        loadedTimes.put(query, timestamp);
                     } else changed = true;
                 } catch (NumberFormatException ignored) { changed = true; }
             }
+        }
+        synchronized (this) {
+            recentSearches.clear();
+            recentSearches.addAll(loadedQueries);
+            recentSearchTimes.clear();
+            recentSearchTimes.putAll(loadedTimes);
+            publishRecentSearches(false);
         }
         if (changed) saveRecentSearches();
     }
 
     private void saveRecentSearches() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < recentSearches.size(); i++) {
-            if (i > 0) sb.append("\n");
-            String query = recentSearches.get(i);
-            sb.append(recentSearchTimes.getOrDefault(query, System.currentTimeMillis()))
-                    .append('\t').append(query);
+        synchronized (this) {
+            for (int i = 0; i < recentSearches.size(); i++) {
+                if (i > 0) sb.append("\n");
+                String query = recentSearches.get(i);
+                sb.append(recentSearchTimes.getOrDefault(query, System.currentTimeMillis()))
+                        .append('\t').append(query);
+            }
         }
-        searchHistoryRepository.writeSerializedSearchHistory(sb.toString());
+        String serialized = sb.toString();
+        ioExecutor.execute(() -> searchHistoryRepository.writeSerializedSearchHistory(serialized));
     }
 
-    private void expireRecentSearches() {
+    private synchronized void expireRecentSearches() {
         long now = System.currentTimeMillis();
         boolean changed = false;
         Iterator<String> iterator = recentSearches.iterator();
@@ -102,16 +129,18 @@ public final class DiscoverSearchViewModel extends ViewModel {
         if (changed) saveRecentSearches();
     }
 
-    public List<String> getRecentSearches() {
+    public synchronized List<String> getRecentSearches() {
         expireRecentSearches();
-        return Collections.unmodifiableList(recentSearches);
+        return Collections.unmodifiableList(new ArrayList<>(recentSearches));
     }
+
+    public LiveData<RecentSearchState> recentSearchState() { return recentSearchState; }
 
     public List<String> getSuggestions() {
         return Collections.unmodifiableList(DEFAULT_SUGGESTIONS);
     }
 
-    public void addRecentSearch(String query) {
+    public synchronized void addRecentSearch(String query) {
         if (query == null) return;
         String trimmed = query.trim();
         if (trimmed.isEmpty()) return;
@@ -122,20 +151,38 @@ public final class DiscoverSearchViewModel extends ViewModel {
             String removed = recentSearches.remove(recentSearches.size() - 1);
             recentSearchTimes.remove(removed);
         }
+        publishRecentSearches(false);
         saveRecentSearches();
     }
 
-    public void removeRecentSearch(String query) {
+    public synchronized void removeRecentSearch(String query) {
         if (query != null && recentSearches.remove(query.trim())) {
             recentSearchTimes.remove(query.trim());
+            publishRecentSearches(false);
             saveRecentSearches();
         }
     }
 
-    public void clearRecentSearches() {
+    public synchronized void clearRecentSearches() {
         recentSearches.clear();
         recentSearchTimes.clear();
+        publishRecentSearches(false);
         saveRecentSearches();
+    }
+
+    private void publishRecentSearches(boolean loading) {
+        RecentSearchState state = new RecentSearchState(recentSearches, loading);
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) recentSearchState.setValue(state);
+        else recentSearchState.postValue(state);
+    }
+
+    public static final class RecentSearchState {
+        public final List<String> searches;
+        public final boolean loading;
+        RecentSearchState(List<String> searches, boolean loading) {
+            this.searches = Collections.unmodifiableList(new ArrayList<>(searches));
+            this.loading = loading;
+        }
     }
 
     public boolean isCookingIngredientSelected(String ingredient) {

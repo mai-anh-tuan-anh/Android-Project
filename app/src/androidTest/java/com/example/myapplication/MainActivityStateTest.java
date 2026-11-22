@@ -7,6 +7,8 @@ import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.PantryIngredient;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
+import com.example.myapplication.domain.model.CookingLogEntry;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
@@ -459,6 +461,60 @@ public class MainActivityStateTest {
                 viewModel.refresh(Collections.singletonList(recipe));
             });
             if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Favorite removal was not persisted");
+        }
+    }
+
+    @Test
+    public void cookingJournalLoadsSavesAndDeletesThroughAsyncState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<CookingJournalViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                CookingJournalViewModel viewModel = (CookingJournalViewModel) getFieldUnchecked(activity,
+                        "cookingJournalViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refresh();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking journal did not load");
+
+            CookingJournalViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-journal-" + System.nanoTime(), "Món nhật ký kiểm tra", "", "20 phút", "Dễ");
+            CountDownLatch saved = new CountDownLatch(1);
+            AtomicReference<String> logIdRef = new AtomicReference<>();
+            scenario.onActivity(activity -> {
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && !state.loading) {
+                        for (CookingLogEntry log : state.logs) {
+                            if (recipe.id.equals(log.recipeId)) {
+                                logIdRef.set(log.id);
+                                saved.countDown();
+                            }
+                        }
+                    }
+                });
+                assertEquals(true, viewModel.save(null, recipe, System.currentTimeMillis(), 1,
+                        20, 5, "Thêm rau thơm", ""));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log save did not complete");
+
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicBoolean deleteRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && state.loading) deleteRefreshStarted.set(true);
+                    if (state != null && !state.loading && deleteRefreshStarted.get()) {
+                        boolean found = false;
+                        for (CookingLogEntry log : state.logs) found |= logIdRef.get().equals(log.id);
+                        if (!found) deleted.countDown();
+                    }
+                });
+                viewModel.delete(logIdRef.get());
+                viewModel.refresh();
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log delete did not complete");
         }
     }
 
