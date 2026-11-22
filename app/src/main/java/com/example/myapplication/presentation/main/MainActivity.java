@@ -9,6 +9,7 @@ import com.example.myapplication.presentation.cookingjournal.CookingJournalViewM
 import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
 import com.example.myapplication.presentation.discover.DiscoverViewModel;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.mealplan.MealPlanFragment;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.pantry.PantryFragment;
 import com.example.myapplication.presentation.shopping.ShoppingFragment;
@@ -65,7 +66,8 @@ import java.util.Date;
 import java.text.Normalizer;
 
 /** Local personal data, meal planning, shopping, pantry, and cooking journal. */
-public class MainActivity extends AppCompatActivity implements PantryFragment.Host, ShoppingFragment.Host {
+public class MainActivity extends AppCompatActivity implements PantryFragment.Host, ShoppingFragment.Host,
+        MealPlanFragment.Host {
     private static final String STATE_APP_SCREEN = "app.currentScreen";
     private static final String STATE_SELECTED_CATEGORY = "discover.selectedCategory";
     private static final String STATE_DISCOVER_SEARCH_QUERY = "discover.searchQuery";
@@ -125,6 +127,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private FrameLayout fragmentContainer;
     private PantryFragment pantryFragment;
     private ShoppingFragment shoppingFragment;
+    private MealPlanFragment mealPlanFragment;
     private View bottomNavigationBar;
     private Screen screen = Screen.DISCOVER;
     private boolean animateNextScreen;
@@ -350,8 +353,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             }
         });
         mealPlanViewModel.planState().observe(this, state -> {
-            if (state != null && !state.loading
-                    && (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER)) render();
+            if (state != null && !state.loading && screen == Screen.MEAL_PLAN_PICKER) render();
         });
         shoppingViewModel.saveResult().observe(this, result -> {
             if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
@@ -592,6 +594,20 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                     .commitNow();
             return;
         }
+        if (screen == Screen.MEAL_PLAN) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            Fragment restored = getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
+            if (restored instanceof MealPlanFragment) {
+                mealPlanFragment = (MealPlanFragment) restored;
+                return;
+            }
+            mealPlanFragment = new MealPlanFragment();
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment_container, mealPlanFragment, MealPlanFragment.class.getName())
+                    .commitNow();
+            return;
+        }
         Fragment existingPantry = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
         if (existingPantry != null) {
             getSupportFragmentManager().beginTransaction().remove(existingPantry).commitNow();
@@ -601,6 +617,11 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (existingShopping != null) {
             getSupportFragmentManager().beginTransaction().remove(existingShopping).commitNow();
             shoppingFragment = null;
+        }
+        Fragment existingMealPlan = getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
+        if (existingMealPlan != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingMealPlan).commitNow();
+            mealPlanFragment = null;
         }
         fragmentContainer.setVisibility(View.GONE);
         removeLegacyContent();
@@ -639,7 +660,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         else if (screen == Screen.COLLECTION) renderCollection();
         else if (screen == Screen.COLLECTION_FORM) renderCollectionForm();
         else if (screen == Screen.NOTE) renderNote();
-        else if (screen == Screen.MEAL_PLAN) renderMealPlan();
         else if (screen == Screen.MEAL_PLAN_PICKER) renderMealPlanPicker();
         else if (screen == Screen.SHOPPING_ITEM_FORM) renderShoppingItemForm();
         else if (screen == Screen.COOKING_JOURNAL) renderAllCookingLogs();
@@ -1790,119 +1810,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
-    private void renderMealPlan() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(16));
-        TextView heading = text("Nấu hôm nay", 28, TEXT, true);
-        page.addView(heading);
-
-        List<PlannedRecipe> planned = mealPlanViewModel.getMealPlanRecipes();
-        if (!planned.isEmpty()) {
-            LinearLayout summary = vertical();
-            summary.setPadding(dp(14), dp(12), dp(14), dp(12));
-            summary.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
-            summary.addView(text(planned.size() + " món cho bữa cơm nhà.", 15, TEXT, true));
-            MealPlanViewModel.MealDurationEstimate estimate = mealPlanViewModel.estimateTotalDuration(planned);
-            String durationLabel;
-            if (estimate.unknownRecipes == 0) {
-                durationLabel = "Tổng thời gian ước tính: " + estimate.knownMinutes + " phút";
-            } else if (estimate.knownRecipes > 0) {
-                durationLabel = "Ít nhất " + estimate.knownMinutes + " phút · "
-                        + estimate.unknownRecipes + " món chưa có thời lượng";
-            } else {
-                durationLabel = "Chưa đủ dữ liệu thời lượng để ước tính";
-            }
-            TextView duration = text(durationLabel, 13, GREEN, true);
-            LinearLayout.LayoutParams durationParams = new LinearLayout.LayoutParams(-1, -2);
-            durationParams.topMargin = dp(5);
-            summary.addView(duration, durationParams);
-            TextView estimateNote = text("Cộng thời lượng từng món; chưa tính việc nấu song song.", 11, MUTED, false);
-            LinearLayout.LayoutParams estimateNoteParams = new LinearLayout.LayoutParams(-1, -2);
-            estimateNoteParams.topMargin = dp(3);
-            summary.addView(estimateNote, estimateNoteParams);
-            LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
-            summaryParams.topMargin = dp(18);
-            summaryParams.bottomMargin = dp(22);
-            page.addView(summary, summaryParams);
-        }
-
-        ScrollView scroll = scrollContent();
-        mealPlanScrollView = scroll;
-        if (planned.isEmpty()) scroll.setFillViewport(true);
-        LinearLayout content = vertical();
-        scroll.addView(content);
-        if (planned.isEmpty()) {
-            LinearLayout empty = vertical();
-            empty.setGravity(Gravity.CENTER_HORIZONTAL);
-            content.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, -2);
-            emptyParams.topMargin = dp(144);
-            content.addView(empty, emptyParams);
-            MealPlanViewModel.PlanState planState = mealPlanViewModel.planState().getValue();
-            if (planState != null && planState.loading) {
-                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-                empty.addView(progress, new LinearLayout.LayoutParams(dp(32), dp(32)));
-                TextView loading = text("Đang tải kế hoạch…", 14, MUTED, false);
-                LinearLayout.LayoutParams loadingParams = new LinearLayout.LayoutParams(-1, -2);
-                loadingParams.topMargin = dp(12);
-                empty.addView(loading, loadingParams);
-            } else {
-            ImageView icon = iconView(R.drawable.ic_calendar_outline, GREEN);
-            icon.setPadding(dp(24), dp(24), dp(24), dp(24));
-            icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
-            empty.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
-            TextView title = text("Bạn chưa chọn món", 22, TEXT, true);
-            title.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-            titleParams.topMargin = dp(18);
-            titleParams.bottomMargin = dp(8);
-            empty.addView(title, titleParams);
-            TextView hint = text("Thêm món và đặt khẩu phần để chuẩn bị bữa ăn.", 14, MUTED, false);
-            hint.setGravity(Gravity.CENTER);
-            hint.setLineSpacing(dp(3), 1f);
-            LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
-            hintParams.bottomMargin = dp(20);
-            empty.addView(hint, hintParams);
-            TextView choose = primaryButton("Chọn món", () -> openMealPlanPicker());
-            empty.addView(choose, new LinearLayout.LayoutParams(-1, dp(49)));
-            }
-        } else {
-            for (int i = 0; i < planned.size(); i++) addPlannedRecipeCard(content, planned.get(i), i, planned.size());
-            TextView addMore = text("＋     Thêm món khác", 16, GREEN, true);
-            addMore.setGravity(Gravity.CENTER);
-            addMore.setBackground(roundRect(WHITE, BORDER, 15));
-            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(52));
-            addParams.topMargin = dp(14);
-            addParams.bottomMargin = dp(14);
-            content.addView(addMore, addParams);
-            addMore.setOnClickListener(v -> openMealPlanPicker());
-        }
-
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        if (!planned.isEmpty()) {
-            FrameLayout shopping = new FrameLayout(this);
-            shopping.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-            ImageView cart = iconView(R.drawable.ic_cart_outline, GREEN);
-            cart.setPadding(dp(14), dp(10), dp(10), dp(10));
-            shopping.addView(cart, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START | Gravity.CENTER_VERTICAL));
-            TextView shoppingLabel = text("Tạo danh sách mua sắm", 15, GREEN, true);
-            shoppingLabel.setGravity(Gravity.CENTER);
-            shopping.addView(shoppingLabel, new FrameLayout.LayoutParams(-1, -1));
-            LinearLayout.LayoutParams shoppingParams = new LinearLayout.LayoutParams(-1, dp(48));
-            shoppingParams.topMargin = dp(10);
-            page.addView(shopping, shoppingParams);
-            shopping.setOnClickListener(v -> openShoppingList(Screen.MEAL_PLAN));
-
-            TextView startCooking = primaryButton("Bắt đầu nấu", () -> Toast.makeText(this,
-                    "Màn Nấu từng bước sẽ được kết nối khi hoàn thành module 4.", Toast.LENGTH_SHORT).show());
-            LinearLayout.LayoutParams cookParams = new LinearLayout.LayoutParams(-1, dp(49));
-            cookParams.topMargin = dp(10);
-            page.addView(startCooking, cookParams);
-        }
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(1);
-    }
-
     private void openShoppingItemForm(String itemId) {
         editingShoppingItemId = itemId;
         ShoppingListItem item = shoppingViewModel.findItem(itemId);
@@ -2114,133 +2021,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         screen = Screen.SHOPPING;
         shoppingViewModel.refreshItems();
         if (returnScreen == Screen.MEAL_PLAN) shoppingViewModel.checkForPlanChangesAsync();
-        render();
-    }
-
-    private void addPlannedRecipeCard(LinearLayout parent, PlannedRecipe item,
-                                      int position, int totalCount) {
-        boolean compact = getResources().getConfiguration().screenWidthDp < 360
-                || getResources().getConfiguration().fontScale >= 1.15f;
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
-        card.setGravity(compact ? Gravity.CENTER_HORIZONTAL : Gravity.CENTER_VERTICAL);
-        int cardPadding = compact ? 8 : 11;
-        card.setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding));
-        card.setBackground(roundRect(WHITE, BORDER, 20));
-
-        LinearLayout contentRow = card;
-        if (compact) {
-            contentRow = new LinearLayout(this);
-            contentRow.setGravity(Gravity.CENTER_VERTICAL);
-            card.addView(contentRow, new LinearLayout.LayoutParams(-1, -2));
-        }
-        ImageView image = recipeImage(item.recipe);
-        int imageSize = compact ? 64 : 78;
-        contentRow.addView(image, new LinearLayout.LayoutParams(dp(imageSize), dp(imageSize)));
-
-        LinearLayout details = vertical();
-        details.setPadding(dp(compact ? 8 : 12), 0, 0, 0);
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text(item.recipe.title, 18, TEXT, true);
-        title.setMaxLines(2);
-        titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView remove = text("×", 28, GREEN, false);
-        remove.setGravity(Gravity.CENTER);
-        remove.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-        remove.setContentDescription("Bỏ " + item.recipe.title + " khỏi kế hoạch");
-        titleRow.addView(remove, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        details.addView(titleRow);
-        details.addView(text(item.recipe.duration + " · " + item.recipe.difficulty, 14, MUTED, false));
-        LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(0, -2, 1);
-        if (!compact) detailsParams.leftMargin = dp(1);
-        contentRow.addView(details, detailsParams);
-
-        addMealPlanOrderControls(compact ? card : details, item, position, totalCount);
-
-        LinearLayout servings = new LinearLayout(this);
-        servings.setGravity(Gravity.CENTER_VERTICAL);
-        servings.setPadding(dp(4), 0, dp(4), 0);
-        servings.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-        TextView minus = stepButton("−", "Giảm khẩu phần", () -> changeServings(item, -1));
-        servings.addView(minus, new LinearLayout.LayoutParams(dp(40), dp(42)));
-        TextView count = text(String.valueOf(item.servings), 19, TEXT, true);
-        count.setGravity(Gravity.CENTER);
-        servings.addView(count, new LinearLayout.LayoutParams(dp(40), dp(42)));
-        TextView plus = stepButton("＋", "Tăng khẩu phần", () -> changeServings(item, 1));
-        servings.addView(plus, new LinearLayout.LayoutParams(dp(40), dp(42)));
-        TextView person = text("người", 14, MUTED, false);
-        person.setSingleLine(true);
-        LinearLayout.LayoutParams personParams = new LinearLayout.LayoutParams(-2, -2);
-        personParams.leftMargin = dp(5);
-        servings.addView(person, personParams);
-        LinearLayout.LayoutParams servingsParams = new LinearLayout.LayoutParams(-1, -2);
-        if (compact) {
-            servingsParams.topMargin = dp(8);
-            card.addView(servings, servingsParams);
-        } else {
-            servingsParams.topMargin = dp(8);
-            details.addView(servings, servingsParams);
-        }
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
-        cardParams.bottomMargin = dp(16);
-        parent.addView(card, cardParams);
-        remove.setOnClickListener(v -> removePlannedRecipe(item));
-    }
-
-    private void addMealPlanOrderControls(LinearLayout card, PlannedRecipe item,
-                                          int position, int totalCount) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = text("Thứ tự nấu · " + (position + 1) + "/" + totalCount, 12, MUTED, false);
-        row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView up = mealPlanOrderButton("↑", "Đưa " + item.recipe.title + " lên trước",
-                position > 0, () -> movePlannedRecipe(item.recipe.id, -1));
-        TextView down = mealPlanOrderButton("↓", "Đưa " + item.recipe.title + " xuống sau",
-                position < totalCount - 1, () -> movePlannedRecipe(item.recipe.id, 1));
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(dp(48), dp(48));
-        buttonParams.leftMargin = dp(4);
-        row.addView(up, buttonParams);
-        LinearLayout.LayoutParams downParams = new LinearLayout.LayoutParams(dp(48), dp(48));
-        downParams.leftMargin = dp(4);
-        row.addView(down, downParams);
-        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-        rowParams.topMargin = dp(6);
-        card.addView(row, rowParams);
-    }
-
-    private TextView mealPlanOrderButton(String glyph, String description, boolean enabled, Runnable action) {
-        TextView button = text(glyph, 20, enabled ? GREEN : MUTED, true);
-        button.setGravity(Gravity.CENTER);
-        button.setBackground(roundRect(enabled ? PALE_GREEN : CREAM, enabled ? PALE_GREEN : BORDER, 14));
-        button.setContentDescription(description);
-        button.setFocusable(true);
-        button.setEnabled(enabled);
-        if (enabled) button.setOnClickListener(v -> action.run());
-        return button;
-    }
-
-    private void movePlannedRecipe(String recipeId, int direction) {
-        if (mealPlanViewModel.moveMealPlanRecipe(recipeId, direction)) render();
-    }
-
-    private void removePlannedRecipe(PlannedRecipe item) {
-        MealPlanViewModel.RemovedPlanRecipe removed = mealPlanViewModel.removeMealPlanRecipeForUndo(item.recipe.id);
-        if (removed == null) return;
-        render();
-        Snackbar snackbar = Snackbar.make(appRoot, "Đã bỏ " + item.recipe.title + " khỏi kế hoạch.",
-                Snackbar.LENGTH_LONG).setDuration(5000).setAction("Hoàn tác", view -> {
-                    if (mealPlanViewModel.restoreMealPlanRecipe(removed)) render();
-                    else Toast.makeText(this, "Món này đã có lại trong kế hoạch.", Toast.LENGTH_SHORT).show();
-                });
-        if (bottomNavigationBar != null) snackbar.setAnchorView(bottomNavigationBar);
-        snackbar.show();
-    }
-
-    private void changeServings(PlannedRecipe item, int delta) {
-        int servings = item.servings + delta;
-        if (servings < MealPlanViewModel.MIN_SERVINGS || servings > MealPlanViewModel.MAX_SERVINGS) return;
-        mealPlanViewModel.setMealPlanRecipeServings(item.recipe.id, servings);
         render();
     }
 
@@ -2752,6 +2532,22 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     @Override public void onShoppingEditItem(String id) { openShoppingItemForm(id); }
 
     @Override public void onShoppingFilterChanged(String status) { shoppingStatusFilter = status; }
+
+    @Override public void onMealPlanOpenPicker() { openMealPlanPicker(); }
+
+    @Override public void onMealPlanOpenShopping() { openShoppingList(Screen.MEAL_PLAN); }
+
+    @Override public void onMealPlanOpenRecipe(Recipe recipe) { openRecipeDetail(recipe); }
+
+    @Override public void onMealPlanNavigateTab(int tab) {
+        animateNextScreen = true;
+        clearCookingJournalDateRangeIfLeavingJournal();
+        if (tab == 0) screen = Screen.DISCOVER;
+        else if (tab == 1) { mealPlanViewModel.refresh(); return; }
+        else if (tab == 2) { openShoppingList(Screen.MEAL_PLAN); return; }
+        else screen = Screen.LIBRARY;
+        render();
+    }
 
     private Bundle createPantryFragmentArguments() {
         Bundle args = new Bundle();
