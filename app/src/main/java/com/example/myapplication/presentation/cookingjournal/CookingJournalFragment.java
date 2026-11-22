@@ -24,6 +24,9 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.example.myapplication.BepNhaApplication;
@@ -231,6 +234,16 @@ public final class CookingJournalFragment extends Fragment {
   public View onCreateView(
       @NonNull LayoutInflater inflater, @Nullable ViewGroup parent, @Nullable Bundle state) {
     root = vertical();
+    ViewCompat.setOnApplyWindowInsetsListener(
+        root,
+        (view, insets) -> {
+          Insets system = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+          Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+          view.setPadding(
+              system.left, system.top, system.right, Math.max(system.bottom, ime.bottom));
+          return insets;
+        });
+    ViewCompat.requestApplyInsets(root);
     viewModel
         .journalState()
         .observe(

@@ -27,6 +27,9 @@ import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
 import com.example.myapplication.domain.model.*;
 import com.example.myapplication.domain.model.Recipe;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
@@ -186,6 +189,13 @@ public class MainActivityStateTest {
                         .findFragmentByTag(CookingJournalFragment.class.getName());
                 if (journal == null || journal.getView() == null)
                     throw new AssertionError("Cooking journal form Fragment is not attached");
+                ViewCompat.dispatchApplyWindowInsets(
+                        journal.getView(),
+                        new WindowInsetsCompat.Builder()
+                                .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(0, 24, 0, 24))
+                                .build());
+                assertEquals("Cooking journal must keep content below the status bar",
+                        24, journal.getView().getPaddingTop());
                 assertTrue(containsText(journal.getView(), "Lưu lần nấu"));
                 journal.handleBackPressed();
                 assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
