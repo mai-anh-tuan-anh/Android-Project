@@ -286,6 +286,10 @@ public class MainActivity extends AppCompatActivity {
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        mealPlanViewModel.planState().observe(this, state -> {
+            if (state != null && !state.loading
+                    && (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER)) render();
+        });
         shoppingViewModel.shoppingState().observe(this, state -> {
             if (screen == Screen.SHOPPING && state != null && !state.loading) render();
         });
@@ -326,6 +330,7 @@ public class MainActivity extends AppCompatActivity {
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
         restoreOfflineFeatureState(savedInstanceState);
+        if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) mealPlanViewModel.refresh();
         if (screen == Screen.SHOPPING) shoppingViewModel.refreshItems();
         render();
     }
@@ -2659,6 +2664,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openMealPlanPicker() {
         mealPlanViewModel.beginPicker();
+        mealPlanViewModel.refresh();
         restoredPickerScrollY = 0;
         screen = Screen.MEAL_PLAN_PICKER;
         render();
@@ -4219,6 +4225,7 @@ public class MainActivity extends AppCompatActivity {
                 } else if (index == 1) {
                     clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.MEAL_PLAN;
+                    mealPlanViewModel.refresh();
                     render();
                 } else if (index == 2) {
                     clearCookingJournalDateRangeIfLeavingJournal();

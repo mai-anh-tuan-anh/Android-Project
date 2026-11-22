@@ -2,6 +2,8 @@ package com.example.myapplication;
 
 import com.example.myapplication.presentation.main.MainActivity;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
@@ -277,6 +279,64 @@ public class MainActivityStateTest {
             if (!deleted.await(5, TimeUnit.SECONDS)) {
                 throw new AssertionError("Shopping item delete did not complete asynchronously");
             }
+        }
+    }
+
+    @Test
+    public void mealPlanLoadsAndPersistsPickerSelectionWithoutBlockingUi() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<MealPlanViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                MealPlanViewModel viewModel = (MealPlanViewModel) getFieldUnchecked(activity,
+                        "mealPlanViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refresh();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan did not load");
+
+            MealPlanViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-plan-" + System.nanoTime(), "Món kiểm tra async", "", "10 phút", "Dễ");
+            CountDownLatch persisted = new CountDownLatch(1);
+            AtomicBoolean refreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.beginPicker();
+                viewModel.setPickerServings(2);
+                viewModel.toggleRecipe(recipe.id);
+                assertEquals(true, viewModel.saveSelection(Arrays.asList(recipe)));
+                List<PlannedRecipe> optimistic = viewModel.getMealPlanRecipes();
+                PlannedRecipe selected = null;
+                for (PlannedRecipe item : optimistic) if (recipe.id.equals(item.recipe.id)) selected = item;
+                assertEquals(2, selected == null ? 0 : selected.servings);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && state.loading) refreshStarted.set(true);
+                    if (state != null && !state.loading && refreshStarted.get()) {
+                        for (PlannedRecipe item : state.recipes) {
+                            if (recipe.id.equals(item.recipe.id) && item.servings == 2) persisted.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh();
+            });
+            if (!persisted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan was not persisted");
+            CountDownLatch removed = new CountDownLatch(1);
+            AtomicBoolean removeRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.removeMealPlanRecipe(recipe.id);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && state.loading) removeRefreshStarted.set(true);
+                    if (state != null && !state.loading && removeRefreshStarted.get()) {
+                        boolean found = false;
+                        for (PlannedRecipe item : state.recipes) found |= recipe.id.equals(item.recipe.id);
+                        if (!found) removed.countDown();
+                    }
+                });
+                viewModel.refresh();
+            });
+            if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan removal was not persisted");
         }
     }
 

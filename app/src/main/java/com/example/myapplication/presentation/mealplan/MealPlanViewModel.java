@@ -3,6 +3,8 @@ package com.example.myapplication.presentation.mealplan;
 
 
 import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 import com.example.myapplication.domain.model.*;
 import com.example.myapplication.domain.repository.PersonalDataRepository;
 import java.text.Normalizer;
@@ -14,6 +16,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Collections;
+import java.util.concurrent.Executor;
 
 /** Presentation state and business actions for module 6. */
 public final class MealPlanViewModel extends ViewModel {
@@ -22,28 +26,64 @@ public final class MealPlanViewModel extends ViewModel {
     public enum PickerSource { ALL, FAVORITES, COLLECTION }
 
     private final PersonalDataRepository repository;
+    private final Executor ioExecutor;
+    private final MutableLiveData<PlanState> planState = new MutableLiveData<>(
+            new PlanState(Collections.emptyList(), true, null));
+    private List<PlannedRecipe> plannedRecipes = new ArrayList<>();
+    private List<RecipeCollection> collections = new ArrayList<>();
+    private List<Recipe> favorites = new ArrayList<>();
+    private final Map<Long, List<Recipe>> collectionRecipes = new HashMap<>();
     private final List<String> selectedRecipeIds = new ArrayList<>();
     private int pickerServings = MIN_SERVINGS;
     private String searchQuery = "";
     private PickerSource pickerSource = PickerSource.ALL;
     private long pickerCollectionId = -1L;
 
-    public MealPlanViewModel(PersonalDataRepository repository) {
+    public MealPlanViewModel(PersonalDataRepository repository, Executor ioExecutor) {
         this.repository = repository;
+        this.ioExecutor = ioExecutor;
+    }
+
+    public LiveData<PlanState> planState() { return planState; }
+
+    /** Loads the plan and picker sources without blocking the UI thread. */
+    public void refresh() {
+        PlanState current = planState.getValue();
+        planState.setValue(new PlanState(current == null ? plannedRecipes : current.recipes, true, null));
+        ioExecutor.execute(() -> {
+            try {
+                List<PlannedRecipe> loadedPlan = repository.getMealPlanRecipes();
+                List<RecipeCollection> loadedCollections = repository.getCollections();
+                List<Recipe> loadedFavorites = repository.getFavorites();
+                Map<Long, List<Recipe>> loadedCollectionRecipes = new HashMap<>();
+                for (RecipeCollection collection : loadedCollections) {
+                    loadedCollectionRecipes.put(collection.id, repository.getCollectionRecipes(collection.id));
+                }
+                plannedRecipes = new ArrayList<>(loadedPlan);
+                collections = new ArrayList<>(loadedCollections);
+                favorites = new ArrayList<>(loadedFavorites);
+                collectionRecipes.clear();
+                collectionRecipes.putAll(loadedCollectionRecipes);
+                planState.postValue(new PlanState(plannedRecipes, false, null));
+            } catch (RuntimeException error) {
+                planState.postValue(new PlanState(plannedRecipes, false, error.getMessage()));
+            }
+        });
     }
 
     public List<PlannedRecipe> getMealPlanRecipes() {
-        return repository.getMealPlanRecipes();
+        return new ArrayList<>(plannedRecipes);
     }
 
-    public List<RecipeCollection> getRecipeCollections() { return repository.getCollections(); }
+    public List<RecipeCollection> getRecipeCollections() { return new ArrayList<>(collections); }
 
     public List<Recipe> getPickerRecipes(List<Recipe> defaultRecipes) {
         switch (pickerSource) {
             case FAVORITES:
-                return repository.getFavorites();
+                return new ArrayList<>(favorites);
             case COLLECTION:
-                return pickerCollectionId > 0 ? repository.getCollectionRecipes(pickerCollectionId)
+                return pickerCollectionId > 0 ? new ArrayList<>(collectionRecipes.getOrDefault(pickerCollectionId,
+                        Collections.emptyList()))
                         : new ArrayList<>();
             case ALL:
             default:
@@ -53,12 +93,12 @@ public final class MealPlanViewModel extends ViewModel {
 
     public List<Recipe> getAllSelectableRecipes(List<Recipe> defaultRecipes) {
         Map<String, Recipe> recipesById = new LinkedHashMap<>();
-        addUniqueRecipes(recipesById, repository.getFavorites());
-        for (RecipeCollection collection : repository.getCollections()) {
-            addUniqueRecipes(recipesById, repository.getCollectionRecipes(collection.id));
+        addUniqueRecipes(recipesById, favorites);
+        for (RecipeCollection collection : collections) {
+            addUniqueRecipes(recipesById, collectionRecipes.getOrDefault(collection.id, Collections.emptyList()));
         }
         addUniqueRecipes(recipesById, defaultRecipes);
-        for (PlannedRecipe planned : repository.getMealPlanRecipes()) {
+        for (PlannedRecipe planned : plannedRecipes) {
             if (!recipesById.containsKey(planned.recipe.id)) {
                 recipesById.put(planned.recipe.id, planned.recipe);
             }
@@ -73,15 +113,17 @@ public final class MealPlanViewModel extends ViewModel {
         }
     }
 
-    public void removeMealPlanRecipe(String recipeId) { repository.removeMealPlanRecipe(recipeId); }
+    public void removeMealPlanRecipe(String recipeId) {
+        removeMealPlanRecipeForUndo(recipeId);
+    }
 
     public RemovedPlanRecipe removeMealPlanRecipeForUndo(String recipeId) {
-        List<PlannedRecipe> current = repository.getMealPlanRecipes();
+        List<PlannedRecipe> current = new ArrayList<>(plannedRecipes);
         for (int i = 0; i < current.size(); i++) {
             PlannedRecipe planned = current.get(i);
             if (planned.recipe.id.equals(recipeId)) {
                 current.remove(i);
-                repository.replaceMealPlanRecipes(current);
+                publishPlan(current);
                 return new RemovedPlanRecipe(planned, i);
             }
         }
@@ -90,18 +132,18 @@ public final class MealPlanViewModel extends ViewModel {
 
     public boolean restoreMealPlanRecipe(RemovedPlanRecipe removed) {
         if (removed == null) return false;
-        List<PlannedRecipe> current = repository.getMealPlanRecipes();
+        List<PlannedRecipe> current = new ArrayList<>(plannedRecipes);
         for (PlannedRecipe planned : current) {
             if (planned.recipe.id.equals(removed.recipe.recipe.id)) return false;
         }
         current.add(Math.min(removed.position, current.size()), removed.recipe);
-        repository.replaceMealPlanRecipes(current);
+        publishPlan(current);
         return true;
     }
 
     public boolean moveMealPlanRecipe(String recipeId, int direction) {
         if (direction != -1 && direction != 1) return false;
-        List<PlannedRecipe> current = repository.getMealPlanRecipes();
+        List<PlannedRecipe> current = new ArrayList<>(plannedRecipes);
         int index = -1;
         for (int i = 0; i < current.size(); i++) {
             if (current.get(i).recipe.id.equals(recipeId)) { index = i; break; }
@@ -111,7 +153,7 @@ public final class MealPlanViewModel extends ViewModel {
         PlannedRecipe moved = current.get(index);
         current.set(index, current.get(destination));
         current.set(destination, moved);
-        repository.replaceMealPlanRecipes(current);
+        publishPlan(current);
         return true;
     }
 
@@ -160,12 +202,20 @@ public final class MealPlanViewModel extends ViewModel {
 
     public void setMealPlanRecipeServings(String recipeId, int servings) {
         validateServings(servings);
-        repository.setMealPlanRecipeServings(recipeId, servings);
+        List<PlannedRecipe> updated = new ArrayList<>(plannedRecipes);
+        for (int i = 0; i < updated.size(); i++) {
+            PlannedRecipe item = updated.get(i);
+            if (item.recipe.id.equals(recipeId)) {
+                updated.set(i, new PlannedRecipe(item.recipe, servings));
+                publishPlan(updated);
+                return;
+            }
+        }
     }
 
     public void beginPicker() {
         selectedRecipeIds.clear();
-        for (PlannedRecipe planned : repository.getMealPlanRecipes()) {
+        for (PlannedRecipe planned : plannedRecipes) {
             selectedRecipeIds.add(planned.recipe.id);
         }
         pickerServings = MIN_SERVINGS;
@@ -212,7 +262,7 @@ public final class MealPlanViewModel extends ViewModel {
     public boolean isSelected(String recipeId) { return selectedRecipeIds.contains(recipeId); }
 
     public boolean isRecipeInPlan(String recipeId) {
-        for (PlannedRecipe item : repository.getMealPlanRecipes()) {
+        for (PlannedRecipe item : plannedRecipes) {
             if (item.recipe.id.equals(recipeId)) return true;
         }
         return false;
@@ -228,7 +278,7 @@ public final class MealPlanViewModel extends ViewModel {
     }
 
     public boolean saveSelection(List<Recipe> availableRecipes) {
-        List<PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
+        List<PlannedRecipe> currentPlan = new ArrayList<>(plannedRecipes);
         if (selectedRecipeIds.isEmpty() && currentPlan.isEmpty()) return false;
 
         Map<String, PlannedRecipe> currentById = new HashMap<>();
@@ -246,9 +296,34 @@ public final class MealPlanViewModel extends ViewModel {
             int servings = servingsForSelection(pickerServings, previous);
             replacement.add(new PlannedRecipe(recipe, servings));
         }
-        repository.replaceMealPlanRecipes(replacement);
+        publishPlan(replacement);
         selectedRecipeIds.clear();
         return true;
+    }
+
+    private void publishPlan(List<PlannedRecipe> updated) {
+        plannedRecipes = new ArrayList<>(updated);
+        planState.setValue(new PlanState(plannedRecipes, false, null));
+        List<PlannedRecipe> snapshot = new ArrayList<>(plannedRecipes);
+        ioExecutor.execute(() -> {
+            try {
+                repository.replaceMealPlanRecipes(snapshot);
+            } catch (RuntimeException error) {
+                planState.postValue(new PlanState(plannedRecipes, false, error.getMessage()));
+            }
+        });
+    }
+
+    public static final class PlanState {
+        public final List<PlannedRecipe> recipes;
+        public final boolean loading;
+        public final String error;
+
+        PlanState(List<PlannedRecipe> recipes, boolean loading, String error) {
+            this.recipes = Collections.unmodifiableList(new ArrayList<>(recipes));
+            this.loading = loading;
+            this.error = error;
+        }
     }
 
     private static String normalizeSearchText(String value) {
