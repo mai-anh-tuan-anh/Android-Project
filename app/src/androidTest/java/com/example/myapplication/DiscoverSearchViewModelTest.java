@@ -32,7 +32,8 @@ public class DiscoverSearchViewModelTest {
     public void setUp() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Application app = (Application) context.getApplicationContext();
-        viewModel = new DiscoverSearchViewModel(new SharedPreferencesSearchHistoryRepository(app));
+        viewModel = new DiscoverSearchViewModel(
+                new SharedPreferencesSearchHistoryRepository(app), Runnable::run);
         viewModel.clearRecentSearches();
         viewModel.resetActiveFilter();
         viewModel.setSearchQuery("");
@@ -197,8 +198,8 @@ public class DiscoverSearchViewModelTest {
                 .putString("recent_searches", (System.currentTimeMillis() - 2L * 60L * 60L * 1000L)
                         + "\told query")
                 .commit();
-        DiscoverSearchViewModel restored = new DiscoverSearchViewModel(new SharedPreferencesSearchHistoryRepository(
-                context.getApplicationContext()));
+        DiscoverSearchViewModel restored = new DiscoverSearchViewModel(
+                new SharedPreferencesSearchHistoryRepository(context.getApplicationContext()), Runnable::run);
         assertTrue(restored.getRecentSearches().isEmpty());
     }
 }

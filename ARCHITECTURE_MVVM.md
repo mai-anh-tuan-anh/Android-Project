@@ -51,7 +51,7 @@ domain ↛ presentation, Android UI, SQLite, Firebase hoặc data implementation
 ```
 
 - **View (Activity, Fragment, Adapter, View):** vẽ state, nhận thao tác người dùng, gọi ViewModel và quan sát LiveData. Không gọi Repository, SQLite, file store hoặc thực hiện phép tính nghiệp vụ.
-- **ViewModel:** giữ state của màn hình, nhận event, gọi use case hoặc repository interface, phát LiveData cho View. Không giữ Activity/View/Context, không thao tác widget, không truy vấn DB trực tiếp.
+- **ViewModel:** giữ state của màn hình, nhận event, gọi use case hoặc repository interface, phát LiveData cho View. Không giữ Activity/View/Context, không thao tác widget, không truy vấn DB trực tiếp. Mọi executor cho repository/file I/O phải được inject; không thêm constructor production mặc định chạy tác vụ đồng bộ trên luồng gọi.
 - **Domain:** giữ model và quy tắc nghiệp vụ; định nghĩa repository interface/use case khi có ích. Không phụ thuộc Presentation hoặc Android UI.
 - **Data:** hiện thực repository interface; điều phối database, storage và remote data source; chuyển đổi model tại mapper khi cần. I/O chạy ngoài main thread.
 - **DI:** `AppContainer` tạo một `PersonalDataDbHelper`, storage và các repository dùng chung; ViewModel nhận dependency qua constructor và `ViewModelProvider.Factory`. Không tạo repository/database trong Activity, ViewModel hay global singleton tùy tiện.

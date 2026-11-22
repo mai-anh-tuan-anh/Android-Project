@@ -52,10 +52,6 @@ public final class DiscoverSearchViewModel extends ViewModel {
     private String draftExcludeIngredient = "";
     private final Set<String> selectedCookingIngredients = new LinkedHashSet<>();
 
-    public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository) {
-        this(searchHistoryRepository, Runnable::run);
-    }
-
     public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository, Executor ioExecutor) {
         this.searchHistoryRepository = searchHistoryRepository;
         this.ioExecutor = ioExecutor;
