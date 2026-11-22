@@ -8,6 +8,7 @@ import com.example.myapplication.domain.model.PantryIngredient;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.pantry.PantryFragment;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.domain.model.CookingLogEntry;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
@@ -43,6 +44,7 @@ import androidx.lifecycle.Observer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivityStateTest {
@@ -203,6 +205,26 @@ public class MainActivityStateTest {
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
+            });
+        }
+    }
+
+    @Test
+    public void personalLibraryAndFavoritesAreHostedByTheFeatureFragment() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                activity.onPersonalNavigateTab(3);
+                PersonalDataFragment fragment = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (fragment == null || fragment.getView() == null) {
+                    throw new AssertionError("Personal data feature fragment is not attached");
+                }
+                assertTrue(containsText(fragment.getView(), "Kho của tôi"));
+                TextView favoritesLink = findTextView(fragment.getView(), "Xem tất cả ›");
+                if (favoritesLink == null) throw new AssertionError("Favorites link is missing");
+                favoritesLink.performClick();
+                assertEquals(MainActivity.Screen.FAVORITES, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Những công thức bạn đã lưu."));
             });
         }
     }
@@ -532,6 +554,19 @@ public class MainActivityStateTest {
             if (containsText(group.getChildAt(index), expected)) return true;
         }
         return false;
+    }
+
+    private static TextView findTextView(View view, String expected) {
+        if (view instanceof TextView && expected.contentEquals(((TextView) view).getText())) {
+            return (TextView) view;
+        }
+        if (!(view instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            TextView found = findTextView(group.getChildAt(index), expected);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static void assertMinimumDpHeight(View view, float density, int expectedDp) {

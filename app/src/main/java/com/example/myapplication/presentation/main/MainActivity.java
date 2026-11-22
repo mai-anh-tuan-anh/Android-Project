@@ -14,6 +14,7 @@ import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.pantry.PantryFragment;
 import com.example.myapplication.presentation.shopping.ShoppingFragment;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -67,7 +68,7 @@ import java.text.Normalizer;
 
 /** Local personal data, meal planning, shopping, pantry, and cooking journal. */
 public class MainActivity extends AppCompatActivity implements PantryFragment.Host, ShoppingFragment.Host,
-        MealPlanFragment.Host {
+        MealPlanFragment.Host, PersonalDataFragment.Host {
     private static final String STATE_APP_SCREEN = "app.currentScreen";
     private static final String STATE_SELECTED_CATEGORY = "discover.selectedCategory";
     private static final String STATE_DISCOVER_SEARCH_QUERY = "discover.searchQuery";
@@ -128,6 +129,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private PantryFragment pantryFragment;
     private ShoppingFragment shoppingFragment;
     private MealPlanFragment mealPlanFragment;
+    private PersonalDataFragment personalDataFragment;
     private View bottomNavigationBar;
     private Screen screen = Screen.DISCOVER;
     private boolean animateNextScreen;
@@ -323,8 +325,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             if (state == null || state.loading) return;
             if (screen == Screen.COLLECTION_FORM) {
                 updateCollectionFormValidation();
-            } else if (screen == Screen.LIBRARY || screen == Screen.FAVORITES
-                    || screen == Screen.COLLECTION_LIST || screen == Screen.COLLECTION
+            } else if (screen == Screen.COLLECTION_LIST || screen == Screen.COLLECTION
                     || screen == Screen.RECIPE_DETAIL) {
                 render();
             }
@@ -608,6 +609,20 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                     .commitNow();
             return;
         }
+        if (screen == Screen.LIBRARY || screen == Screen.FAVORITES) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            Fragment restored = getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
+            if (restored instanceof PersonalDataFragment) {
+                personalDataFragment = (PersonalDataFragment) restored;
+                return;
+            }
+            personalDataFragment = PersonalDataFragment.newInstance(screen == Screen.FAVORITES);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment_container, personalDataFragment, PersonalDataFragment.class.getName())
+                    .commitNow();
+            return;
+        }
         Fragment existingPantry = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
         if (existingPantry != null) {
             getSupportFragmentManager().beginTransaction().remove(existingPantry).commitNow();
@@ -622,6 +637,11 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (existingMealPlan != null) {
             getSupportFragmentManager().beginTransaction().remove(existingMealPlan).commitNow();
             mealPlanFragment = null;
+        }
+        Fragment existingPersonalData = getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
+        if (existingPersonalData != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingPersonalData).commitNow();
+            personalDataFragment = null;
         }
         fragmentContainer.setVisibility(View.GONE);
         removeLegacyContent();
@@ -654,8 +674,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         else if (screen == Screen.WHAT_TO_COOK_INGREDIENTS) renderWhatToCookIngredients();
         else if (screen == Screen.WHAT_TO_COOK_RESULTS) renderWhatToCookResults();
         else if (screen == Screen.RECIPE_DETAIL) renderRecipeDetail();
-        else if (screen == Screen.LIBRARY) renderLibrary();
-        else if (screen == Screen.FAVORITES) renderFavorites();
         else if (screen == Screen.COLLECTION_LIST) renderCollections();
         else if (screen == Screen.COLLECTION) renderCollection();
         else if (screen == Screen.COLLECTION_FORM) renderCollectionForm();
@@ -1597,132 +1615,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         addBottomNavigation(0);
     }
 
-    private void renderLibrary() {
-        ScrollView scroll = scrollContent();
-        LinearLayout content = vertical();
-        content.setPadding(dp(24), dp(28), dp(24), dp(24));
-        scroll.addView(content);
-
-        addText(content, "Kho của tôi", 23, TEXT, true, 0, 0, 0, 0);
-        addText(content, "Các món và ghi chú lưu trên thiết bị.", 14, MUTED, false, 0, 22, 0, 0);
-
-        addSectionHeader(content, "Yêu thích", "Xem tất cả ›", () -> {
-            screen = Screen.FAVORITES;
-            render();
-        }, 30);
-        List<Recipe> favoriteRows = personalDataViewModel.getFavorites();
-        if (favoriteRows.isEmpty()) addEmptyFavoriteCard(content);
-        else addRecipeGrid(content, favoriteRows.subList(0, Math.min(2, favoriteRows.size())), true, true);
-
-        addSectionHeader(content, "Bộ sưu tập", "Xem tất cả ›", () -> {
-            screen = Screen.COLLECTION_LIST;
-            render();
-        }, 14);
-        List<RecipeCollection> collections = personalDataViewModel.getCollections();
-        if (collections.isEmpty()) addEmptyCard(content, "Chưa có bộ sưu tập",
-                "Tạo bộ sưu tập đầu tiên của bạn.", () -> openCollectionForm(null));
-        else {
-            for (int i = 0; i < Math.min(5, collections.size()); i++) addCollectionRow(content, collections.get(i), 0);
-        }
-
-        addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
-        List<Recipe> history = personalDataViewModel.getHistory();
-        for (int i = 0; i < Math.min(10, history.size()); i++) addHistoryRow(content, history.get(i));
-
-        addSectionHeader(content, "Nhật ký nấu", "Xem tất cả ›", () -> openAllCookingLogs(Screen.LIBRARY), 24);
-        addText(content, cookingJournalViewModel.getAllLogs().size() + " lần nấu đã ghi", 13, MUTED,
-                false, 0, 0, 0, 8);
-
-        appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(3);
-    }
-
-    private void renderFavorites() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(24));
-        addBackTitle(page, "Yêu thích");
-        addText(page, "Những công thức bạn đã lưu.", 14, MUTED, false, 0, 0, 0, 16);
-        List<Recipe> favorites = personalDataViewModel.getFavorites();
-        LinearLayout content = vertical();
-        content.setGravity(Gravity.CENTER_HORIZONTAL);
-        if (!favorites.isEmpty()) {
-            EditText search = editField(favoritesSearchQuery, 16, 49);
-            search.setInputType(InputType.TYPE_CLASS_TEXT);
-            search.setSingleLine(true);
-            search.setHint("Tìm món yêu thích");
-            search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-            search.setBackgroundColor(Color.TRANSPARENT);
-            search.setPadding(dp(48), dp(10), dp(12), dp(10));
-            FrameLayout searchBox = new FrameLayout(this);
-            searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-            ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
-            searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
-            searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
-            searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
-            LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
-            searchParams.bottomMargin = dp(18);
-            page.addView(searchBox, searchParams);
-            search.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    favoritesSearchQuery = s.toString();
-                    populateFavoriteResults(content, favorites);
-                }
-                @Override public void afterTextChanged(Editable s) { }
-            });
-        }
-        ScrollView scroll = scrollContent();
-        scroll.addView(content);
-        if (favorites.isEmpty()) {
-            LinearLayout empty = vertical();
-            empty.setGravity(Gravity.CENTER);
-            content.addView(empty, new LinearLayout.LayoutParams(-1, -1));
-            ImageView star = iconView(R.drawable.ic_star_outline, GREEN);
-            star.setPadding(dp(24), dp(24), dp(24), dp(24));
-            star.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
-            empty.addView(star, new LinearLayout.LayoutParams(dp(84), dp(84)));
-            TextView emptyTitle = text("Chưa lưu món nào", 22, TEXT, true);
-            emptyTitle.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams emptyTitleParams = new LinearLayout.LayoutParams(-1, -2);
-            emptyTitleParams.topMargin = dp(18);
-            emptyTitleParams.bottomMargin = dp(8);
-            empty.addView(emptyTitle, emptyTitleParams);
-            TextView hint = text("Lưu một công thức để tìm lại nhanh hơn.", 14, MUTED, false);
-            hint.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(-1, -2);
-            hintParams.bottomMargin = dp(16);
-            empty.addView(hint, hintParams);
-            TextView explore = text("Khám phá món", 15, WHITE, true);
-            explore.setGravity(Gravity.CENTER);
-            explore.setBackground(roundRect(GREEN, GREEN, 14));
-            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, dp(49));
-            buttonParams.setMargins(dp(24), dp(16), dp(24), 0);
-            empty.addView(explore, buttonParams);
-        } else {
-            populateFavoriteResults(content, favorites);
-        }
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-    }
-
-    private void populateFavoriteResults(LinearLayout content, List<Recipe> favorites) {
-        content.removeAllViews();
-        String query = normalizeRecipeSearch(favoritesSearchQuery);
-        List<Recipe> matches = new ArrayList<>();
-        for (Recipe recipe : favorites) {
-            if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) matches.add(recipe);
-        }
-        if (matches.isEmpty()) {
-            TextView noResults = text("Không tìm thấy món yêu thích phù hợp.", 14, MUTED, false);
-            noResults.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(96));
-            content.addView(noResults, params);
-            return;
-        }
-        addRecipeGrid(content, matches, true, true);
-        addInfoBanner(content, "Chạm biểu tượng lưu để bỏ yêu thích.", 22);
-    }
-
     private static String normalizeRecipeSearch(String value) {
         String decomposed = java.text.Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
                 java.text.Normalizer.Form.NFD);
@@ -2549,6 +2441,37 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         render();
     }
 
+    @Override public void onPersonalOpenFavorites() { screen = Screen.FAVORITES; render(); }
+
+    @Override public void onPersonalOpenCollections() { screen = Screen.COLLECTION_LIST; render(); }
+
+    @Override public void onPersonalCreateCollection() { openCollectionForm(null); }
+
+    @Override public void onPersonalOpenCollection(long collectionId) {
+        selectedCollectionId = collectionId;
+        collectionReturnScreen = Screen.LIBRARY;
+        screen = Screen.COLLECTION;
+        render();
+    }
+
+    @Override public void onPersonalOpenRecipe(Recipe recipe) { openRecipeDetail(recipe); }
+
+    @Override public void onPersonalOpenNote(Recipe recipe) { openRecipeNote(recipe); }
+
+    @Override public void onPersonalOpenJournal() { openAllCookingLogs(Screen.LIBRARY); }
+
+    @Override public void onPersonalNavigateTab(int tab) {
+        animateNextScreen = true;
+        clearCookingJournalDateRangeIfLeavingJournal();
+        if (tab == 0) screen = Screen.DISCOVER;
+        else if (tab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
+        else if (tab == 2) { openShoppingList(Screen.LIBRARY); return; }
+        else screen = Screen.LIBRARY;
+        render();
+    }
+
+    @Override public void onPersonalBack() { getOnBackPressedDispatcher().onBackPressed(); }
+
     private Bundle createPantryFragmentArguments() {
         Bundle args = new Bundle();
         args.putBoolean("pantry.initialScreen", screen == Screen.PANTRY_FORM);
@@ -3281,31 +3204,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (top > 0) item.setTranslationY(dp(0));
     }
 
-    private void addEmptyFavoriteCard(LinearLayout parent) {
-        LinearLayout item = new LinearLayout(this);
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(9), dp(10), dp(14), dp(10));
-        item.setBackground(roundRect(WHITE, BORDER, 16));
-        ImageView star = iconView(R.drawable.ic_star_outline, GREEN);
-        star.setPadding(dp(10), dp(10), dp(10), dp(10));
-        star.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 13));
-        item.addView(star, new LinearLayout.LayoutParams(dp(40), dp(40)));
-        LinearLayout labels = vertical();
-        labels.setPadding(dp(12), 0, 0, 0);
-        labels.addView(text("Chưa có món yêu thích nào", 13, TEXT, true));
-        labels.addView(text("Lưu món để tìm lại nhanh hơn.", 11, MUTED, false));
-        item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-        item.addView(text("›", 23, GREEN, false));
-        item.setFocusable(true);
-        item.setContentDescription("Chưa có món yêu thích nào. Mở danh sách yêu thích.");
-        item.setOnClickListener(v -> {
-            screen = Screen.FAVORITES;
-            render();
-        });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(62));
-        parent.addView(item, params);
-    }
-
     private LinearLayout collectionActionButton(String label, int icon, int tint, int background, Runnable action) {
         LinearLayout button = new LinearLayout(this);
         button.setGravity(Gravity.CENTER);
@@ -3346,30 +3244,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             selectedCollectionId = row.id;
             screen = Screen.COLLECTION;
             render();
-        });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
-        params.bottomMargin = dp(9);
-        parent.addView(item, params);
-    }
-
-    private void addHistoryRow(LinearLayout parent, Recipe recipe) {
-        LinearLayout item = new LinearLayout(this);
-        item.setGravity(Gravity.CENTER_VERTICAL);
-        item.setPadding(dp(7), dp(5), dp(12), dp(5));
-        item.setBackground(roundRect(WHITE, BORDER, 14));
-        ImageView image = recipeImage(recipe);
-        item.addView(image, new LinearLayout.LayoutParams(dp(52), dp(52)));
-        LinearLayout labels = vertical();
-        labels.setPadding(dp(12), 0, 0, 0);
-        labels.addView(text(recipe.title, 14, TEXT, true));
-        labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
-        item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams favoriteParams = new LinearLayout.LayoutParams(dp(48), dp(48));
-        favoriteParams.setMarginEnd(dp(8));
-        item.addView(favoriteToggleButton(recipe), favoriteParams);
-        item.addView(text("›", 23, GREEN, false));
-        item.setOnClickListener(v -> {
-            openRecipeDetail(recipe);
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(64));
         params.bottomMargin = dp(9);
