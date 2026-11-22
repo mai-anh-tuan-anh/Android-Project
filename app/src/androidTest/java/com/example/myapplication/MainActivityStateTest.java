@@ -2,6 +2,7 @@ package com.example.myapplication;
 
 import com.example.myapplication.presentation.main.MainActivity;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.mealplan.MealPlanFragment;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.PantryIngredient;
@@ -65,6 +66,10 @@ public class MainActivityStateTest {
                     Method render = MainActivity.class.getDeclaredMethod("render");
                     render.setAccessible(true);
                     render.invoke(activity);
+                    assertEquals("com", viewModel.getSearchQuery());
+                    MealPlanFragment fragment = (MealPlanFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(MealPlanFragment.class.getName());
+                    assertTrue(fragment != null && fragment.getView() != null);
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
@@ -83,8 +88,11 @@ public class MainActivityStateTest {
                     assertEquals("com", getField(viewModel, "searchQuery"));
                     assertEquals(MealPlanViewModel.PickerSource.COLLECTION, viewModel.getPickerSource());
                     assertEquals(24L, viewModel.getPickerCollectionId());
-                    assertEquals("com", ((android.widget.EditText) getField(activity,
-                            "planPickerSearchInput")).getText().toString());
+                    MealPlanFragment fragment = (MealPlanFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(MealPlanFragment.class.getName());
+                    assertTrue(fragment != null && fragment.getView() != null);
+                    assertEquals("com", ((android.widget.EditText) getField(fragment,
+                            "pickerSearch")).getText().toString());
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }

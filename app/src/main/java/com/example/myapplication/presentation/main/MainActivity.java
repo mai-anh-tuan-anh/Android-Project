@@ -80,8 +80,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private static final String STATE_SEARCH_QUERY = "module6.searchQuery";
     private static final String STATE_PICKER_SOURCE = "module6.pickerSource";
     private static final String STATE_PICKER_COLLECTION_ID = "module6.pickerCollectionId";
-    private static final String STATE_PICKER_SCROLL_Y = "module6.pickerScrollY";
-    private static final String STATE_PLAN_SCROLL_Y = "module6.planScrollY";
     private static final String STATE_SHOPPING_SCREEN = "module7.screen";
     private static final String STATE_SHOPPING_ITEM_ID = "module7.itemId";
     private static final String STATE_SHOPPING_NAME = "module7.name";
@@ -143,13 +141,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private String noteRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
     private String favoritesSearchQuery = "";
     private EditText discoverSearchInput;
-    private LinearLayout planPickerRows;
-    private TextView planPickerSourceButton;
-    private EditText planPickerSearchInput;
-    private ScrollView planPickerScrollView;
-    private ScrollView mealPlanScrollView;
-    private int restoredPickerScrollY;
-    private int restoredMealPlanScrollY;
     private Screen shoppingReturnScreen = Screen.DISCOVER;
     private String editingShoppingItemId;
     private EditText shoppingNameInput;
@@ -316,9 +307,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                 render();
             }
         });
-        mealPlanViewModel.planState().observe(this, state -> {
-            if (state != null && !state.loading && screen == Screen.MEAL_PLAN_PICKER) render();
-        });
         shoppingViewModel.saveResult().observe(this, result -> {
             if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
             shoppingViewModel.clearSaveResult();
@@ -415,9 +403,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                     state.getInt(STATE_PICKER_SERVINGS, MealPlanViewModel.MIN_SERVINGS),
                     state.getString(STATE_SEARCH_QUERY, ""), savedSource,
                     state.getLong(STATE_PICKER_COLLECTION_ID, -1L));
-            restoredPickerScrollY = Math.max(0, state.getInt(STATE_PICKER_SCROLL_Y, 0));
         } else {
-            restoredMealPlanScrollY = Math.max(0, state.getInt(STATE_PLAN_SCROLL_Y, 0));
         }
     }
 
@@ -462,14 +448,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                 outState.putInt(STATE_PICKER_SERVINGS, mealPlanViewModel.getPickerServings());
                 outState.putString(STATE_PICKER_SOURCE, mealPlanViewModel.getPickerSource().name());
                 outState.putLong(STATE_PICKER_COLLECTION_ID, mealPlanViewModel.getPickerCollectionId());
-                String query = planPickerSearchInput == null
-                        ? mealPlanViewModel.getSearchQuery() : planPickerSearchInput.getText().toString();
-                outState.putString(STATE_SEARCH_QUERY, query);
-                outState.putInt(STATE_PICKER_SCROLL_Y,
-                        planPickerScrollView == null ? 0 : planPickerScrollView.getScrollY());
-            } else {
-                outState.putInt(STATE_PLAN_SCROLL_Y,
-                        mealPlanScrollView == null ? 0 : mealPlanScrollView.getScrollY());
+                outState.putString(STATE_SEARCH_QUERY, mealPlanViewModel.getSearchQuery());
             }
         }
         searchViewModel.setSearchQuery(discoverSearchQuery);
@@ -558,15 +537,16 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                     .commitNow();
             return;
         }
-        if (screen == Screen.MEAL_PLAN) {
+        if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
             Fragment restored = getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
             if (restored instanceof MealPlanFragment) {
                 mealPlanFragment = (MealPlanFragment) restored;
+                mealPlanFragment.showPicker(screen == Screen.MEAL_PLAN_PICKER);
                 return;
             }
-            mealPlanFragment = new MealPlanFragment();
+            mealPlanFragment = MealPlanFragment.newInstance(screen == Screen.MEAL_PLAN_PICKER);
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.main_fragment_container, mealPlanFragment, MealPlanFragment.class.getName())
                     .commitNow();
@@ -611,10 +591,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         }
         fragmentContainer.setVisibility(View.GONE);
         removeLegacyContent();
-        planPickerSearchInput = null;
-        planPickerSourceButton = null;
-        planPickerScrollView = null;
-        mealPlanScrollView = null;
         bottomNavigationBar = null;
         FrameLayout frame = new FrameLayout(this);
         appRoot = new LinearLayout(this);
@@ -640,7 +616,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         else if (screen == Screen.WHAT_TO_COOK_INGREDIENTS) renderWhatToCookIngredients();
         else if (screen == Screen.WHAT_TO_COOK_RESULTS) renderWhatToCookResults();
         else if (screen == Screen.RECIPE_DETAIL) renderRecipeDetail();
-        else if (screen == Screen.MEAL_PLAN_PICKER) renderMealPlanPicker();
         else if (screen == Screen.SHOPPING_ITEM_FORM) renderShoppingItemForm();
         else if (screen == Screen.COOKING_JOURNAL) renderAllCookingLogs();
         else if (screen == Screen.COOKING_LOGS) renderCookingLogs();
@@ -653,16 +628,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             frame.animate().alpha(1f).translationY(0f).setDuration(160L).start();
         }
         ViewCompat.requestApplyInsets(frame);
-        if (screen == Screen.MEAL_PLAN && mealPlanScrollView != null && restoredMealPlanScrollY > 0) {
-            int scrollY = restoredMealPlanScrollY;
-            mealPlanScrollView.post(() -> mealPlanScrollView.scrollTo(0, scrollY));
-            restoredMealPlanScrollY = 0;
-        } else if (screen == Screen.MEAL_PLAN_PICKER && planPickerScrollView != null
-                && restoredPickerScrollY > 0) {
-            int scrollY = restoredPickerScrollY;
-            planPickerScrollView.post(() -> planPickerScrollView.scrollTo(0, scrollY));
-            restoredPickerScrollY = 0;
-        }
     }
 
     private void removeLegacyContent() {
@@ -1825,289 +1790,23 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         render();
     }
 
-    private void renderMealPlanPicker() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(12));
-        addBackTitle(page, "Thêm món vào kế hoạch");
 
-        EditText search = editField(mealPlanViewModel.getSearchQuery(), 16, 49);
-        planPickerSearchInput = search;
-        search.setInputType(InputType.TYPE_CLASS_TEXT);
-        search.setSingleLine(true);
-        search.setHint("Tìm món hoặc nguyên liệu");
-        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        search.setBackgroundColor(Color.TRANSPARENT);
-        search.setPadding(dp(48), dp(10), dp(12), dp(10));
-        FrameLayout searchBox = new FrameLayout(this);
-        searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
-        searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
-        searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
-        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
-        searchParams.topMargin = dp(14);
-        searchParams.bottomMargin = dp(10);
-        page.addView(searchBox, searchParams);
 
-        planPickerSourceButton = text("", 14, GREEN, true);
-        planPickerSourceButton.setGravity(Gravity.CENTER_VERTICAL);
-        planPickerSourceButton.setSingleLine(true);
-        planPickerSourceButton.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        planPickerSourceButton.setMaxWidth(Math.round(getResources().getDisplayMetrics().widthPixels * 0.68f));
-        planPickerSourceButton.setPadding(dp(14), 0, dp(14), 0);
-        planPickerSourceButton.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-        LinearLayout.LayoutParams sourceParams = new LinearLayout.LayoutParams(-2, dp(40));
-        sourceParams.bottomMargin = dp(14);
-        page.addView(planPickerSourceButton, sourceParams);
-        planPickerSourceButton.setOnClickListener(v -> showMealPlanSourceMenu(v));
-        updatePickerSourceButton();
 
-        ScrollView scroll = scrollContent();
-        planPickerScrollView = scroll;
-        planPickerRows = vertical();
-        scroll.addView(planPickerRows);
-        populateMealPlanPickerRows();
-        Runnable[] pendingSearch = new Runnable[1];
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { }
-            @Override public void afterTextChanged(Editable s) {
-                if (BaseInputConnection.getComposingSpanStart((Spannable) s) >= 0) return;
-                if (pendingSearch[0] != null) search.removeCallbacks(pendingSearch[0]);
-                pendingSearch[0] = () -> {
-                    if (BaseInputConnection.getComposingSpanStart(search.getText()) < 0) {
-                        applyMealPlanSearch(search.getText().toString());
-                    }
-                };
-                search.postDelayed(pendingSearch[0], 1000L);
-            }
-        });
-        search.setOnEditorActionListener((view, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE
-                    || (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
-                if (pendingSearch[0] != null) search.removeCallbacks(pendingSearch[0]);
-                applyMealPlanSearch(search.getText().toString());
-                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
-                        getSystemService(INPUT_METHOD_SERVICE);
-                if (imm != null) imm.hideSoftInputFromWindow(search.getWindowToken(), 0);
-                return true;
-            }
-            return false;
-        });
 
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        TextView selectedTitle = text("Khẩu phần món đã chọn", 20, TEXT, true);
-        LinearLayout.LayoutParams selectedTitleParams = new LinearLayout.LayoutParams(-1, -2);
-        selectedTitleParams.topMargin = dp(14);
-        selectedTitleParams.bottomMargin = dp(8);
-        page.addView(selectedTitle, selectedTitleParams);
-        LinearLayout stepper = new LinearLayout(this);
-        stepper.setGravity(Gravity.CENTER_VERTICAL);
-        stepper.setPadding(dp(4), 0, dp(4), 0);
-        stepper.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-        TextView minus = stepButton("−", "Giảm khẩu phần món đã chọn", () -> {
-            int servings = mealPlanViewModel.getPickerServings();
-            if (servings > MealPlanViewModel.MIN_SERVINGS) {
-                mealPlanViewModel.setPickerServings(servings - 1);
-                updatePickerServingCount();
-            }
-        });
-        stepper.addView(minus, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView servingCount = text(String.valueOf(mealPlanViewModel.getPickerServings()), 20, TEXT, true);
-        servingCount.setGravity(Gravity.CENTER);
-        servingCount.setTag("plan-serving-count");
-        stepper.addView(servingCount, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView plus = stepButton("＋", "Tăng khẩu phần món đã chọn", () -> {
-            int servings = mealPlanViewModel.getPickerServings();
-            if (servings < MealPlanViewModel.MAX_SERVINGS) {
-                mealPlanViewModel.setPickerServings(servings + 1);
-                updatePickerServingCount();
-            }
-        });
-        stepper.addView(plus, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        page.addView(stepper, new LinearLayout.LayoutParams(-2, dp(48)));
-
-        TextView confirm = primaryButton("Thêm vào Nấu hôm nay", this::saveMealPlanSelection);
-        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(-1, dp(52));
-        confirmParams.topMargin = dp(14);
-        page.addView(confirm, confirmParams);
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-    }
-
-    private void populateMealPlanPickerRows() {
-        if (planPickerRows == null) return;
-        planPickerRows.removeAllViews();
-        List<Recipe> sourceRecipes = getCurrentMealPlanPickerRecipes();
-        List<Recipe> matches = mealPlanViewModel.filterRecipes(sourceRecipes);
-        if (matches.isEmpty()) {
-            String message;
-            if (!mealPlanViewModel.getSearchQuery().trim().isEmpty()) {
-                message = "Không tìm thấy món phù hợp.";
-            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.FAVORITES) {
-                message = "Chưa có món yêu thích nào.";
-            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.COLLECTION
-                    && mealPlanViewModel.getPickerCollectionId() > 0) {
-                message = "Bộ sưu tập này chưa có món nào.";
-            } else if (mealPlanViewModel.getPickerSource() == MealPlanViewModel.PickerSource.COLLECTION) {
-                message = "Chọn một bộ sưu tập để xem món.";
-            } else {
-                message = "Không tìm thấy món phù hợp.";
-            }
-            TextView empty = text(message, 14, MUTED, false);
-            empty.setGravity(Gravity.CENTER);
-            planPickerRows.addView(empty, new LinearLayout.LayoutParams(-1, dp(72)));
-            return;
-        }
-        for (Recipe recipe : matches) {
-            boolean planned = mealPlanViewModel.isRecipeInPlan(recipe.id);
-            boolean selected = mealPlanViewModel.isSelected(recipe.id);
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(7), dp(6), dp(14), dp(6));
-            row.setBackground(roundRect(WHITE, BORDER, 15));
-            ImageView image = recipeImage(recipe);
-            row.addView(image, new LinearLayout.LayoutParams(dp(52), dp(52)));
-            LinearLayout labels = vertical();
-            labels.setPadding(dp(12), 0, 0, 0);
-            labels.addView(text(recipe.title, 15, TEXT, true));
-            String subtitle = planned
-                    ? (selected ? "Đã có trong kế hoạch" : "Sẽ bỏ khỏi kế hoạch")
-                    : (selected ? "Đang chọn" : recipe.duration + " · " + recipe.difficulty);
-            labels.addView(text(subtitle, 13, MUTED, false));
-            row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
-            FrameLayout toggleTarget = new FrameLayout(this);
-            toggleTarget.setFocusable(true);
-            toggleTarget.setClickable(true);
-            toggleTarget.setContentDescription((selected ? "Bỏ chọn " : "Chọn ") + recipe.title);
-            TextView mark = text(selected ? "✓" : "+", 21, selected ? WHITE : GREEN, false);
-            mark.setGravity(Gravity.CENTER);
-            if (selected) mark.setBackground(roundRect(GREEN, GREEN, 8));
-            toggleTarget.addView(mark, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
-            row.addView(toggleTarget, new LinearLayout.LayoutParams(dp(48), dp(48)));
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(64));
-            rowParams.bottomMargin = dp(10);
-            planPickerRows.addView(row, rowParams);
-            row.setContentDescription("Xem chi tiết món " + recipe.title);
-            row.setFocusable(true);
-            row.setOnClickListener(v -> openRecipeDetail(recipe));
-            toggleTarget.setOnClickListener(v -> togglePlanPickerRecipe(recipe));
-        }
-    }
-
-    private void applyMealPlanSearch(String query) {
-        mealPlanViewModel.setSearchQuery(query);
-        populateMealPlanPickerRows();
-    }
-
-    private List<Recipe> getCurrentMealPlanPickerRecipes() {
-        return mealPlanViewModel.getPickerRecipes(PreviewRecipeCatalog.mealPlanPreviews());
-    }
-
-    private void showMealPlanSourceMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add(0, 1, 0, "Tất cả món");
-        menu.getMenu().add(0, 2, 1, "Món yêu thích");
-        Map<Integer, Long> collectionIdsByMenuId = new LinkedHashMap<>();
-        List<RecipeCollection> collections = mealPlanViewModel.getRecipeCollections();
-        if (collections.isEmpty()) {
-            menu.getMenu().add(0, 3, 2, "Chưa có bộ sưu tập").setEnabled(false);
-        } else {
-            int menuId = 10;
-            int order = 2;
-            for (RecipeCollection collection : collections) {
-                menu.getMenu().add(0, menuId, order++, "Bộ sưu tập: " + collection.name);
-                collectionIdsByMenuId.put(menuId, collection.id);
-                menuId++;
-            }
-        }
-        menu.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == 1) {
-                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.ALL, -1L);
-            } else if (item.getItemId() == 2) {
-                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.FAVORITES, -1L);
-            } else {
-                Long collectionId = collectionIdsByMenuId.get(item.getItemId());
-                if (collectionId == null) return false;
-                mealPlanViewModel.setPickerSource(MealPlanViewModel.PickerSource.COLLECTION, collectionId);
-            }
-            updatePickerSourceButton();
-            populateMealPlanPickerRows();
-            if (planPickerScrollView != null) planPickerScrollView.scrollTo(0, 0);
-            return true;
-        });
-        menu.show();
-    }
-
-    private void updatePickerSourceButton() {
-        if (planPickerSourceButton == null || mealPlanViewModel == null) return;
-        String label;
-        switch (mealPlanViewModel.getPickerSource()) {
-            case FAVORITES:
-                label = "Yêu thích";
-                break;
-            case COLLECTION:
-                label = "Chọn bộ sưu tập";
-                for (RecipeCollection collection : mealPlanViewModel.getRecipeCollections()) {
-                    if (collection.id == mealPlanViewModel.getPickerCollectionId()) {
-                        label = collection.name;
-                        break;
-                    }
-                }
-                break;
-            case ALL:
-            default:
-                label = "Tất cả món";
-                break;
-        }
-        planPickerSourceButton.setText(label + "  ▾");
-        planPickerSourceButton.setContentDescription("Nguồn món: " + label + ". Chạm để đổi nguồn.");
-    }
 
     private void openMealPlanPicker() {
         mealPlanViewModel.beginPicker();
         mealPlanViewModel.refresh();
-        restoredPickerScrollY = 0;
         screen = Screen.MEAL_PLAN_PICKER;
         render();
     }
 
-    private void togglePlanPickerRecipe(Recipe recipe) {
-        mealPlanViewModel.toggleRecipe(recipe.id);
-        populateMealPlanPickerRows();
-    }
 
-    private void saveMealPlanSelection() {
-        if (!mealPlanViewModel.saveSelection(mealPlanViewModel.getAllSelectableRecipes(PreviewRecipeCatalog.designRecipes()))) {
-            Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        screen = Screen.MEAL_PLAN;
-        render();
-    }
 
-    private void updatePickerServingCount() {
-        if (appRoot == null) return;
-        TextView count = appRoot.findViewWithTag("plan-serving-count");
-        if (count != null) count.setText(String.valueOf(mealPlanViewModel.getPickerServings()));
-    }
 
-    private TextView stepButton(String label, String description, Runnable action) {
-        TextView button = text(label, 21, GREEN, false);
-        button.setGravity(Gravity.CENTER);
-        button.setContentDescription(description);
-        button.setFocusable(true);
-        button.setOnClickListener(v -> action.run());
-        return button;
-    }
 
-    private TextView primaryButton(String label, Runnable action) {
-        TextView button = text(label, 15, WHITE, true);
-        button.setGravity(Gravity.CENTER);
-        button.setBackground(roundRect(GREEN, GREEN, 14));
-        button.setOnClickListener(v -> action.run());
-        return button;
-    }
 
 
 
@@ -2153,6 +1852,16 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     @Override public void onShoppingFilterChanged(String status) { shoppingStatusFilter = status; }
 
     @Override public void onMealPlanOpenPicker() { openMealPlanPicker(); }
+
+    @Override public void onMealPlanBackFromPicker() {
+        screen = Screen.MEAL_PLAN;
+        render();
+    }
+
+    @Override public void onMealPlanSelectionSaved() {
+        screen = Screen.MEAL_PLAN;
+        render();
+    }
 
     @Override public void onMealPlanOpenShopping() { openShoppingList(Screen.MEAL_PLAN); }
 
