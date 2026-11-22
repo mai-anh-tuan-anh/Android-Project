@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
+import com.example.myapplication.presentation.discover.DiscoverViewModel;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
@@ -43,6 +44,9 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
         }
         if (modelClass == DiscoverSearchViewModel.class) {
             return (T) new DiscoverSearchViewModel(appContainer.searchHistoryRepository);
+        }
+        if (modelClass == DiscoverViewModel.class) {
+            return (T) new DiscoverViewModel();
         }
         throw new IllegalArgumentException("Unknown ViewModel class: " + modelClass.getName());
     }

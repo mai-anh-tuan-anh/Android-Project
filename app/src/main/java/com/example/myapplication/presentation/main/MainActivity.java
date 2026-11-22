@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
     private PantryViewModel pantryViewModel;
     private CookingJournalViewModel cookingJournalViewModel;
     private DiscoverSearchViewModel searchViewModel;
-    private final DiscoverViewModel discoverViewModel = new DiscoverViewModel();
+    private DiscoverViewModel discoverViewModel;
     private ActivityResultLauncher<String> cookingPhotoPicker;
     private LinearLayout appRoot;
     private View bottomNavigationBar;
@@ -285,6 +285,7 @@ public class MainActivity extends AppCompatActivity {
         pantryViewModel = new ViewModelProvider(this, viewModelFactory).get(PantryViewModel.class);
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
+        discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
         cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
             PhotoSaveResult result = cookingJournalViewModel.savePhoto(uri.toString());
