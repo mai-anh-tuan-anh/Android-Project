@@ -4,6 +4,8 @@ import com.example.myapplication.presentation.main.MainActivity;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.PlannedRecipe;
+import com.example.myapplication.domain.model.PantryIngredient;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
@@ -337,6 +339,56 @@ public class MainActivityStateTest {
                 viewModel.refresh();
             });
             if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan removal was not persisted");
+        }
+    }
+
+    @Test
+    public void pantryItemsLoadSaveAndDeleteThroughAsyncState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<PantryViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                PantryViewModel viewModel = (PantryViewModel) getFieldUnchecked(activity, "pantryViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refreshItems();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry items did not load");
+
+            PantryViewModel viewModel = viewModelRef.get();
+            String name = "Nguyên liệu kiểm tra async " + System.nanoTime();
+            CountDownLatch saved = new CountDownLatch(1);
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicReference<String> idRef = new AtomicReference<>();
+            AtomicBoolean deletionRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state == null || state.loading) return;
+                    for (PantryIngredient item : state.items) {
+                        if (name.equals(item.name)) saved.countDown();
+                    }
+                });
+                assertEquals(true, viewModel.saveItem(null, name, "2", "PCS",
+                        ShoppingCategoryCatalog.OTHER, "", "", ""));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry item save did not complete");
+            scenario.onActivity(activity -> {
+                for (PantryIngredient item : viewModel.getItems()) if (name.equals(item.name)) idRef.set(item.id);
+                assertEquals(true, idRef.get() != null);
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state != null && state.loading) deletionRefreshStarted.set(true);
+                    if (state != null && !state.loading && deletionRefreshStarted.get()) {
+                        boolean found = false;
+                        for (PantryIngredient item : state.items) found |= idRef.get().equals(item.id);
+                        if (!found) deleted.countDown();
+                    }
+                });
+                viewModel.deleteItem(idRef.get());
+                viewModel.refreshItems();
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry item delete did not complete");
         }
     }
 

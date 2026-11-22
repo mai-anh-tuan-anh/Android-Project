@@ -286,6 +286,21 @@ public class MainActivity extends AppCompatActivity {
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        pantryViewModel.pantryState().observe(this, state -> {
+            if (state != null && !state.loading && screen == Screen.PANTRY) render();
+        });
+        pantryViewModel.mutationResult().observe(this, result -> {
+            if (result == null) return;
+            pantryViewModel.clearMutationResult();
+            if (!result.success) {
+                Toast.makeText(this, result.error == null ? "Không thể cập nhật tủ nguyên liệu." : result.error,
+                        Toast.LENGTH_SHORT).show();
+            } else if (PantryViewModel.MutationResult.SAVE.equals(result.operation)
+                    && screen == Screen.PANTRY_FORM) {
+                screen = Screen.PANTRY;
+                render();
+            }
+        });
         mealPlanViewModel.planState().observe(this, state -> {
             if (state != null && !state.loading
                     && (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER)) render();
@@ -330,6 +345,7 @@ public class MainActivity extends AppCompatActivity {
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
         restoreOfflineFeatureState(savedInstanceState);
+        if (screen == Screen.PANTRY) pantryViewModel.refreshItems();
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) mealPlanViewModel.refresh();
         if (screen == Screen.SHOPPING) shoppingViewModel.refreshItems();
         render();
@@ -1778,6 +1794,15 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, -2);
             emptyParams.topMargin = dp(144);
             content.addView(empty, emptyParams);
+            MealPlanViewModel.PlanState planState = mealPlanViewModel.planState().getValue();
+            if (planState != null && planState.loading) {
+                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+                empty.addView(progress, new LinearLayout.LayoutParams(dp(32), dp(32)));
+                TextView loading = text("Đang tải kế hoạch…", 14, MUTED, false);
+                LinearLayout.LayoutParams loadingParams = new LinearLayout.LayoutParams(-1, -2);
+                loadingParams.topMargin = dp(12);
+                empty.addView(loading, loadingParams);
+            } else {
             ImageView icon = iconView(R.drawable.ic_calendar_outline, GREEN);
             icon.setPadding(dp(24), dp(24), dp(24), dp(24));
             icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
@@ -1796,6 +1821,7 @@ public class MainActivity extends AppCompatActivity {
             empty.addView(hint, hintParams);
             TextView choose = primaryButton("Chọn món", () -> openMealPlanPicker());
             empty.addView(choose, new LinearLayout.LayoutParams(-1, dp(49)));
+            }
         } else {
             for (int i = 0; i < planned.size(); i++) addPlannedRecipeCard(content, planned.get(i), i, planned.size());
             TextView addMore = text("＋     Thêm món khác", 16, GREEN, true);
@@ -2896,6 +2922,7 @@ public class MainActivity extends AppCompatActivity {
         pantryReturnScreen = returnScreen == Screen.PANTRY ? Screen.SHOPPING : returnScreen;
         pantryFilter = "ALL";
         screen = Screen.PANTRY;
+        pantryViewModel.refreshItems();
         render();
     }
 
@@ -2996,6 +3023,19 @@ public class MainActivity extends AppCompatActivity {
             matches.add(item);
         }
         if (matches.isEmpty()) {
+            PantryViewModel.PantryState state = pantryViewModel.pantryState().getValue();
+            if (allItems.isEmpty() && state != null && state.loading) {
+                LinearLayout loading = vertical();
+                loading.setGravity(Gravity.CENTER);
+                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+                loading.addView(progress, new LinearLayout.LayoutParams(dp(32), dp(32)));
+                TextView label = text("Đang tải tủ nguyên liệu…", 14, MUTED, false);
+                LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-2, -2);
+                labelParams.topMargin = dp(10);
+                loading.addView(label, labelParams);
+                content.addView(loading, new LinearLayout.LayoutParams(-1, dp(160)));
+                return;
+            }
             String title = allItems.isEmpty() ? "Tủ nguyên liệu đang trống" : "Không tìm thấy nguyên liệu";
             String subtitle = allItems.isEmpty()
                     ? "Thêm những nguyên liệu bạn đang có để quản lý hạn sử dụng."
@@ -3270,8 +3310,6 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Vui lòng kiểm tra tên, số lượng và đơn vị.", Toast.LENGTH_SHORT).show();
             return;
         }
-        screen = Screen.PANTRY;
-        render();
     }
 
     private void confirmDeletePantryItem(PantryIngredient item) {
