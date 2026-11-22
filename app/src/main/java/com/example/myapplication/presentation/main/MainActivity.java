@@ -67,12 +67,6 @@ public class MainActivity extends AppCompatActivity
     private DiscoverSearchViewModel searchViewModel;
     private FrameLayout mainContent;
     private FrameLayout fragmentContainer;
-    private PantryFragment pantryFragment;
-    private ShoppingFragment shoppingFragment;
-    private MealPlanFragment mealPlanFragment;
-    private PersonalDataFragment personalDataFragment;
-    private CookingJournalFragment cookingJournalFragment;
-    private DiscoverFragment discoverFragment;
     private Screen cookingLogReturnScreen = Screen.NOTE;
     private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
     private String cookingLogRecipeId;
@@ -384,16 +378,16 @@ public class MainActivity extends AppCompatActivity
             Fragment restored =
                     getSupportFragmentManager().findFragmentByTag(DiscoverFragment.class.getName());
             if (restored instanceof DiscoverFragment) {
-                discoverFragment = (DiscoverFragment) restored;
-                discoverFragment.syncScreen(screen, selectedCategory, detailRecipeId, detailReturnScreen);
+                ((DiscoverFragment) restored)
+                        .syncScreen(screen, selectedCategory, detailRecipeId, detailReturnScreen);
                 return;
             }
-            discoverFragment = new DiscoverFragment();
+            DiscoverFragment fragment = new DiscoverFragment();
             getSupportFragmentManager()
                     .beginTransaction()
-                    .replace(R.id.main_fragment_container, discoverFragment, DiscoverFragment.class.getName())
+                    .replace(R.id.main_fragment_container, fragment, DiscoverFragment.class.getName())
                     .commitNow();
-            discoverFragment.syncScreen(screen, selectedCategory, detailRecipeId, detailReturnScreen);
+            fragment.syncScreen(screen, selectedCategory, detailRecipeId, detailReturnScreen);
             return;
         }
         if (isCookingJournalScreen()) {
@@ -403,27 +397,27 @@ public class MainActivity extends AppCompatActivity
                     getSupportFragmentManager()
                             .findFragmentByTag(CookingJournalFragment.class.getName());
             if (restored instanceof CookingJournalFragment) {
-                cookingJournalFragment = (CookingJournalFragment) restored;
-                if (screen == Screen.COOKING_LOG_FORM && !cookingJournalFragment.isFormShowing())
-                    cookingJournalFragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
-                else cookingJournalFragment.showScreen(screen.name(), cookingLogRecipeId);
+                CookingJournalFragment fragment = (CookingJournalFragment) restored;
+                if (screen == Screen.COOKING_LOG_FORM && !fragment.isFormShowing())
+                    fragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
+                else fragment.showScreen(screen.name(), cookingLogRecipeId);
                 return;
             }
             String initialJournalScreen =
                     screen == Screen.COOKING_LOG_FORM
                             ? cookingLogFormReturnScreen.name()
                             : screen.name();
-            cookingJournalFragment =
+            CookingJournalFragment fragment =
                     CookingJournalFragment.newInstance(initialJournalScreen, cookingLogRecipeId);
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(
                             R.id.main_fragment_container,
-                            cookingJournalFragment,
+                            fragment,
                             CookingJournalFragment.class.getName())
                     .commitNow();
             if (screen == Screen.COOKING_LOG_FORM)
-                cookingJournalFragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
+                fragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
             return;
         }
         if (isPantryScreen()) {
@@ -432,15 +426,14 @@ public class MainActivity extends AppCompatActivity
             Fragment restored =
                     getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
             if (restored instanceof PantryFragment) {
-                pantryFragment = (PantryFragment) restored;
                 return;
             }
-            pantryFragment = PantryFragment.newInstance(createPantryFragmentArguments());
+            PantryFragment fragment = PantryFragment.newInstance(createPantryFragmentArguments());
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(
                             R.id.main_fragment_container,
-                            pantryFragment,
+                            fragment,
                             PantryFragment.class.getName())
                     .commitNow();
             return;
@@ -451,14 +444,13 @@ public class MainActivity extends AppCompatActivity
             Fragment restored =
                     getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
             if (restored instanceof ShoppingFragment) {
-                shoppingFragment = (ShoppingFragment) restored;
-                if (screen == Screen.SHOPPING_ITEM_FORM && !shoppingFragment.isFormShowing())
-                    shoppingFragment.showForm(editingShoppingItemId);
-                else if (screen == Screen.SHOPPING && shoppingFragment.isFormShowing())
-                    shoppingFragment.showList();
+                ShoppingFragment fragment = (ShoppingFragment) restored;
+                if (screen == Screen.SHOPPING_ITEM_FORM && !fragment.isFormShowing())
+                    fragment.showForm(editingShoppingItemId);
+                else if (screen == Screen.SHOPPING && fragment.isFormShowing()) fragment.showList();
                 return;
             }
-            shoppingFragment =
+            ShoppingFragment fragment =
                     ShoppingFragment.newInstance(
                             shoppingStatusFilter == null
                                     ? ShoppingViewModel.NEED_TO_BUY
@@ -467,11 +459,11 @@ public class MainActivity extends AppCompatActivity
                     .beginTransaction()
                     .replace(
                             R.id.main_fragment_container,
-                            shoppingFragment,
+                            fragment,
                             ShoppingFragment.class.getName())
                     .commitNow();
             if (screen == Screen.SHOPPING_ITEM_FORM)
-                shoppingFragment.showForm(editingShoppingItemId);
+                fragment.showForm(editingShoppingItemId);
             return;
         }
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
@@ -480,16 +472,15 @@ public class MainActivity extends AppCompatActivity
             Fragment restored =
                     getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
             if (restored instanceof MealPlanFragment) {
-                mealPlanFragment = (MealPlanFragment) restored;
-                mealPlanFragment.showPicker(screen == Screen.MEAL_PLAN_PICKER);
+                ((MealPlanFragment) restored).showPicker(screen == Screen.MEAL_PLAN_PICKER);
                 return;
             }
-            mealPlanFragment = MealPlanFragment.newInstance(screen == Screen.MEAL_PLAN_PICKER);
+            MealPlanFragment fragment = MealPlanFragment.newInstance(screen == Screen.MEAL_PLAN_PICKER);
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(
                             R.id.main_fragment_container,
-                            mealPlanFragment,
+                            fragment,
                             MealPlanFragment.class.getName())
                     .commitNow();
             return;
@@ -506,19 +497,18 @@ public class MainActivity extends AppCompatActivity
                     getSupportFragmentManager()
                             .findFragmentByTag(PersonalDataFragment.class.getName());
             if (restored instanceof PersonalDataFragment) {
-                personalDataFragment = (PersonalDataFragment) restored;
-                personalDataFragment.showScreen(
+                ((PersonalDataFragment) restored).showScreen(
                         personalDataSection(), selectedCollectionId, noteRecipeId);
                 return;
             }
-            personalDataFragment =
+            PersonalDataFragment fragment =
                     PersonalDataFragment.newInstance(
                             personalDataSection(), selectedCollectionId, noteRecipeId);
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(
                             R.id.main_fragment_container,
-                            personalDataFragment,
+                            fragment,
                             PersonalDataFragment.class.getName())
                     .commitNow();
             return;
@@ -574,7 +564,7 @@ public class MainActivity extends AppCompatActivity
     private PantryFragment activePantryFragment() {
         Fragment fragment =
                 getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
-        return fragment instanceof PantryFragment ? (PantryFragment) fragment : pantryFragment;
+        return fragment instanceof PantryFragment ? (PantryFragment) fragment : null;
     }
 
     private boolean isDiscoverScreen() {
@@ -593,7 +583,7 @@ public class MainActivity extends AppCompatActivity
     private DiscoverFragment activeDiscoverFragment() {
         Fragment fragment =
                 getSupportFragmentManager().findFragmentByTag(DiscoverFragment.class.getName());
-        return fragment instanceof DiscoverFragment ? (DiscoverFragment) fragment : discoverFragment;
+        return fragment instanceof DiscoverFragment ? (DiscoverFragment) fragment : null;
     }
 
     private boolean isShoppingScreen() {
@@ -603,7 +593,7 @@ public class MainActivity extends AppCompatActivity
     private ShoppingFragment activeShoppingFragment() {
         Fragment fragment =
                 getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
-        return fragment instanceof ShoppingFragment ? (ShoppingFragment) fragment : shoppingFragment;
+        return fragment instanceof ShoppingFragment ? (ShoppingFragment) fragment : null;
     }
 
     @Override
