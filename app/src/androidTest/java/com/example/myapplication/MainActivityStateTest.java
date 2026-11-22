@@ -225,6 +225,9 @@ public class MainActivityStateTest {
                 favoritesLink.performClick();
                 assertEquals(MainActivity.Screen.FAVORITES, getFieldUnchecked(activity, "screen"));
                 assertTrue(containsText(fragment.getView(), "Những công thức bạn đã lưu."));
+                activity.onPersonalOpenCollections();
+                assertEquals(MainActivity.Screen.COLLECTION_LIST, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Các bộ sưu tập bạn đã tạo."));
             });
         }
     }

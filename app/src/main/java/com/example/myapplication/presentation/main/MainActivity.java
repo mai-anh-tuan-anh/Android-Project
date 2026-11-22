@@ -609,15 +609,18 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                     .commitNow();
             return;
         }
-        if (screen == Screen.LIBRARY || screen == Screen.FAVORITES) {
+        if (screen == Screen.LIBRARY || screen == Screen.FAVORITES || screen == Screen.COLLECTION_LIST) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
             Fragment restored = getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
             if (restored instanceof PersonalDataFragment) {
                 personalDataFragment = (PersonalDataFragment) restored;
+                personalDataFragment.showSection(screen == Screen.FAVORITES ? "FAVORITES"
+                        : screen == Screen.COLLECTION_LIST ? "COLLECTIONS" : "LIBRARY");
                 return;
             }
-            personalDataFragment = PersonalDataFragment.newInstance(screen == Screen.FAVORITES);
+            personalDataFragment = PersonalDataFragment.newInstance(screen == Screen.FAVORITES ? "FAVORITES"
+                    : screen == Screen.COLLECTION_LIST ? "COLLECTIONS" : "LIBRARY");
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.main_fragment_container, personalDataFragment, PersonalDataFragment.class.getName())
                     .commitNow();
@@ -674,7 +677,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         else if (screen == Screen.WHAT_TO_COOK_INGREDIENTS) renderWhatToCookIngredients();
         else if (screen == Screen.WHAT_TO_COOK_RESULTS) renderWhatToCookResults();
         else if (screen == Screen.RECIPE_DETAIL) renderRecipeDetail();
-        else if (screen == Screen.COLLECTION_LIST) renderCollections();
         else if (screen == Screen.COLLECTION) renderCollection();
         else if (screen == Screen.COLLECTION_FORM) renderCollectionForm();
         else if (screen == Screen.NOTE) renderNote();

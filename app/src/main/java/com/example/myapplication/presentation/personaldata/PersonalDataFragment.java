@@ -40,7 +40,7 @@ public final class PersonalDataFragment extends Fragment {
   private static final String ARG_SECTION = "personal.section";
   private static final String STATE_SECTION = "personal.fragment.section";
   private static final String STATE_QUERY = "personal.fragment.query";
-  private static final String LIBRARY = "LIBRARY", FAVORITES = "FAVORITES";
+  private static final String LIBRARY = "LIBRARY", FAVORITES = "FAVORITES", COLLECTIONS = "COLLECTIONS";
   private static final int CREAM = Color.rgb(250, 249, 246),
       GREEN = Color.rgb(50, 108, 79),
       PALE_GREEN = Color.rgb(232, 242, 233),
@@ -77,11 +77,20 @@ public final class PersonalDataFragment extends Fragment {
   private LinearLayout root;
 
   public static PersonalDataFragment newInstance(boolean favorites) {
+    return newInstance(favorites ? FAVORITES : LIBRARY);
+  }
+
+  public static PersonalDataFragment newInstance(String section) {
     PersonalDataFragment f = new PersonalDataFragment();
     Bundle b = new Bundle();
-    b.putString(ARG_SECTION, favorites ? FAVORITES : LIBRARY);
+    b.putString(ARG_SECTION, section);
     f.setArguments(b);
     return f;
+  }
+
+  public void showSection(String section) {
+    this.section = section;
+    render();
   }
 
   @Override
@@ -150,6 +159,7 @@ public final class PersonalDataFragment extends Fragment {
     if (root == null || !isAdded()) return;
     root.removeAllViews();
     if (FAVORITES.equals(section)) renderFavorites();
+    else if (COLLECTIONS.equals(section)) renderCollections();
     else renderLibrary();
   }
 
@@ -175,7 +185,15 @@ public final class PersonalDataFragment extends Fragment {
     if (favorites.isEmpty()) addEmptyFavoriteCard(content);
     else addFavoriteGrid(content, favorites.subList(0, Math.min(2, favorites.size())));
     addSectionHeader(
-        content, "Bộ sưu tập", "Xem tất cả ›", () -> host.onPersonalOpenCollections(), 14);
+        content,
+        "Bộ sưu tập",
+        "Xem tất cả ›",
+        () -> {
+          section = COLLECTIONS;
+          host.onPersonalOpenCollections();
+          render();
+        },
+        14);
     List<RecipeCollection> collections = viewModel.getCollections();
     if (collections.isEmpty()) addEmptyCollectionCard(content);
     else
@@ -198,6 +216,29 @@ public final class PersonalDataFragment extends Fragment {
         8);
     root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     addBottomNavigation();
+  }
+
+  private void renderCollections() {
+    LinearLayout page = vertical();
+    page.setPadding(dp(24), dp(8), dp(24), dp(24));
+    addBackTitle(page, "Bộ sưu tập");
+    addText(page, "Các bộ sưu tập bạn đã tạo.", 14, MUTED, false, 0, 0, 0, 20);
+
+    ScrollView scroll = new ScrollView(requireContext());
+    scroll.setFillViewport(false);
+    LinearLayout content = vertical();
+    scroll.addView(content);
+    List<RecipeCollection> collections = viewModel.getCollections();
+    if (collections.isEmpty()) addEmptyCollectionCard(content);
+    else for (RecipeCollection collection : collections) addCollectionRow(content, collection);
+    page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+    TextView create = button("+     Tạo bộ sưu tập", true);
+    LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, dp(52));
+    createParams.topMargin = dp(18);
+    page.addView(create, createParams);
+    create.setOnClickListener(v -> host.onPersonalCreateCollection());
+    root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
   }
 
   private void renderFavorites() {
