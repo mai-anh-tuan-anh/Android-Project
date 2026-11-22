@@ -1,10 +1,13 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.shopping;
 
-import android.app.Application;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
 
+import androidx.lifecycle.ViewModel;
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.domain.repository.PersonalDataRepository;
+import com.example.myapplication.domain.catalog.KitchenUnitCatalog;
+import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
@@ -19,26 +22,25 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /** Screen state and validation for module 7's current local shopping list. */
-public final class ShoppingViewModel extends AndroidViewModel {
-    static final String NEED_TO_BUY = "NEED_TO_BUY";
-    static final String AVAILABLE = "AVAILABLE";
+public final class ShoppingViewModel extends ViewModel {
+    public static final String NEED_TO_BUY = "NEED_TO_BUY";
+    public static final String AVAILABLE = "AVAILABLE";
 
     private final PersonalDataRepository repository;
 
-    public ShoppingViewModel(@NonNull Application application) {
-        super(application);
-        repository = PersonalDataRepository.getInstance(application);
+    public ShoppingViewModel(PersonalDataRepository repository) {
+        this.repository = repository;
     }
 
-    List<PersonalDataDbHelper.ShoppingItem> getItems() { return repository.getShoppingItems(); }
+    public List<ShoppingListItem> getItems() { return repository.getShoppingItems(); }
 
-    String initialStatusForPantry(String ingredientId, String name, String amount, String unitId) {
+    public String initialStatusForPantry(String ingredientId, String name, String amount, String unitId) {
         return initialStatusForPantry(ingredientId, name, amount, unitId,
                 repository.getPantryItems(), System.currentTimeMillis());
     }
 
-    static String initialStatusForPantry(String ingredientId, String name, String amount, String unitId,
-                                         List<PersonalDataDbHelper.PantryItem> pantryItems, long nowMillis) {
+    public static String initialStatusForPantry(String ingredientId, String name, String amount, String unitId,
+                                         List<PantryIngredient> pantryItems, long nowMillis) {
         if (name == null || amount == null || unitId == null || unitId.trim().isEmpty()) return NEED_TO_BUY;
         final BigDecimal requested;
         try {
@@ -52,7 +54,7 @@ public final class ShoppingViewModel extends AndroidViewModel {
         String expectedUnit = KitchenUnitCatalog.canonicalId(unitId);
         if (expectedName.isEmpty() || expectedUnit.isEmpty()) return NEED_TO_BUY;
         BigDecimal available = BigDecimal.ZERO;
-        for (PersonalDataDbHelper.PantryItem item : pantryItems) {
+        for (PantryIngredient item : pantryItems) {
             if (item == null || item.amountDecimal == null || item.unitId == null) continue;
             if (ingredientId != null && !ingredientId.trim().isEmpty()) {
                 if (!ingredientId.equals(item.ingredientId)) continue;
@@ -78,15 +80,15 @@ public final class ShoppingViewModel extends AndroidViewModel {
         return normalized.replaceAll("\\s+", " ");
     }
 
-    PersonalDataDbHelper.ShoppingItem findItem(String id) {
+    public ShoppingListItem findItem(String id) {
         if (id == null) return null;
-        for (PersonalDataDbHelper.ShoppingItem item : getItems()) {
+        for (ShoppingListItem item : getItems()) {
             if (item.id.equals(id)) return item;
         }
         return null;
     }
 
-    boolean saveItem(String id, String name, String amount, String unit, String category, String status) {
+    public boolean saveItem(String id, String name, String amount, String unit, String category, String status) {
         if (name == null || name.trim().isEmpty() || amount == null || amount.trim().isEmpty()
                 || unit == null || unit.trim().isEmpty() || !ShoppingCategoryCatalog.contains(category)) return false;
         try {
@@ -103,18 +105,18 @@ public final class ShoppingViewModel extends AndroidViewModel {
         return true;
     }
 
-    void setStatus(String id, String status) {
+    public void setStatus(String id, String status) {
         if (id != null && isValidStatus(status)) repository.setShoppingItemStatus(id, status);
     }
 
-    void deleteItem(String id) {
+    public void deleteItem(String id) {
         if (id != null) repository.deleteShoppingItem(id);
     }
 
-    void clearItems() { repository.clearShoppingItems(); }
+    public void clearItems() { repository.clearShoppingItems(); }
 
-    PlanUpdate checkForPlanChanges() {
-        List<PersonalDataDbHelper.PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
+    public PlanUpdate checkForPlanChanges() {
+        List<PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
         String currentSnapshot = serializePlan(currentPlan);
         String previousSnapshot = repository.getShoppingPlanSnapshot();
         if (previousSnapshot.isEmpty()) {
@@ -131,15 +133,15 @@ public final class ShoppingViewModel extends AndroidViewModel {
         return new PlanUpdate(currentSnapshot, changes, buildPlanChangeMessage(changes));
     }
 
-    void acceptPlanUpdate(PlanUpdate update) {
+    public void acceptPlanUpdate(PlanUpdate update) {
         if (update != null) repository.saveShoppingPlanSnapshot(update.currentSnapshot);
     }
 
-    private String serializePlan(List<PersonalDataDbHelper.PlannedRecipe> plan) {
+    private String serializePlan(List<PlannedRecipe> plan) {
         JSONArray json = new JSONArray();
-        List<PersonalDataDbHelper.PlannedRecipe> stableOrder = new ArrayList<>(plan);
+        List<PlannedRecipe> stableOrder = new ArrayList<>(plan);
         stableOrder.sort((left, right) -> left.recipe.id.compareTo(right.recipe.id));
-        for (PersonalDataDbHelper.PlannedRecipe item : stableOrder) {
+        for (PlannedRecipe item : stableOrder) {
             JSONObject row = new JSONObject();
             try {
                 row.put("recipeId", item.recipe.id);
@@ -154,7 +156,7 @@ public final class ShoppingViewModel extends AndroidViewModel {
     }
 
     private List<PlanUpdateRow> comparePlans(String previousSnapshot,
-                                              List<PersonalDataDbHelper.PlannedRecipe> currentPlan) {
+                                              List<PlannedRecipe> currentPlan) {
         Map<String, PlanUpdateRow> previousById = new LinkedHashMap<>();
         try {
             JSONArray previous = new JSONArray(previousSnapshot);
@@ -169,7 +171,7 @@ public final class ShoppingViewModel extends AndroidViewModel {
         }
 
         Map<String, PlanUpdateRow> currentById = new LinkedHashMap<>();
-        for (PersonalDataDbHelper.PlannedRecipe item : currentPlan) {
+        for (PlannedRecipe item : currentPlan) {
             currentById.put(item.recipe.id,
                     new PlanUpdateRow(item.recipe.id, item.recipe.title, item.servings, item.servings));
         }
@@ -204,29 +206,29 @@ public final class ShoppingViewModel extends AndroidViewModel {
         return "Kế hoạch Nấu hôm nay đã thay đổi " + changes.size() + " món.";
     }
 
-    static final class PlanUpdate {
-        final String currentSnapshot;
-        final List<PlanUpdateRow> changes;
-        final String message;
-        PlanUpdate(String currentSnapshot, List<PlanUpdateRow> changes, String message) {
+    public static final class PlanUpdate {
+        public final String currentSnapshot;
+        public final List<PlanUpdateRow> changes;
+        public final String message;
+        public PlanUpdate(String currentSnapshot, List<PlanUpdateRow> changes, String message) {
             this.currentSnapshot = currentSnapshot;
             this.changes = changes;
             this.message = message;
         }
     }
 
-    static final class PlanUpdateRow {
-        final String recipeId;
-        final String title;
-        final int previousServings;
-        final int currentServings;
-        PlanUpdateRow(String recipeId, String title, int previousServings, int currentServings) {
+    public static final class PlanUpdateRow {
+        public final String recipeId;
+        public final String title;
+        public final int previousServings;
+        public final int currentServings;
+        public PlanUpdateRow(String recipeId, String title, int previousServings, int currentServings) {
             this.recipeId = recipeId;
             this.title = title;
             this.previousServings = previousServings;
             this.currentServings = currentServings;
         }
-        String servingChangeLabel() {
+        public String servingChangeLabel() {
             if (previousServings == 0) return "Thêm · " + currentServings + " người";
             if (currentServings == 0) return "Đã bỏ · " + previousServings + " người";
             return previousServings + " người → " + currentServings + " người";

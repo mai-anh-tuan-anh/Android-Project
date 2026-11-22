@@ -1,8 +1,10 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.cookingjournal;
 
-import android.app.Application;
-import android.net.Uri;
 
+
+import androidx.lifecycle.ViewModel;
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.domain.repository.PersonalDataRepository;
 import java.io.File;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -10,27 +12,23 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
-
 /** Local cooking-session history linked to the original recipe. */
-public final class CookingJournalViewModel extends AndroidViewModel {
+public final class CookingJournalViewModel extends ViewModel {
     private final PersonalDataRepository repository;
 
-    public CookingJournalViewModel(@NonNull Application application) {
-        super(application);
-        repository = PersonalDataRepository.getInstance(application);
+    public CookingJournalViewModel(PersonalDataRepository repository) {
+        this.repository = repository;
     }
 
-    List<PersonalDataDbHelper.CookingLog> getLogs(String recipeId) { return repository.getCookingLogs(recipeId); }
-    List<PersonalDataDbHelper.CookingLog> getAllLogs() { return repository.getAllCookingLogs(); }
+    public List<CookingLogEntry> getLogs(String recipeId) { return repository.getCookingLogs(recipeId); }
+    public List<CookingLogEntry> getAllLogs() { return repository.getAllCookingLogs(); }
 
-    List<PersonalDataDbHelper.CookingLog> filterLogs(List<PersonalDataDbHelper.CookingLog> source,
+    public List<CookingLogEntry> filterLogs(List<CookingLogEntry> source,
                                                      String query, long fromInclusive, long toExclusive,
                                                      int selectedRating) {
         String normalizedQuery = normalize(query);
-        List<PersonalDataDbHelper.CookingLog> matches = new ArrayList<>();
-        for (PersonalDataDbHelper.CookingLog log : source) {
+        List<CookingLogEntry> matches = new ArrayList<>();
+        for (CookingLogEntry log : source) {
             if (fromInclusive > 0 && log.cookedAt < fromInclusive) continue;
             if (toExclusive > 0 && log.cookedAt >= toExclusive) continue;
             if (selectedRating > 0 && (log.rating == null || log.rating != selectedRating)) continue;
@@ -41,14 +39,14 @@ public final class CookingJournalViewModel extends AndroidViewModel {
         return matches;
     }
 
-    JournalStats getStats() {
-        List<PersonalDataDbHelper.CookingLog> logs = getAllLogs();
+    public JournalStats getStats() {
+        List<CookingLogEntry> logs = getAllLogs();
         if (logs.isEmpty()) return new JournalStats("—", 0, null, null);
         LinkedHashMap<String, Integer> recipeCounts = new LinkedHashMap<>();
         String mostCookedRecipe = "—";
         int mostCookedCount = 0;
         Integer latestRating = null;
-        for (PersonalDataDbHelper.CookingLog log : logs) {
+        for (CookingLogEntry log : logs) {
             int count = recipeCounts.containsKey(log.recipeId) ? recipeCounts.get(log.recipeId) + 1 : 1;
             recipeCounts.put(log.recipeId, count);
             if (count > mostCookedCount) {
@@ -66,25 +64,25 @@ public final class CookingJournalViewModel extends AndroidViewModel {
         return decomposed.replaceAll("\\s+", " ").trim();
     }
 
-    static final class JournalStats {
-        final String mostCookedRecipe;
-        final int mostCookedCount;
-        final Long lastCookedAt;
-        final Integer latestRating;
-        JournalStats(String recipe, int count, Long lastCookedAt, Integer latestRating) {
+    public static final class JournalStats {
+        public final String mostCookedRecipe;
+        public final int mostCookedCount;
+        public final Long lastCookedAt;
+        public final Integer latestRating;
+        public JournalStats(String recipe, int count, Long lastCookedAt, Integer latestRating) {
             this.mostCookedRecipe = recipe;
             this.mostCookedCount = count;
             this.lastCookedAt = lastCookedAt;
             this.latestRating = latestRating;
         }
     }
-    PersonalDataDbHelper.CookingLog getLog(String id) { return repository.getCookingLog(id); }
-    boolean save(String id, MainActivity.RecipePreview recipe, long cookedAt, int servings,
+    public CookingLogEntry getLog(String id) { return repository.getCookingLog(id); }
+    public boolean save(String id, Recipe recipe, long cookedAt, int servings,
                  Integer duration, Integer rating, String adjustment, String photoPath) {
         return repository.saveCookingLog(id, recipe, cookedAt, servings, duration, rating, adjustment, photoPath);
     }
-    boolean delete(String id) { return repository.deleteCookingLog(id); }
-    CookingJournalPhotoStore.CopyResult savePhoto(Uri uri) { return repository.saveCookingLogPhoto(uri); }
-    File getPhoto(String filename) { return repository.getCookingLogPhoto(filename); }
-    void deletePhoto(String filename) { repository.deleteCookingLogPhoto(filename); }
+    public boolean delete(String id) { return repository.deleteCookingLog(id); }
+    public PhotoSaveResult savePhoto(String uriString) { return repository.saveCookingLogPhoto(uriString); }
+    public File getPhoto(String filename) { return repository.getCookingLogPhoto(filename); }
+    public void deletePhoto(String filename) { repository.deleteCookingLogPhoto(filename); }
 }

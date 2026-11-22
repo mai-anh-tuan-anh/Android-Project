@@ -1,5 +1,17 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.main;
 
+import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.R;
+import com.example.myapplication.di.AppViewModelFactory;
+import com.example.myapplication.domain.catalog.*;
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
+import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
+import com.example.myapplication.presentation.discover.DiscoverViewModel;
+import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -112,26 +124,6 @@ public class MainActivity extends AppCompatActivity {
     private static final int ERROR = Color.rgb(169, 54, 54);
     private static final int WHITE = Color.WHITE;
 
-    static final List<RecipePreview> DESIGN_RECIPES = Arrays.asList(
-            new RecipePreview("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ",
-                    30, "Không giới hạn", Arrays.asList("Món Việt", "Canh & súp", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ")),
-            new RecipePreview("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
-                    25, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh"),
-                    Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô")),
-            new RecipePreview("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
-                    35, "Không giới hạn", Arrays.asList("Món Âu", "Món chính", "Món nhanh"),
-                    Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi")),
-            new RecipePreview("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
-                    20, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi")),
-            new RecipePreview("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
-                    15, "Món chay", Arrays.asList("Món chay", "Món Âu", "Món nhanh", "Dễ làm"),
-                    Arrays.asList("Xà lách", "Cà chua", "Dưa chuột", "Sốt mè rang", "Bắp ngọt"))
-    );
-    private static final List<RecipePreview> MEAL_PLAN_PREVIEWS = Arrays.asList(
-            DESIGN_RECIPES.get(0), DESIGN_RECIPES.get(1), DESIGN_RECIPES.get(3));
-
     private PersonalDataViewModel personalDataViewModel;
     private MealPlanViewModel mealPlanViewModel;
     private ShoppingViewModel shoppingViewModel;
@@ -147,11 +139,11 @@ public class MainActivity extends AppCompatActivity {
     private Screen noteReturnScreen = Screen.LIBRARY;
     private Screen collectionReturnScreen = Screen.LIBRARY;
     private Screen detailReturnScreen = Screen.DISCOVER;
-    private String detailRecipeId = DESIGN_RECIPES.get(0).id;
+    private String detailRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
     private String selectedCategory = "";
     private String discoverSearchQuery = "";
     private long selectedCollectionId = -1L;
-    private String noteRecipeId = DESIGN_RECIPES.get(0).id;
+    private String noteRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
     private String favoritesSearchQuery = "";
     private String collectionDetailSearchQuery = "";
     private long collectionDetailSearchOwnerId = -1L;
@@ -222,72 +214,15 @@ public class MainActivity extends AppCompatActivity {
     private long cookingJournalFromDate;
     private long cookingJournalToDate;
     private int cookingJournalRatingFilter;
-    private List<PersonalDataDbHelper.CookingLog> cookingJournalAllLogs = new ArrayList<>();
+    private List<CookingLogEntry> cookingJournalAllLogs = new ArrayList<>();
 
-    enum Screen { DISCOVER, CATEGORY_LIST, CATEGORY_RECIPES, NEW_RECIPES, SEARCH, SEARCH_FILTER, SEARCH_RESULTS,
+    public enum Screen { DISCOVER, CATEGORY_LIST, CATEGORY_RECIPES, NEW_RECIPES, SEARCH, SEARCH_FILTER, SEARCH_RESULTS,
         WHAT_TO_COOK_INGREDIENTS, WHAT_TO_COOK_RESULTS, RECIPE_DETAIL,
         LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN,
         MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM, PANTRY, PANTRY_FORM, COOKING_JOURNAL,
         COOKING_LOGS, COOKING_LOG_FORM }
 
-    static final class RecipePreview {
-        final String id;
-        final String title;
-        final String imageName;
-        final String duration;
-        final String difficulty;
-        final int durationMinutes;
-        final String diet;
-        final List<String> categories;
-        final List<String> ingredients;
-        final long publishedAtMillis;
-        final boolean ingredientListComplete;
 
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty) {
-            this(id, title, imageName, duration, difficulty, parseMinutes(duration), "Không giới hạn",
-                    Collections.emptyList(), Collections.emptyList(), 0L);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients) {
-            this(id, title, imageName, duration, difficulty, durationMinutes, diet, categories, ingredients, 0L);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients,
-                      long publishedAtMillis) {
-            this(id, title, imageName, duration, difficulty, durationMinutes, diet, categories, ingredients,
-                    publishedAtMillis, false);
-        }
-
-        RecipePreview(String id, String title, String imageName, String duration, String difficulty,
-                      int durationMinutes, String diet, List<String> categories, List<String> ingredients,
-                      long publishedAtMillis, boolean ingredientListComplete) {
-            this.id = id;
-            this.title = title;
-            this.imageName = imageName;
-            this.duration = duration;
-            this.difficulty = difficulty;
-            this.durationMinutes = durationMinutes;
-            this.diet = diet == null ? "Không giới hạn" : diet;
-            this.categories = categories == null ? Collections.emptyList()
-                    : Collections.unmodifiableList(new ArrayList<>(categories));
-            this.ingredients = ingredients == null ? Collections.emptyList()
-                    : Collections.unmodifiableList(new ArrayList<>(ingredients));
-            this.publishedAtMillis = Math.max(0L, publishedAtMillis);
-            this.ingredientListComplete = ingredientListComplete;
-        }
-
-        private static int parseMinutes(String dur) {
-            if (dur == null) return 30;
-            String digits = dur.replaceAll("[^0-9]", "").trim();
-            try {
-                return Integer.parseInt(digits);
-            } catch (NumberFormatException e) {
-                return 30;
-            }
-        }
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -343,15 +278,16 @@ public class MainActivity extends AppCompatActivity {
                 render();
             }
         });
-        personalDataViewModel = new ViewModelProvider(this).get(PersonalDataViewModel.class);
-        mealPlanViewModel = new ViewModelProvider(this).get(MealPlanViewModel.class);
-        shoppingViewModel = new ViewModelProvider(this).get(ShoppingViewModel.class);
-        pantryViewModel = new ViewModelProvider(this).get(PantryViewModel.class);
-        cookingJournalViewModel = new ViewModelProvider(this).get(CookingJournalViewModel.class);
-        searchViewModel = new ViewModelProvider(this).get(DiscoverSearchViewModel.class);
+        AppViewModelFactory viewModelFactory = new AppViewModelFactory((BepNhaApplication) getApplication());
+        personalDataViewModel = new ViewModelProvider(this, viewModelFactory).get(PersonalDataViewModel.class);
+        mealPlanViewModel = new ViewModelProvider(this, viewModelFactory).get(MealPlanViewModel.class);
+        shoppingViewModel = new ViewModelProvider(this, viewModelFactory).get(ShoppingViewModel.class);
+        pantryViewModel = new ViewModelProvider(this, viewModelFactory).get(PantryViewModel.class);
+        cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
+        searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
-            CookingJournalPhotoStore.CopyResult result = cookingJournalViewModel.savePhoto(uri);
+            PhotoSaveResult result = cookingJournalViewModel.savePhoto(uri.toString());
             String copied = result.filename;
             if (copied != null) {
                 if (!originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) cookingJournalViewModel.deletePhoto(cookingLogPhotoPath);
@@ -362,7 +298,7 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
             }
         });
-        personalDataViewModel.seedDesignPreviewIfNeeded(DESIGN_RECIPES);
+        personalDataViewModel.seedDesignPreviewIfNeeded(PreviewRecipeCatalog.designRecipes());
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
         restoreOfflineFeatureState(savedInstanceState);
@@ -373,7 +309,7 @@ public class MainActivity extends AppCompatActivity {
         if (state == null) return;
         selectedCategory = state.getString(STATE_SELECTED_CATEGORY, "");
         discoverSearchQuery = state.getString(STATE_DISCOVER_SEARCH_QUERY, "");
-        detailRecipeId = state.getString(STATE_DETAIL_RECIPE_ID, DESIGN_RECIPES.get(0).id);
+        detailRecipeId = state.getString(STATE_DETAIL_RECIPE_ID, PreviewRecipeCatalog.designRecipes().get(0).id);
         String savedDetailReturn = state.getString(STATE_DETAIL_RETURN_SCREEN, Screen.DISCOVER.name());
         try {
             detailReturnScreen = Screen.valueOf(savedDetailReturn);
@@ -479,7 +415,7 @@ public class MainActivity extends AppCompatActivity {
             cookingLogRating = rating >= 1 && rating <= 5 ? rating : null;
             cookingLogAdjustment = state.getString(STATE_LOG_NOTE, "");
             cookingLogPhotoPath = state.getString(STATE_LOG_PHOTO, "");
-            PersonalDataDbHelper.CookingLog original = cookingJournalViewModel.getLog(editingCookingLogId);
+            CookingLogEntry original = cookingJournalViewModel.getLog(editingCookingLogId);
             originalCookingLogPhotoPath = original == null ? "" : original.photoLocalPath;
             String savedReturn = state.getString(STATE_LOG_RETURN_SCREEN, Screen.NOTE.name());
             try { cookingLogReturnScreen = Screen.valueOf(savedReturn); }
@@ -730,8 +666,8 @@ public class MainActivity extends AppCompatActivity {
             screen = Screen.NEW_RECIPES;
             render();
         }, 24);
-        List<RecipePreview> newRecipes = discoverViewModel.newlyPublished(
-                DESIGN_RECIPES, recipe -> recipe.publishedAtMillis);
+        List<Recipe> newRecipes = discoverViewModel.newlyPublished(
+                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
             addText(content, "Chưa có món mới công bố.", 13, MUTED, false, 0, 0, 0, 0);
         } else {
@@ -739,8 +675,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         addSectionHeader(content, "Món nhanh & Dễ làm", "", () -> {}, 24);
-        List<RecipePreview> quickRecipes = discoverViewModel.quickAndEasy(
-                DESIGN_RECIPES, recipe -> recipe.durationMinutes, recipe -> recipe.difficulty);
+        List<Recipe> quickRecipes = discoverViewModel.quickAndEasy(
+                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.durationMinutes, recipe -> recipe.difficulty);
         if (quickRecipes.isEmpty()) addText(content, "Chưa có món vừa nhanh vừa dễ.", 13, MUTED, false, 0, 0, 0, 0);
         else addRecipeGrid(content, quickRecipes, true, true);
 
@@ -815,8 +751,8 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, selectedCategory.isEmpty() ? "Danh mục món ăn" : selectedCategory);
         addText(page, "Các công thức phù hợp thuộc danh mục.", 14, MUTED, false, 0, 0, 0, 16);
-        List<RecipePreview> matches = discoverViewModel.recipesInCategory(
-                DESIGN_RECIPES, selectedCategory, recipe -> recipe.categories);
+        List<Recipe> matches = discoverViewModel.recipesInCategory(
+                PreviewRecipeCatalog.designRecipes(), selectedCategory, recipe -> recipe.categories);
         if (matches.isEmpty()) addText(page, "Danh mục này hiện chưa có món nào.", 14, MUTED, false, 0, 8, 0, 0);
         else addRecipeGrid(page, matches, true, true);
         scroll.addView(page);
@@ -830,8 +766,8 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addText(page, "Món mới", 28, TEXT, true, 0, 0, 0, 0);
         addText(page, "Sắp xếp theo ngày công bố gần nhất.", 14, MUTED, false, 0, 4, 0, 20);
-        List<RecipePreview> newRecipes = discoverViewModel.newlyPublished(
-                DESIGN_RECIPES, recipe -> recipe.publishedAtMillis);
+        List<Recipe> newRecipes = discoverViewModel.newlyPublished(
+                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
             addEmptyCard(page, "Chưa có món mới công bố",
                     "Món sẽ xuất hiện tại đây sau khi kho công thức cung cấp thời điểm công bố.", () -> {
@@ -846,7 +782,7 @@ public class MainActivity extends AppCompatActivity {
         addBottomNavigation(0);
     }
 
-    private void addSearchDishItem(LinearLayout parent, RecipePreview recipe) {
+    private void addSearchDishItem(LinearLayout parent, Recipe recipe) {
         LinearLayout item = new LinearLayout(this);
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(8), dp(7), dp(14), dp(7));
@@ -995,8 +931,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Section "Món phù hợp"
         addSectionHeader(page, "Món phù hợp", "", () -> {}, 20);
-        List<RecipePreview> matches = searchViewModel.filterRecipes(DESIGN_RECIPES);
-        for (RecipePreview r : matches) {
+        List<Recipe> matches = searchViewModel.filterRecipes(PreviewRecipeCatalog.designRecipes());
+        for (Recipe r : matches) {
             addSearchDishItem(page, r);
         }
 
@@ -1244,13 +1180,13 @@ public class MainActivity extends AppCompatActivity {
         page.addView(filterRow, frParams);
 
         // Search matches
-        List<RecipePreview> matches = searchViewModel.filterRecipes(DESIGN_RECIPES);
+        List<Recipe> matches = searchViewModel.filterRecipes(PreviewRecipeCatalog.designRecipes());
         if (!matches.isEmpty()) {
             TextView countText = text(matches.size() + " món phù hợp", 13, MUTED, false);
             countText.setPadding(0, 0, 0, dp(12));
             page.addView(countText);
 
-            for (RecipePreview r : matches) {
+            for (Recipe r : matches) {
                 addSearchDishItem(page, r);
             }
         } else {
@@ -1383,7 +1319,7 @@ public class MainActivity extends AppCompatActivity {
         return result.toString();
     }
 
-    private void addSuggestionCard(LinearLayout parent, RecipePreview recipe) {
+    private void addSuggestionCard(LinearLayout parent, Recipe recipe) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(10), dp(10), dp(12), dp(10));
@@ -1438,8 +1374,8 @@ public class MainActivity extends AppCompatActivity {
                         render();
                     });
         } else {
-            List<RecipePreview> matches = searchViewModel.suggestRecipes(DESIGN_RECIPES);
-            if (!searchViewModel.hasCompleteRecipeIngredients(DESIGN_RECIPES)) {
+            List<Recipe> matches = searchViewModel.suggestRecipes(PreviewRecipeCatalog.designRecipes());
+            if (!searchViewModel.hasCompleteRecipeIngredients(PreviewRecipeCatalog.designRecipes())) {
                 addEmptyCard(page, "Chưa có đủ dữ liệu nguyên liệu",
                         "Gợi ý sẽ xuất hiện khi kho công thức cung cấp đầy đủ nguyên liệu cho món.", () -> {
                             screen = Screen.WHAT_TO_COOK_INGREDIENTS;
@@ -1453,10 +1389,10 @@ public class MainActivity extends AppCompatActivity {
                         });
             } else {
                 addText(page, "Món đủ nguyên liệu đứng trước; các món còn lại xếp theo số nguyên liệu thiếu.", 13, MUTED, false, 0, 0, 0, 16);
-                if (searchViewModel.hasIncompleteRecipeIngredients(DESIGN_RECIPES)) {
+                if (searchViewModel.hasIncompleteRecipeIngredients(PreviewRecipeCatalog.designRecipes())) {
                     addText(page, "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.", 12, MUTED, false, 0, 0, 0, 12);
                 }
-                for (RecipePreview recipe : matches) {
+                for (Recipe recipe : matches) {
                     addSuggestionCard(page, recipe);
                 }
             }
@@ -1467,7 +1403,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderRecipeDetail() {
-        RecipePreview recipe = recipeById(detailRecipeId);
+        Recipe recipe = recipeById(detailRecipeId);
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
@@ -1564,7 +1500,7 @@ public class MainActivity extends AppCompatActivity {
             screen = Screen.FAVORITES;
             render();
         }, 30);
-        List<RecipePreview> favoriteRows = personalDataViewModel.getFavorites();
+        List<Recipe> favoriteRows = personalDataViewModel.getFavorites();
         if (favoriteRows.isEmpty()) addEmptyFavoriteCard(content);
         else addRecipeGrid(content, favoriteRows.subList(0, Math.min(2, favoriteRows.size())), true, true);
 
@@ -1572,7 +1508,7 @@ public class MainActivity extends AppCompatActivity {
             screen = Screen.COLLECTION_LIST;
             render();
         }, 14);
-        List<PersonalDataDbHelper.CollectionRow> collections = personalDataViewModel.getCollections();
+        List<RecipeCollection> collections = personalDataViewModel.getCollections();
         if (collections.isEmpty()) addEmptyCard(content, "Chưa có bộ sưu tập",
                 "Tạo bộ sưu tập đầu tiên của bạn.", () -> openCollectionForm(null));
         else {
@@ -1580,7 +1516,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         addText(content, "Đã xem gần đây", 19, TEXT, true, 0, 24, 0, 12);
-        List<RecipePreview> history = personalDataViewModel.getHistory();
+        List<Recipe> history = personalDataViewModel.getHistory();
         for (int i = 0; i < Math.min(10, history.size()); i++) addHistoryRow(content, history.get(i));
 
         addSectionHeader(content, "Nhật ký nấu", "Xem tất cả ›", () -> openAllCookingLogs(Screen.LIBRARY), 24);
@@ -1596,7 +1532,7 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Yêu thích");
         addText(page, "Những công thức bạn đã lưu.", 14, MUTED, false, 0, 0, 0, 16);
-        List<RecipePreview> favorites = personalDataViewModel.getFavorites();
+        List<Recipe> favorites = personalDataViewModel.getFavorites();
         LinearLayout content = vertical();
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         if (!favorites.isEmpty()) {
@@ -1659,11 +1595,11 @@ public class MainActivity extends AppCompatActivity {
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
-    private void populateFavoriteResults(LinearLayout content, List<RecipePreview> favorites) {
+    private void populateFavoriteResults(LinearLayout content, List<Recipe> favorites) {
         content.removeAllViews();
         String query = normalizeRecipeSearch(favoritesSearchQuery);
-        List<RecipePreview> matches = new ArrayList<>();
-        for (RecipePreview recipe : favorites) {
+        List<Recipe> matches = new ArrayList<>();
+        for (Recipe recipe : favorites) {
             if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) matches.add(recipe);
         }
         if (matches.isEmpty()) {
@@ -1708,12 +1644,12 @@ public class MainActivity extends AppCompatActivity {
         return params;
     }
 
-    private void populateCollectionRecipeResults(LinearLayout results, List<RecipePreview> recipes) {
+    private void populateCollectionRecipeResults(LinearLayout results, List<Recipe> recipes) {
         if (results == null) return;
         results.removeAllViews();
         String query = normalizeRecipeSearch(collectionDetailSearchQuery);
-        List<RecipePreview> matches = new ArrayList<>();
-        for (RecipePreview recipe : recipes) {
+        List<Recipe> matches = new ArrayList<>();
+        for (Recipe recipe : recipes) {
             if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) matches.add(recipe);
         }
         if (matches.isEmpty()) {
@@ -1730,7 +1666,7 @@ public class MainActivity extends AppCompatActivity {
         rows.removeAllViews();
         String query = normalizeRecipeSearch(collectionFormSearchQuery);
         int matches = 0;
-        for (RecipePreview recipe : DESIGN_RECIPES) {
+        for (Recipe recipe : PreviewRecipeCatalog.designRecipes()) {
             if (query.isEmpty() || normalizeRecipeSearch(recipe.title).contains(query)) {
                 addSelectableRecipeRow(rows, recipe);
                 matches++;
@@ -1752,12 +1688,12 @@ public class MainActivity extends AppCompatActivity {
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         scroll.addView(content);
-        List<PersonalDataDbHelper.CollectionRow> collections = personalDataViewModel.getCollections();
+        List<RecipeCollection> collections = personalDataViewModel.getCollections();
         if (collections.isEmpty()) {
             addEmptyCard(content, "Chưa có bộ sưu tập", "Tạo bộ sưu tập đầu tiên của bạn.",
                     () -> openCollectionForm(null));
         } else {
-            for (PersonalDataDbHelper.CollectionRow collection : collections) addCollectionRow(content, collection, 0);
+            for (RecipeCollection collection : collections) addCollectionRow(content, collection, 0);
         }
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "+     Tạo bộ sưu tập", true, () -> openCollectionForm(null), 18);
@@ -1770,7 +1706,7 @@ public class MainActivity extends AppCompatActivity {
         TextView heading = text("Nấu hôm nay", 28, TEXT, true);
         page.addView(heading);
 
-        List<PersonalDataDbHelper.PlannedRecipe> planned = mealPlanViewModel.getMealPlanRecipes();
+        List<PlannedRecipe> planned = mealPlanViewModel.getMealPlanRecipes();
         if (!planned.isEmpty()) {
             LinearLayout summary = vertical();
             summary.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -1872,7 +1808,7 @@ public class MainActivity extends AppCompatActivity {
         page.setPadding(dp(24), dp(20), dp(24), dp(16));
         addShoppingTitleWithPantry(page);
 
-        List<PersonalDataDbHelper.ShoppingItem> items = shoppingViewModel.getItems();
+        List<ShoppingListItem> items = shoppingViewModel.getItems();
         if (items.isEmpty()) {
             ScrollView emptyScroll = scrollContent();
             emptyScroll.setFillViewport(true);
@@ -1912,7 +1848,7 @@ public class MainActivity extends AppCompatActivity {
         page.addView(summary, summaryParams);
 
         int availableCount = 0;
-        for (PersonalDataDbHelper.ShoppingItem item : items) {
+        for (ShoppingListItem item : items) {
             if (ShoppingViewModel.AVAILABLE.equals(item.status)) availableCount++;
         }
         android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
@@ -1944,21 +1880,21 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout content = vertical();
         content.setPadding(0, 0, 0, dp(12));
         scroll.addView(content);
-        Map<String, List<PersonalDataDbHelper.ShoppingItem>> groupedItems = new LinkedHashMap<>();
+        Map<String, List<ShoppingListItem>> groupedItems = new LinkedHashMap<>();
         for (String category : ShoppingCategoryCatalog.ORDER) groupedItems.put(category, new ArrayList<>());
-        for (PersonalDataDbHelper.ShoppingItem item : items) {
+        for (ShoppingListItem item : items) {
             if (shoppingStatusFilter != null && !shoppingStatusFilter.equals(item.status)) continue;
             String category = ShoppingCategoryCatalog.contains(item.category)
                     ? item.category : ShoppingCategoryCatalog.OTHER;
             groupedItems.get(category).add(item);
         }
         int renderedCategoryCount = 0;
-        for (Map.Entry<String, List<PersonalDataDbHelper.ShoppingItem>> group : groupedItems.entrySet()) {
+        for (Map.Entry<String, List<ShoppingListItem>> group : groupedItems.entrySet()) {
             if (group.getValue().isEmpty()) continue;
             addText(content, group.getKey(), 20, TEXT, true, 0,
                     renderedCategoryCount == 0 ? 0 : 18, 0, 0);
             renderedCategoryCount++;
-            for (PersonalDataDbHelper.ShoppingItem item : group.getValue()) {
+            for (ShoppingListItem item : group.getValue()) {
                 addShoppingItemRow(content, item);
             }
         }
@@ -2023,15 +1959,15 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private int filteredShoppingCount(List<PersonalDataDbHelper.ShoppingItem> items) {
+    private int filteredShoppingCount(List<ShoppingListItem> items) {
         int count = 0;
-        for (PersonalDataDbHelper.ShoppingItem item : items) {
+        for (ShoppingListItem item : items) {
             if (shoppingStatusFilter != null && shoppingStatusFilter.equals(item.status)) count++;
         }
         return count;
     }
 
-    private void addShoppingItemRow(LinearLayout parent, PersonalDataDbHelper.ShoppingItem item) {
+    private void addShoppingItemRow(LinearLayout parent, ShoppingListItem item) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
@@ -2105,7 +2041,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openShoppingItemForm(String itemId) {
         editingShoppingItemId = itemId;
-        PersonalDataDbHelper.ShoppingItem item = shoppingViewModel.findItem(itemId);
+        ShoppingListItem item = shoppingViewModel.findItem(itemId);
         shoppingDraftName = item == null ? "" : item.name;
         shoppingDraftAmount = item == null ? "" : item.amount;
         shoppingDraftUnit = item == null ? "" : KitchenUnitCatalog.label(item.unit);
@@ -2204,7 +2140,7 @@ public class MainActivity extends AppCompatActivity {
             status = shoppingViewModel.initialStatusForPantry(null, shoppingDraftName,
                     shoppingDraftAmount, canonicalUnit);
         } else {
-            PersonalDataDbHelper.ShoppingItem existing = shoppingViewModel.findItem(editingShoppingItemId);
+            ShoppingListItem existing = shoppingViewModel.findItem(editingShoppingItemId);
             status = existing == null ? ShoppingViewModel.NEED_TO_BUY : existing.status;
         }
         if (!shoppingViewModel.saveItem(editingShoppingItemId, shoppingDraftName, shoppingDraftAmount,
@@ -2218,7 +2154,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void confirmDeleteShoppingItem(String itemId) {
-        PersonalDataDbHelper.ShoppingItem item = shoppingViewModel.findItem(itemId);
+        ShoppingListItem item = shoppingViewModel.findItem(itemId);
         if (item == null) return;
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Xóa nguyên liệu?")
@@ -2323,7 +2259,7 @@ public class MainActivity extends AppCompatActivity {
         if (update != null) showShoppingPlanUpdate(update);
     }
 
-    private void addPlannedRecipeCard(LinearLayout parent, PersonalDataDbHelper.PlannedRecipe item,
+    private void addPlannedRecipeCard(LinearLayout parent, PlannedRecipe item,
                                       int position, int totalCount) {
         boolean compact = getResources().getConfiguration().screenWidthDp < 360
                 || getResources().getConfiguration().fontScale >= 1.15f;
@@ -2394,7 +2330,7 @@ public class MainActivity extends AppCompatActivity {
         remove.setOnClickListener(v -> removePlannedRecipe(item));
     }
 
-    private void addMealPlanOrderControls(LinearLayout card, PersonalDataDbHelper.PlannedRecipe item,
+    private void addMealPlanOrderControls(LinearLayout card, PlannedRecipe item,
                                           int position, int totalCount) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -2430,7 +2366,7 @@ public class MainActivity extends AppCompatActivity {
         if (mealPlanViewModel.moveMealPlanRecipe(recipeId, direction)) render();
     }
 
-    private void removePlannedRecipe(PersonalDataDbHelper.PlannedRecipe item) {
+    private void removePlannedRecipe(PlannedRecipe item) {
         MealPlanViewModel.RemovedPlanRecipe removed = mealPlanViewModel.removeMealPlanRecipeForUndo(item.recipe.id);
         if (removed == null) return;
         render();
@@ -2443,7 +2379,7 @@ public class MainActivity extends AppCompatActivity {
         snackbar.show();
     }
 
-    private void changeServings(PersonalDataDbHelper.PlannedRecipe item, int delta) {
+    private void changeServings(PlannedRecipe item, int delta) {
         int servings = item.servings + delta;
         if (servings < MealPlanViewModel.MIN_SERVINGS || servings > MealPlanViewModel.MAX_SERVINGS) return;
         mealPlanViewModel.setMealPlanRecipeServings(item.recipe.id, servings);
@@ -2563,8 +2499,8 @@ public class MainActivity extends AppCompatActivity {
     private void populateMealPlanPickerRows() {
         if (planPickerRows == null) return;
         planPickerRows.removeAllViews();
-        List<RecipePreview> sourceRecipes = getCurrentMealPlanPickerRecipes();
-        List<RecipePreview> matches = mealPlanViewModel.filterRecipes(sourceRecipes);
+        List<Recipe> sourceRecipes = getCurrentMealPlanPickerRecipes();
+        List<Recipe> matches = mealPlanViewModel.filterRecipes(sourceRecipes);
         if (matches.isEmpty()) {
             String message;
             if (!mealPlanViewModel.getSearchQuery().trim().isEmpty()) {
@@ -2584,7 +2520,7 @@ public class MainActivity extends AppCompatActivity {
             planPickerRows.addView(empty, new LinearLayout.LayoutParams(-1, dp(72)));
             return;
         }
-        for (RecipePreview recipe : matches) {
+        for (Recipe recipe : matches) {
             boolean planned = mealPlanViewModel.isRecipeInPlan(recipe.id);
             boolean selected = mealPlanViewModel.isSelected(recipe.id);
             LinearLayout row = new LinearLayout(this);
@@ -2625,8 +2561,8 @@ public class MainActivity extends AppCompatActivity {
         populateMealPlanPickerRows();
     }
 
-    private List<RecipePreview> getCurrentMealPlanPickerRecipes() {
-        return mealPlanViewModel.getPickerRecipes(MEAL_PLAN_PREVIEWS);
+    private List<Recipe> getCurrentMealPlanPickerRecipes() {
+        return mealPlanViewModel.getPickerRecipes(PreviewRecipeCatalog.mealPlanPreviews());
     }
 
     private void showMealPlanSourceMenu(View anchor) {
@@ -2634,13 +2570,13 @@ public class MainActivity extends AppCompatActivity {
         menu.getMenu().add(0, 1, 0, "Tất cả món");
         menu.getMenu().add(0, 2, 1, "Món yêu thích");
         Map<Integer, Long> collectionIdsByMenuId = new LinkedHashMap<>();
-        List<PersonalDataDbHelper.CollectionRow> collections = mealPlanViewModel.getRecipeCollections();
+        List<RecipeCollection> collections = mealPlanViewModel.getRecipeCollections();
         if (collections.isEmpty()) {
             menu.getMenu().add(0, 3, 2, "Chưa có bộ sưu tập").setEnabled(false);
         } else {
             int menuId = 10;
             int order = 2;
-            for (PersonalDataDbHelper.CollectionRow collection : collections) {
+            for (RecipeCollection collection : collections) {
                 menu.getMenu().add(0, menuId, order++, "Bộ sưu tập: " + collection.name);
                 collectionIdsByMenuId.put(menuId, collection.id);
                 menuId++;
@@ -2673,7 +2609,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case COLLECTION:
                 label = "Chọn bộ sưu tập";
-                for (PersonalDataDbHelper.CollectionRow collection : mealPlanViewModel.getRecipeCollections()) {
+                for (RecipeCollection collection : mealPlanViewModel.getRecipeCollections()) {
                     if (collection.id == mealPlanViewModel.getPickerCollectionId()) {
                         label = collection.name;
                         break;
@@ -2696,13 +2632,13 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
-    private void togglePlanPickerRecipe(RecipePreview recipe) {
+    private void togglePlanPickerRecipe(Recipe recipe) {
         mealPlanViewModel.toggleRecipe(recipe.id);
         populateMealPlanPickerRows();
     }
 
     private void saveMealPlanSelection() {
-        if (!mealPlanViewModel.saveSelection(mealPlanViewModel.getAllSelectableRecipes(DESIGN_RECIPES))) {
+        if (!mealPlanViewModel.saveSelection(mealPlanViewModel.getAllSelectableRecipes(PreviewRecipeCatalog.designRecipes()))) {
             Toast.makeText(this, "Chọn ít nhất một món.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -2737,7 +2673,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Bộ sưu tập");
-        PersonalDataDbHelper.CollectionRow selected = findCollection(selectedCollectionId);
+        RecipeCollection selected = findCollection(selectedCollectionId);
         if (selected == null) {
             screen = Screen.LIBRARY;
             render();
@@ -2766,7 +2702,7 @@ public class MainActivity extends AppCompatActivity {
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         scroll.addView(content);
-        List<RecipePreview> collectionRecipes = personalDataViewModel.getCollectionRecipes(selectedCollectionId);
+        List<Recipe> collectionRecipes = personalDataViewModel.getCollectionRecipes(selectedCollectionId);
         if (collectionRecipes.isEmpty()) {
             LinearLayout empty = vertical();
             empty.setGravity(Gravity.CENTER);
@@ -2805,9 +2741,9 @@ public class MainActivity extends AppCompatActivity {
             content.addView(collectionRecipeResults);
             populateCollectionRecipeResults(collectionRecipeResults, collectionRecipes);
         }
-        List<PersonalDataDbHelper.CollectionRow> otherCollections = personalDataViewModel.getCollections();
+        List<RecipeCollection> otherCollections = personalDataViewModel.getCollections();
         boolean hasOtherCollections = false;
-        for (PersonalDataDbHelper.CollectionRow row : otherCollections) {
+        for (RecipeCollection row : otherCollections) {
             if (row.id == selectedCollectionId) continue;
             if (!hasOtherCollections) {
                 addText(content, "Bộ sưu tập khác", 19, TEXT, true, 0, 22, 0, 12);
@@ -2865,7 +2801,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderNote() {
-        RecipePreview recipe = recipeById(noteRecipeId);
+        Recipe recipe = recipeById(noteRecipeId);
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
 
@@ -2929,11 +2865,11 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Tủ nguyên liệu");
-        List<PersonalDataDbHelper.PantryItem> items = pantryViewModel.getItems();
+        List<PantryIngredient> items = pantryViewModel.getItems();
         int usableCount = 0;
         int expiringCount = 0;
         int expiredCount = 0;
-        for (PersonalDataDbHelper.PantryItem item : items) {
+        for (PantryIngredient item : items) {
             String state = pantryViewModel.expiryState(item.expiryDate);
             if ("EXPIRED".equals(state)) expiredCount++;
             else if ("EXPIRING".equals(state)) expiringCount++;
@@ -3008,11 +2944,11 @@ public class MainActivity extends AppCompatActivity {
         schedulePantryExpiryRefresh();
     }
 
-    private void populatePantryRows(LinearLayout content, List<PersonalDataDbHelper.PantryItem> allItems) {
+    private void populatePantryRows(LinearLayout content, List<PantryIngredient> allItems) {
         content.removeAllViews();
-        List<PersonalDataDbHelper.PantryItem> matches = new ArrayList<>();
+        List<PantryIngredient> matches = new ArrayList<>();
         String query = normalizeSearchText(pantrySearchQuery);
-        for (PersonalDataDbHelper.PantryItem item : allItems) {
+        for (PantryIngredient item : allItems) {
             String expiryState = pantryViewModel.expiryState(item.expiryDate);
             if ("USABLE".equals(pantryFilter) && !expiryState.isEmpty()) continue;
             if ("EXPIRING".equals(pantryFilter) && !"EXPIRING".equals(expiryState)) continue;
@@ -3033,19 +2969,19 @@ public class MainActivity extends AppCompatActivity {
             });
             return;
         }
-        Map<String, List<PersonalDataDbHelper.PantryItem>> groups = new LinkedHashMap<>();
+        Map<String, List<PantryIngredient>> groups = new LinkedHashMap<>();
         for (String category : ShoppingCategoryCatalog.ORDER) groups.put(category, new ArrayList<>());
-        for (PersonalDataDbHelper.PantryItem item : matches) {
+        for (PantryIngredient item : matches) {
             String category = ShoppingCategoryCatalog.contains(item.category)
                     ? item.category : ShoppingCategoryCatalog.OTHER;
             groups.get(category).add(item);
         }
         int groupIndex = 0;
-        for (Map.Entry<String, List<PersonalDataDbHelper.PantryItem>> group : groups.entrySet()) {
+        for (Map.Entry<String, List<PantryIngredient>> group : groups.entrySet()) {
             if (group.getValue().isEmpty()) continue;
             addText(content, group.getKey(), 18, TEXT, true, 0, groupIndex == 0 ? 4 : 20, 0, 0);
             groupIndex++;
-            for (PersonalDataDbHelper.PantryItem item : group.getValue()) addPantryItemCard(content, item);
+            for (PantryIngredient item : group.getValue()) addPantryItemCard(content, item);
         }
     }
 
@@ -3064,7 +3000,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void addPantryItemCard(LinearLayout parent, PersonalDataDbHelper.PantryItem item) {
+    private void addPantryItemCard(LinearLayout parent, PantryIngredient item) {
         LinearLayout card = vertical();
         card.setPadding(dp(14), dp(12), dp(12), dp(12));
         card.setBackground(roundRect(WHITE, BORDER, 16));
@@ -3125,7 +3061,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPantryForm(String itemId) {
         editingPantryItemId = itemId;
-        PersonalDataDbHelper.PantryItem item = pantryViewModel.getItem(itemId);
+        PantryIngredient item = pantryViewModel.getItem(itemId);
         pantryDraftName = item == null ? "" : item.name;
         pantryDraftAmount = item == null || item.amountDecimal == null ? "" : item.amountDecimal;
         pantryDraftUnitId = item == null || item.unitId == null ? "" : item.unitId;
@@ -3300,7 +3236,7 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
-    private void confirmDeletePantryItem(PersonalDataDbHelper.PantryItem item) {
+    private void confirmDeletePantryItem(PantryIngredient item) {
         if (item == null) return;
         new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Xóa nguyên liệu khỏi tủ?")
                 .setMessage("Xóa “" + item.name + "” khỏi tủ nguyên liệu?")
@@ -3327,8 +3263,8 @@ public class MainActivity extends AppCompatActivity {
                 }).show();
     }
 
-    private void addCookingJournalPreview(LinearLayout parent, RecipePreview recipe) {
-        List<PersonalDataDbHelper.CookingLog> logs = cookingJournalViewModel.getLogs(recipe.id);
+    private void addCookingJournalPreview(LinearLayout parent, Recipe recipe) {
+        List<CookingLogEntry> logs = cookingJournalViewModel.getLogs(recipe.id);
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
@@ -3371,7 +3307,7 @@ public class MainActivity extends AppCompatActivity {
         addBackTitle(page, "Nhật ký nấu của tôi");
         addText(page, "Tìm lại những lần bạn đã nấu.", 14, MUTED, false, 0, 0, 0, 14);
 
-        List<PersonalDataDbHelper.CookingLog> allLogs = cookingJournalViewModel.getAllLogs();
+        List<CookingLogEntry> allLogs = cookingJournalViewModel.getAllLogs();
         cookingJournalAllLogs = allLogs;
         addJournalStatsCard(page, cookingJournalViewModel.getStats());
 
@@ -3549,7 +3485,7 @@ public class MainActivity extends AppCompatActivity {
             });
             return;
         }
-        List<PersonalDataDbHelper.CookingLog> filtered = cookingJournalViewModel.filterLogs(
+        List<CookingLogEntry> filtered = cookingJournalViewModel.filterLogs(
                 cookingJournalAllLogs, cookingJournalSearch, fromInclusive, toExclusive, cookingJournalRatingFilter);
         addText(rows, filtered.size() + " lần nấu",
                 13, MUTED, false, 0, 4, 0, 8);
@@ -3568,11 +3504,11 @@ public class MainActivity extends AppCompatActivity {
             }
             return;
         }
-        for (PersonalDataDbHelper.CookingLog log : filtered) addCookingLogCard(rows, log, true);
+        for (CookingLogEntry log : filtered) addCookingLogCard(rows, log, true);
     }
 
     private void renderCookingLogs() {
-        RecipePreview recipe = recipeById(cookingLogRecipeId);
+        Recipe recipe = recipeById(cookingLogRecipeId);
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(12));
         addBackTitle(page, "Nhật ký nấu");
@@ -3590,7 +3526,7 @@ public class MainActivity extends AppCompatActivity {
         recipeParams.topMargin = dp(18);
         page.addView(recipeCard, recipeParams);
 
-        List<PersonalDataDbHelper.CookingLog> logs = cookingJournalViewModel.getLogs(recipe.id);
+        List<CookingLogEntry> logs = cookingJournalViewModel.getLogs(recipe.id);
         addText(page, "Đã nấu " + logs.size() + (logs.size() == 1 ? " lần" : " lần"),
                 14, MUTED, false, 0, 12, 0, 10);
         ScrollView scroll = scrollContent();
@@ -3601,14 +3537,14 @@ public class MainActivity extends AppCompatActivity {
             addEmptyCard(content, "Chưa có lần nấu nào", "Lưu lại cách bạn đã nấu để dễ xem lại lần sau.",
                     () -> openCookingLogForm(null, recipe.id));
         } else {
-            for (PersonalDataDbHelper.CookingLog log : logs) addCookingLogCard(content, log);
+            for (CookingLogEntry log : logs) addCookingLogCard(content, log);
         }
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addButton(page, "+   Ghi lại lần nấu", true, () -> openCookingLogForm(null, recipe.id), 8);
         appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
-    private void addCookingLogPreviewRow(LinearLayout parent, PersonalDataDbHelper.CookingLog log) {
+    private void addCookingLogPreviewRow(LinearLayout parent, CookingLogEntry log) {
         LinearLayout card = vertical();
         card.setPadding(dp(12), dp(10), dp(12), dp(10));
         card.setBackground(roundRect(WHITE, BORDER, 14));
@@ -3628,11 +3564,11 @@ public class MainActivity extends AppCompatActivity {
         card.setOnClickListener(v -> openCookingLogs(log.recipeId, Screen.NOTE));
     }
 
-    private void addCookingLogCard(LinearLayout parent, PersonalDataDbHelper.CookingLog log) {
+    private void addCookingLogCard(LinearLayout parent, CookingLogEntry log) {
         addCookingLogCard(parent, log, false);
     }
 
-    private void addCookingLogCard(LinearLayout parent, PersonalDataDbHelper.CookingLog log, boolean showRecipeTitle) {
+    private void addCookingLogCard(LinearLayout parent, CookingLogEntry log, boolean showRecipeTitle) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -3687,7 +3623,7 @@ public class MainActivity extends AppCompatActivity {
                 ? Screen.COOKING_JOURNAL : Screen.COOKING_LOGS;
         cookingLogRecipeId = recipeId;
         editingCookingLogId = logId;
-        PersonalDataDbHelper.CookingLog log = cookingJournalViewModel.getLog(logId);
+        CookingLogEntry log = cookingJournalViewModel.getLog(logId);
         if (log == null) {
             cookingLogCookedAt = System.currentTimeMillis();
             cookingLogServings = 1;
@@ -3711,7 +3647,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void renderCookingLogForm() {
-        RecipePreview recipe = recipeById(cookingLogRecipeId);
+        Recipe recipe = recipeById(cookingLogRecipeId);
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(14));
         addBackTitle(page, editingCookingLogId == null ? "Ghi lại lần nấu" : "Sửa lần nấu");
@@ -3864,7 +3800,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
         }
-        RecipePreview recipe = recipeById(cookingLogRecipeId);
+        Recipe recipe = recipeById(cookingLogRecipeId);
         if (!cookingJournalViewModel.save(editingCookingLogId, recipe, cookingLogCookedAt,
                 cookingLogServings, duration, cookingLogRating, cookingLogAdjustment, cookingLogPhotoPath)) {
             Toast.makeText(this, "Không thể lưu lần nấu. Vui lòng kiểm tra thông tin.", Toast.LENGTH_SHORT).show();
@@ -3880,7 +3816,7 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Đã lưu lần nấu.", Toast.LENGTH_SHORT).show();
     }
 
-    private void confirmDeleteCookingLog(PersonalDataDbHelper.CookingLog log) {
+    private void confirmDeleteCookingLog(CookingLogEntry log) {
         new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Xóa lần nấu?")
                 .setMessage("Xóa nhật ký nấu ngày " + formatDate(log.cookedAt) + "? Công thức và ghi chú chung vẫn được giữ.")
                 .setNegativeButton("Hủy", null)
@@ -3962,12 +3898,12 @@ public class MainActivity extends AppCompatActivity {
         page.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    private void addRecipeGrid(LinearLayout parent, List<RecipePreview> recipes, boolean showFavorite, boolean removable) {
+    private void addRecipeGrid(LinearLayout parent, List<Recipe> recipes, boolean showFavorite, boolean removable) {
         if (recipes.isEmpty()) return;
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(2);
         int index = 0;
-        for (RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             LinearLayout card = recipeCard(recipe, showFavorite, removable);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = 0;
@@ -3979,7 +3915,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(grid, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    private LinearLayout recipeCard(RecipePreview recipe, boolean showFavorite, boolean removable) {
+    private LinearLayout recipeCard(Recipe recipe, boolean showFavorite, boolean removable) {
         LinearLayout card = vertical();
         card.setBackground(roundRect(WHITE, BORDER, 15));
         card.setClipToOutline(true);
@@ -4019,7 +3955,7 @@ public class MainActivity extends AppCompatActivity {
         return card;
     }
 
-    private void openRecipeDetail(RecipePreview recipe) {
+    private void openRecipeDetail(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
         detailReturnScreen = screen;
         detailRecipeId = recipe.id;
@@ -4042,7 +3978,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(spacer, new LinearLayout.LayoutParams(1, dp(16)));
     }
 
-    private void addCollectionRow(LinearLayout parent, PersonalDataDbHelper.CollectionRow row, int top) {
+    private void addCollectionRow(LinearLayout parent, RecipeCollection row, int top) {
         LinearLayout item = new LinearLayout(this);
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(9), dp(10), dp(14), dp(10));
@@ -4111,12 +4047,12 @@ public class MainActivity extends AppCompatActivity {
         return button;
     }
 
-    private void addRelatedCollectionRow(LinearLayout parent, PersonalDataDbHelper.CollectionRow row) {
+    private void addRelatedCollectionRow(LinearLayout parent, RecipeCollection row) {
         LinearLayout item = new LinearLayout(this);
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(7), dp(5), dp(12), dp(5));
         item.setBackground(roundRect(WHITE, BORDER, 14));
-        List<RecipePreview> recipes = personalDataViewModel.getCollectionRecipes(row.id);
+        List<Recipe> recipes = personalDataViewModel.getCollectionRecipes(row.id);
         if (recipes.isEmpty()) {
             ImageView folder = iconView(R.drawable.ic_folder_outline, GREEN);
             folder.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
@@ -4140,7 +4076,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(item, params);
     }
 
-    private void addHistoryRow(LinearLayout parent, RecipePreview recipe) {
+    private void addHistoryRow(LinearLayout parent, Recipe recipe) {
         LinearLayout item = new LinearLayout(this);
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(7), dp(5), dp(12), dp(5));
@@ -4164,7 +4100,7 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(item, params);
     }
 
-    private FrameLayout favoriteToggleButton(RecipePreview recipe) {
+    private FrameLayout favoriteToggleButton(Recipe recipe) {
         boolean favorite = personalDataViewModel.isFavorite(recipe.id);
         FrameLayout button = new FrameLayout(this);
         button.setFocusable(true);
@@ -4185,11 +4121,11 @@ public class MainActivity extends AppCompatActivity {
         return button;
     }
 
-    private static void updateFavoriteToggleDescription(FrameLayout button, boolean favorite, RecipePreview recipe) {
+    private static void updateFavoriteToggleDescription(FrameLayout button, boolean favorite, Recipe recipe) {
         button.setContentDescription((favorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
     }
 
-    private void addSelectableRecipeRow(LinearLayout parent, RecipePreview recipe) {
+    private void addSelectableRecipeRow(LinearLayout parent, Recipe recipe) {
         boolean selected = personalDataViewModel.isCollectionRecipeSelected(recipe.id);
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -4308,7 +4244,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Long currentId = selectedCollectionId > 0 ? selectedCollectionId : null;
-        Long savedCollectionId = personalDataViewModel.saveCollectionForm(currentId, DESIGN_RECIPES);
+        Long savedCollectionId = personalDataViewModel.saveCollectionForm(currentId, PreviewRecipeCatalog.designRecipes());
         if (savedCollectionId == null) {
             collectionError.setText("Tên này đã được sử dụng.");
             collectionNameInput.setBackground(roundRect(WHITE, ERROR, 14));
@@ -4354,9 +4290,9 @@ public class MainActivity extends AppCompatActivity {
         collectionFormSearchQuery = "";
         selectedCollectionId = collectionId == null ? -1L : collectionId;
         String name = "";
-        List<RecipePreview> recipes = new ArrayList<>();
+        List<Recipe> recipes = new ArrayList<>();
         if (collectionId != null) {
-            PersonalDataDbHelper.CollectionRow row = findCollection(collectionId);
+            RecipeCollection row = findCollection(collectionId);
             if (row != null) name = row.name;
             recipes.addAll(personalDataViewModel.getCollectionRecipes(collectionId));
         }
@@ -4365,7 +4301,7 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
-    private void openRecipeNote(RecipePreview recipe) {
+    private void openRecipeNote(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
         noteReturnScreen = screen;
         noteRecipeId = recipe.id;
@@ -4373,7 +4309,7 @@ public class MainActivity extends AppCompatActivity {
         render();
     }
 
-    private void confirmDeleteCollection(PersonalDataDbHelper.CollectionRow collection) {
+    private void confirmDeleteCollection(RecipeCollection collection) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Xóa bộ sưu tập?")
                 .setMessage("Bộ sưu tập “" + collection.name + "” và danh sách món trong đó sẽ bị xóa. Yêu thích và ghi chú của các món vẫn được giữ.")
@@ -4387,8 +4323,8 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private PersonalDataDbHelper.CollectionRow findCollection(long id) {
-        for (PersonalDataDbHelper.CollectionRow row : personalDataViewModel.getCollections()) if (row.id == id) return row;
+    private RecipeCollection findCollection(long id) {
+        for (RecipeCollection row : personalDataViewModel.getCollections()) if (row.id == id) return row;
         return null;
     }
 
@@ -4442,7 +4378,7 @@ public class MainActivity extends AppCompatActivity {
         return field;
     }
 
-    private ImageView recipeImage(RecipePreview recipe) {
+    private ImageView recipeImage(Recipe recipe) {
         ImageView image = new ImageView(this);
         int resource = recipeDrawable(recipe.id);
         image.setImageResource(resource);
@@ -4505,8 +4441,8 @@ public class MainActivity extends AppCompatActivity {
 
     private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
 
-    private RecipePreview recipeById(String id) {
-        for (RecipePreview recipe : DESIGN_RECIPES) if (recipe.id.equals(id)) return recipe;
-        return DESIGN_RECIPES.get(0);
+    private Recipe recipeById(String id) {
+        for (Recipe recipe : PreviewRecipeCatalog.designRecipes()) if (recipe.id.equals(id)) return recipe;
+        return PreviewRecipeCatalog.designRecipes().get(0);
     }
 }

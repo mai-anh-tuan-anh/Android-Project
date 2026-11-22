@@ -1,4 +1,6 @@
-package com.example.myapplication;
+package com.example.myapplication.domain.catalog;
+
+import com.example.myapplication.domain.model.Recipe;
 
 import java.text.Normalizer;
 import java.util.ArrayList;

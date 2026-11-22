@@ -1,5 +1,10 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.discover;
 
+import com.example.myapplication.BepNhaApplication;
+
+
+import com.example.myapplication.domain.repository.PersonalDataRepository;
+import com.example.myapplication.domain.model.Recipe;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;

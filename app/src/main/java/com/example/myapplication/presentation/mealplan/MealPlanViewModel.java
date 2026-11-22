@@ -1,10 +1,10 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.mealplan;
 
-import android.app.Application;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
 
+import androidx.lifecycle.ViewModel;
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.domain.repository.PersonalDataRepository;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,10 +16,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Presentation state and business actions for module 6. */
-public final class MealPlanViewModel extends AndroidViewModel {
-    static final int MIN_SERVINGS = 1;
-    static final int MAX_SERVINGS = 999;
-    enum PickerSource { ALL, FAVORITES, COLLECTION }
+public final class MealPlanViewModel extends ViewModel {
+    public static final int MIN_SERVINGS = 1;
+    public static final int MAX_SERVINGS = 999;
+    public enum PickerSource { ALL, FAVORITES, COLLECTION }
 
     private final PersonalDataRepository repository;
     private final List<String> selectedRecipeIds = new ArrayList<>();
@@ -28,18 +28,17 @@ public final class MealPlanViewModel extends AndroidViewModel {
     private PickerSource pickerSource = PickerSource.ALL;
     private long pickerCollectionId = -1L;
 
-    public MealPlanViewModel(@NonNull Application application) {
-        super(application);
-        repository = PersonalDataRepository.getInstance(application);
+    public MealPlanViewModel(PersonalDataRepository repository) {
+        this.repository = repository;
     }
 
-    List<PersonalDataDbHelper.PlannedRecipe> getMealPlanRecipes() {
+    public List<PlannedRecipe> getMealPlanRecipes() {
         return repository.getMealPlanRecipes();
     }
 
-    List<PersonalDataDbHelper.CollectionRow> getRecipeCollections() { return repository.getCollections(); }
+    public List<RecipeCollection> getRecipeCollections() { return repository.getCollections(); }
 
-    List<MainActivity.RecipePreview> getPickerRecipes(List<MainActivity.RecipePreview> defaultRecipes) {
+    public List<Recipe> getPickerRecipes(List<Recipe> defaultRecipes) {
         switch (pickerSource) {
             case FAVORITES:
                 return repository.getFavorites();
@@ -52,14 +51,14 @@ public final class MealPlanViewModel extends AndroidViewModel {
         }
     }
 
-    List<MainActivity.RecipePreview> getAllSelectableRecipes(List<MainActivity.RecipePreview> defaultRecipes) {
-        Map<String, MainActivity.RecipePreview> recipesById = new LinkedHashMap<>();
+    public List<Recipe> getAllSelectableRecipes(List<Recipe> defaultRecipes) {
+        Map<String, Recipe> recipesById = new LinkedHashMap<>();
         addUniqueRecipes(recipesById, repository.getFavorites());
-        for (PersonalDataDbHelper.CollectionRow collection : repository.getCollections()) {
+        for (RecipeCollection collection : repository.getCollections()) {
             addUniqueRecipes(recipesById, repository.getCollectionRecipes(collection.id));
         }
         addUniqueRecipes(recipesById, defaultRecipes);
-        for (PersonalDataDbHelper.PlannedRecipe planned : repository.getMealPlanRecipes()) {
+        for (PlannedRecipe planned : repository.getMealPlanRecipes()) {
             if (!recipesById.containsKey(planned.recipe.id)) {
                 recipesById.put(planned.recipe.id, planned.recipe);
             }
@@ -67,19 +66,19 @@ public final class MealPlanViewModel extends AndroidViewModel {
         return new ArrayList<>(recipesById.values());
     }
 
-    private static void addUniqueRecipes(Map<String, MainActivity.RecipePreview> output,
-                                         List<MainActivity.RecipePreview> recipes) {
-        for (MainActivity.RecipePreview recipe : recipes) {
+    private static void addUniqueRecipes(Map<String, Recipe> output,
+                                         List<Recipe> recipes) {
+        for (Recipe recipe : recipes) {
             if (!output.containsKey(recipe.id)) output.put(recipe.id, recipe);
         }
     }
 
-    void removeMealPlanRecipe(String recipeId) { repository.removeMealPlanRecipe(recipeId); }
+    public void removeMealPlanRecipe(String recipeId) { repository.removeMealPlanRecipe(recipeId); }
 
-    RemovedPlanRecipe removeMealPlanRecipeForUndo(String recipeId) {
-        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
+    public RemovedPlanRecipe removeMealPlanRecipeForUndo(String recipeId) {
+        List<PlannedRecipe> current = repository.getMealPlanRecipes();
         for (int i = 0; i < current.size(); i++) {
-            PersonalDataDbHelper.PlannedRecipe planned = current.get(i);
+            PlannedRecipe planned = current.get(i);
             if (planned.recipe.id.equals(recipeId)) {
                 current.remove(i);
                 repository.replaceMealPlanRecipes(current);
@@ -89,10 +88,10 @@ public final class MealPlanViewModel extends AndroidViewModel {
         return null;
     }
 
-    boolean restoreMealPlanRecipe(RemovedPlanRecipe removed) {
+    public boolean restoreMealPlanRecipe(RemovedPlanRecipe removed) {
         if (removed == null) return false;
-        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
-        for (PersonalDataDbHelper.PlannedRecipe planned : current) {
+        List<PlannedRecipe> current = repository.getMealPlanRecipes();
+        for (PlannedRecipe planned : current) {
             if (planned.recipe.id.equals(removed.recipe.recipe.id)) return false;
         }
         current.add(Math.min(removed.position, current.size()), removed.recipe);
@@ -100,26 +99,26 @@ public final class MealPlanViewModel extends AndroidViewModel {
         return true;
     }
 
-    boolean moveMealPlanRecipe(String recipeId, int direction) {
+    public boolean moveMealPlanRecipe(String recipeId, int direction) {
         if (direction != -1 && direction != 1) return false;
-        List<PersonalDataDbHelper.PlannedRecipe> current = repository.getMealPlanRecipes();
+        List<PlannedRecipe> current = repository.getMealPlanRecipes();
         int index = -1;
         for (int i = 0; i < current.size(); i++) {
             if (current.get(i).recipe.id.equals(recipeId)) { index = i; break; }
         }
         int destination = index + direction;
         if (index < 0 || destination < 0 || destination >= current.size()) return false;
-        PersonalDataDbHelper.PlannedRecipe moved = current.get(index);
+        PlannedRecipe moved = current.get(index);
         current.set(index, current.get(destination));
         current.set(destination, moved);
         repository.replaceMealPlanRecipes(current);
         return true;
     }
 
-    MealDurationEstimate estimateTotalDuration(List<PersonalDataDbHelper.PlannedRecipe> planned) {
+    public MealDurationEstimate estimateTotalDuration(List<PlannedRecipe> planned) {
         int totalMinutes = 0;
         int knownDurations = 0;
-        for (PersonalDataDbHelper.PlannedRecipe item : planned) {
+        for (PlannedRecipe item : planned) {
             int minutes = parseDurationMinutes(item.recipe.duration);
             if (minutes <= 0) continue;
             totalMinutes += minutes;
@@ -139,34 +138,34 @@ public final class MealPlanViewModel extends AndroidViewModel {
         return hours * 60 + minutes;
     }
 
-    static final class RemovedPlanRecipe {
-        final PersonalDataDbHelper.PlannedRecipe recipe;
+    public static final class RemovedPlanRecipe {
+        final PlannedRecipe recipe;
         final int position;
-        RemovedPlanRecipe(PersonalDataDbHelper.PlannedRecipe recipe, int position) {
+        RemovedPlanRecipe(PlannedRecipe recipe, int position) {
             this.recipe = recipe;
             this.position = position;
         }
     }
 
-    static final class MealDurationEstimate {
-        final int knownMinutes;
-        final int knownRecipes;
-        final int unknownRecipes;
-        MealDurationEstimate(int knownMinutes, int knownRecipes, int unknownRecipes) {
+    public static final class MealDurationEstimate {
+        public final int knownMinutes;
+        public final int knownRecipes;
+        public final int unknownRecipes;
+        public MealDurationEstimate(int knownMinutes, int knownRecipes, int unknownRecipes) {
             this.knownMinutes = knownMinutes;
             this.knownRecipes = knownRecipes;
             this.unknownRecipes = unknownRecipes;
         }
     }
 
-    void setMealPlanRecipeServings(String recipeId, int servings) {
+    public void setMealPlanRecipeServings(String recipeId, int servings) {
         validateServings(servings);
         repository.setMealPlanRecipeServings(recipeId, servings);
     }
 
-    void beginPicker() {
+    public void beginPicker() {
         selectedRecipeIds.clear();
-        for (PersonalDataDbHelper.PlannedRecipe planned : repository.getMealPlanRecipes()) {
+        for (PlannedRecipe planned : repository.getMealPlanRecipes()) {
             selectedRecipeIds.add(planned.recipe.id);
         }
         pickerServings = MIN_SERVINGS;
@@ -175,11 +174,11 @@ public final class MealPlanViewModel extends AndroidViewModel {
         pickerCollectionId = -1L;
     }
 
-    void restorePickerDraft(List<String> recipeIds, int servings, String query) {
+    public void restorePickerDraft(List<String> recipeIds, int servings, String query) {
         restorePickerDraft(recipeIds, servings, query, PickerSource.ALL, -1L);
     }
 
-    void restorePickerDraft(List<String> recipeIds, int servings, String query,
+    public void restorePickerDraft(List<String> recipeIds, int servings, String query,
                             PickerSource source, long collectionId) {
         selectedRecipeIds.clear();
         if (recipeIds != null) selectedRecipeIds.addAll(recipeIds);
@@ -189,63 +188,63 @@ public final class MealPlanViewModel extends AndroidViewModel {
         pickerCollectionId = pickerSource == PickerSource.COLLECTION ? collectionId : -1L;
     }
 
-    List<String> getSelectedRecipeIds() { return new ArrayList<>(selectedRecipeIds); }
-    int getPickerServings() { return pickerServings; }
-    String getSearchQuery() { return searchQuery; }
-    PickerSource getPickerSource() { return pickerSource; }
-    long getPickerCollectionId() { return pickerCollectionId; }
-    void setPickerSource(PickerSource source, long collectionId) {
+    public List<String> getSelectedRecipeIds() { return new ArrayList<>(selectedRecipeIds); }
+    public int getPickerServings() { return pickerServings; }
+    public String getSearchQuery() { return searchQuery; }
+    public PickerSource getPickerSource() { return pickerSource; }
+    public long getPickerCollectionId() { return pickerCollectionId; }
+    public void setPickerSource(PickerSource source, long collectionId) {
         pickerSource = source == null ? PickerSource.ALL : source;
         pickerCollectionId = pickerSource == PickerSource.COLLECTION ? collectionId : -1L;
     }
-    void setPickerServings(int servings) {
+    public void setPickerServings(int servings) {
         validateServings(servings);
         pickerServings = servings;
     }
 
-    void setSearchQuery(String query) { searchQuery = query == null ? "" : query; }
+    public void setSearchQuery(String query) { searchQuery = query == null ? "" : query; }
 
-    void toggleRecipe(String recipeId) {
+    public void toggleRecipe(String recipeId) {
         if (selectedRecipeIds.contains(recipeId)) selectedRecipeIds.remove(recipeId);
         else selectedRecipeIds.add(recipeId);
     }
 
-    boolean isSelected(String recipeId) { return selectedRecipeIds.contains(recipeId); }
+    public boolean isSelected(String recipeId) { return selectedRecipeIds.contains(recipeId); }
 
-    boolean isRecipeInPlan(String recipeId) {
-        for (PersonalDataDbHelper.PlannedRecipe item : repository.getMealPlanRecipes()) {
+    public boolean isRecipeInPlan(String recipeId) {
+        for (PlannedRecipe item : repository.getMealPlanRecipes()) {
             if (item.recipe.id.equals(recipeId)) return true;
         }
         return false;
     }
 
-    List<MainActivity.RecipePreview> filterRecipes(List<MainActivity.RecipePreview> recipes) {
-        List<MainActivity.RecipePreview> matches = new ArrayList<>();
+    public List<Recipe> filterRecipes(List<Recipe> recipes) {
+        List<Recipe> matches = new ArrayList<>();
         String query = normalizeSearchText(searchQuery);
-        for (MainActivity.RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             if (query.isEmpty() || normalizeSearchText(recipe.title).contains(query)) matches.add(recipe);
         }
         return matches;
     }
 
-    boolean saveSelection(List<MainActivity.RecipePreview> availableRecipes) {
-        List<PersonalDataDbHelper.PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
+    public boolean saveSelection(List<Recipe> availableRecipes) {
+        List<PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
         if (selectedRecipeIds.isEmpty() && currentPlan.isEmpty()) return false;
 
-        Map<String, PersonalDataDbHelper.PlannedRecipe> currentById = new HashMap<>();
-        for (PersonalDataDbHelper.PlannedRecipe current : currentPlan) {
+        Map<String, PlannedRecipe> currentById = new HashMap<>();
+        for (PlannedRecipe current : currentPlan) {
             currentById.put(current.recipe.id, current);
         }
-        Map<String, MainActivity.RecipePreview> availableById = new HashMap<>();
-        for (MainActivity.RecipePreview recipe : availableRecipes) availableById.put(recipe.id, recipe);
+        Map<String, Recipe> availableById = new HashMap<>();
+        for (Recipe recipe : availableRecipes) availableById.put(recipe.id, recipe);
 
-        List<PersonalDataDbHelper.PlannedRecipe> replacement = new ArrayList<>();
+        List<PlannedRecipe> replacement = new ArrayList<>();
         for (String id : selectedRecipeIds) {
-            PersonalDataDbHelper.PlannedRecipe previous = currentById.get(id);
-            MainActivity.RecipePreview recipe = previous == null ? availableById.get(id) : previous.recipe;
+            PlannedRecipe previous = currentById.get(id);
+            Recipe recipe = previous == null ? availableById.get(id) : previous.recipe;
             if (recipe == null) continue;
             int servings = servingsForSelection(pickerServings, previous);
-            replacement.add(new PersonalDataDbHelper.PlannedRecipe(recipe, servings));
+            replacement.add(new PlannedRecipe(recipe, servings));
         }
         repository.replaceMealPlanRecipes(replacement);
         selectedRecipeIds.clear();
@@ -264,8 +263,8 @@ public final class MealPlanViewModel extends AndroidViewModel {
         }
     }
 
-    static int servingsForSelection(int pickerServings,
-                                    PersonalDataDbHelper.PlannedRecipe existingRecipe) {
+    public static int servingsForSelection(int pickerServings,
+                                    PlannedRecipe existingRecipe) {
         return existingRecipe == null ? pickerServings : existingRecipe.servings;
     }
 }

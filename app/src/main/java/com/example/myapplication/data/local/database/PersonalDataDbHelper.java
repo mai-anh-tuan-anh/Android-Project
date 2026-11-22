@@ -1,4 +1,6 @@
-package com.example.myapplication;
+package com.example.myapplication.data.local.database;
+
+import com.example.myapplication.domain.model.*;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -18,17 +20,17 @@ import java.util.Locale;
 import java.util.Set;
 
 /** Local storage for personal recipes, meal plans, and shopping lists (modules 5–7). */
-final class PersonalDataDbHelper extends SQLiteOpenHelper {
+public final class PersonalDataDbHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "bep_nha_personal.db";
     private static final int DB_VERSION = 10;
     private static final long HISTORY_RETENTION_MS = 3L * 24 * 60 * 60 * 1000;
     private final boolean debugBuild;
 
-    PersonalDataDbHelper(Context context) {
+    public PersonalDataDbHelper(Context context) {
         this(context, DB_NAME);
     }
 
-    PersonalDataDbHelper(Context context, String databaseName) {
+    public PersonalDataDbHelper(Context context, String databaseName) {
         super(context, databaseName, null, DB_VERSION);
         debugBuild = (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
@@ -153,7 +155,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.setForeignKeyConstraintsEnabled(true);
     }
 
-    void seedDesignPreviewIfNeeded(List<MainActivity.RecipePreview> recipes) {
+    public void seedDesignPreviewIfNeeded(List<Recipe> recipes) {
         if (!debugBuild) return;
         SQLiteDatabase db = getWritableDatabase();
         if (exists(db, "SELECT 1 FROM LocalMeta WHERE key='design_preview_seeded'")) return;
@@ -189,7 +191,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         try (Cursor cursor = db.rawQuery(sql, null)) { return cursor.moveToFirst(); }
     }
 
-    private ContentValues recipeValues(MainActivity.RecipePreview recipe) {
+    private ContentValues recipeValues(Recipe recipe) {
         ContentValues value = new ContentValues();
         value.put("recipeId", recipe.id);
         value.put("title", recipe.title);
@@ -199,13 +201,13 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return value;
     }
 
-    private void addFavorite(SQLiteDatabase db, MainActivity.RecipePreview recipe) {
+    private void addFavorite(SQLiteDatabase db, Recipe recipe) {
         ContentValues value = recipeValues(recipe);
         value.put("savedAt", System.currentTimeMillis());
         db.insertWithOnConflict("Favorite", null, value, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
-    private void addHistory(SQLiteDatabase db, MainActivity.RecipePreview recipe) {
+    private void addHistory(SQLiteDatabase db, Recipe recipe) {
         ContentValues value = recipeValues(recipe);
         value.put("viewedAt", System.currentTimeMillis());
         db.insertWithOnConflict("RecipeViewHistory", null, value, SQLiteDatabase.CONFLICT_REPLACE);
@@ -218,32 +220,32 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return db.insertWithOnConflict("Collection", null, value, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
-    private void addCollectionRecipe(SQLiteDatabase db, long collectionId, MainActivity.RecipePreview recipe) {
+    private void addCollectionRecipe(SQLiteDatabase db, long collectionId, Recipe recipe) {
         ContentValues value = recipeValues(recipe);
         value.put("collectionId", collectionId);
         db.insertWithOnConflict("CollectionRecipe", null, value, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
-    void addFavorite(MainActivity.RecipePreview recipe) {
+    public void addFavorite(Recipe recipe) {
         SQLiteDatabase db = getWritableDatabase();
         addFavorite(db, recipe);
     }
 
-    void removeFavorite(String recipeId) {
+    public void removeFavorite(String recipeId) {
         getWritableDatabase().delete("Favorite", "recipeId=?", new String[]{recipeId});
     }
 
-    boolean isFavorite(String recipeId) {
+    public boolean isFavorite(String recipeId) {
         try (Cursor cursor = getReadableDatabase().rawQuery("SELECT 1 FROM Favorite WHERE recipeId=?", new String[]{recipeId})) {
             return cursor.moveToFirst();
         }
     }
 
-    List<MainActivity.RecipePreview> getFavorites() {
+    public List<Recipe> getFavorites() {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM Favorite ORDER BY savedAt ASC, rowid ASC");
     }
 
-    List<MainActivity.RecipePreview> getHistory() {
+    public List<Recipe> getHistory() {
         deleteExpiredHistory(getWritableDatabase());
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM RecipeViewHistory " +
                 "ORDER BY viewedAt DESC, rowid DESC LIMIT 10");
@@ -255,7 +257,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
     }
 
     /** Keeps client-local recipe history for at most three days and ten recent IDs. */
-    void recordViewedRecipe(MainActivity.RecipePreview recipe) {
+    public void recordViewedRecipe(Recipe recipe) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -271,27 +273,27 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    List<CollectionRow> getCollections() {
-        List<CollectionRow> rows = new ArrayList<>();
+    public List<RecipeCollection> getCollections() {
+        List<RecipeCollection> rows = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT c.collectionId,c.name,COUNT(r.recipeId) FROM Collection c " +
                         "LEFT JOIN CollectionRecipe r ON r.collectionId=c.collectionId " +
                         "GROUP BY c.collectionId ORDER BY c.collectionId", null)) {
-            while (cursor.moveToNext()) rows.add(new CollectionRow(cursor.getLong(0), cursor.getString(1), cursor.getInt(2)));
+            while (cursor.moveToNext()) rows.add(new RecipeCollection(cursor.getLong(0), cursor.getString(1), cursor.getInt(2)));
         }
         return rows;
     }
 
-    boolean deleteCollection(long collectionId) {
+    public boolean deleteCollection(long collectionId) {
         return getWritableDatabase().delete("Collection", "collectionId=?",
                 new String[]{String.valueOf(collectionId)}) > 0;
     }
 
-    List<MainActivity.RecipePreview> getCollectionRecipes(long collectionId) {
+    public List<Recipe> getCollectionRecipes(long collectionId) {
         return readRecipes("SELECT recipeId,title,imageRes,duration,difficulty FROM CollectionRecipe WHERE collectionId=" + collectionId + " ORDER BY rowid");
     }
 
-    boolean isCollectionNameAvailable(String name, Long collectionId) {
+    public boolean isCollectionNameAvailable(String name, Long collectionId) {
         String clean = normalizeCollectionDisplayName(name);
         if (clean.isEmpty()) return false;
         try (Cursor cursor = getReadableDatabase().rawQuery(
@@ -302,20 +304,20 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    private List<MainActivity.RecipePreview> readRecipes(String sql) {
-        List<MainActivity.RecipePreview> rows = new ArrayList<>();
+    private List<Recipe> readRecipes(String sql) {
+        List<Recipe> rows = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(sql, null)) {
-            while (cursor.moveToNext()) rows.add(new MainActivity.RecipePreview(
+            while (cursor.moveToNext()) rows.add(new Recipe(
                     cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4)));
         }
         return rows;
     }
 
-    boolean saveCollection(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
+    public boolean saveCollection(String name, List<Recipe> selected, Long collectionId) {
         return saveCollectionAndGetId(name, selected, collectionId) != null;
     }
 
-    Long saveCollectionAndGetId(String name, List<MainActivity.RecipePreview> selected, Long collectionId) {
+    public Long saveCollectionAndGetId(String name, List<Recipe> selected, Long collectionId) {
         String clean = normalizeCollectionDisplayName(name);
         if (clean.isEmpty()) return null;
         SQLiteDatabase db = getWritableDatabase();
@@ -340,7 +342,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
                 db.update("Collection", value, "collectionId=?", new String[]{String.valueOf(collectionId)});
                 db.delete("CollectionRecipe", "collectionId=?", new String[]{String.valueOf(collectionId)});
             }
-            for (MainActivity.RecipePreview recipe : selected) addCollectionRecipe(db, collectionId, recipe);
+            for (Recipe recipe : selected) addCollectionRecipe(db, collectionId, recipe);
             db.setTransactionSuccessful();
             return collectionId;
         } finally {
@@ -348,26 +350,26 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    String getNote(String recipeId) {
+    public String getNote(String recipeId) {
         try (Cursor cursor = getReadableDatabase().rawQuery("SELECT note FROM RecipeNote WHERE recipeId=?", new String[]{recipeId})) {
             return cursor.moveToFirst() ? cursor.getString(0) : "";
         }
     }
 
-    void saveNote(MainActivity.RecipePreview recipe, String note) {
+    public void saveNote(Recipe recipe, String note) {
         ContentValues value = noteValues(recipe);
         value.put("note", note);
         value.put("updatedAt", System.currentTimeMillis());
         getWritableDatabase().insertWithOnConflict("RecipeNote", null, value, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
-    List<PlannedRecipe> getMealPlanRecipes() {
+    public List<PlannedRecipe> getMealPlanRecipes() {
         List<PlannedRecipe> rows = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT recipeId,title,imageRes,duration,difficulty,servings FROM MealPlanRecipe " +
                         "WHERE planId=1 ORDER BY position, rowid", null)) {
             while (cursor.moveToNext()) {
-                MainActivity.RecipePreview recipe = new MainActivity.RecipePreview(
+                Recipe recipe = new Recipe(
                         cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4));
                 rows.add(new PlannedRecipe(recipe, cursor.getInt(5)));
             }
@@ -375,7 +377,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return rows;
     }
 
-    void addMealPlanRecipe(MainActivity.RecipePreview recipe, int servings) {
+    public void addMealPlanRecipe(Recipe recipe, int servings) {
         validateServings(servings);
         SQLiteDatabase db = getWritableDatabase();
         ContentValues value = recipeValues(recipe);
@@ -385,19 +387,19 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.insertWithOnConflict("MealPlanRecipe", null, value, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
-    void setMealPlanRecipeServings(String recipeId, int servings) {
+    public void setMealPlanRecipeServings(String recipeId, int servings) {
         validateServings(servings);
         ContentValues value = new ContentValues();
         value.put("servings", servings);
         getWritableDatabase().update("MealPlanRecipe", value, "planId=1 AND recipeId=?", new String[]{recipeId});
     }
 
-    void removeMealPlanRecipe(String recipeId) {
+    public void removeMealPlanRecipe(String recipeId) {
         getWritableDatabase().delete("MealPlanRecipe", "planId=1 AND recipeId=?", new String[]{recipeId});
     }
 
     /** Replaces the current plan atomically so a failed save cannot leave a partial selection. */
-    void replaceMealPlanRecipes(List<PlannedRecipe> recipes) {
+    public void replaceMealPlanRecipes(List<PlannedRecipe> recipes) {
         if (recipes == null) throw new IllegalArgumentException("recipes cannot be null");
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
@@ -426,19 +428,19 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    List<ShoppingItem> getShoppingItems() {
-        List<ShoppingItem> items = new ArrayList<>();
+    public List<ShoppingListItem> getShoppingItems() {
+        List<ShoppingListItem> items = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT itemId,name,amount,unit,status,category FROM ShoppingListItem WHERE listId=1 ORDER BY position,rowid", null)) {
             while (cursor.moveToNext()) {
-                items.add(new ShoppingItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                items.add(new ShoppingListItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
                         cursor.getString(3), cursor.getString(4), cursor.getString(5)));
             }
         }
         return items;
     }
 
-    void saveShoppingItem(String itemId, String name, String amount, String unit, String category, String status) {
+    public void saveShoppingItem(String itemId, String name, String amount, String unit, String category, String status) {
         if (name == null || name.trim().isEmpty() || amount == null || amount.trim().isEmpty()
                 || unit == null || unit.trim().isEmpty() || category == null || category.trim().isEmpty()) {
             throw new IllegalArgumentException("shopping item fields cannot be empty");
@@ -479,7 +481,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         db.update("ShoppingList", list, "listId=1", null);
     }
 
-    void setShoppingItemStatus(String itemId, String status) {
+    public void setShoppingItemStatus(String itemId, String status) {
         if (!"NEED_TO_BUY".equals(status) && !"AVAILABLE".equals(status)) {
             throw new IllegalArgumentException("invalid shopping item status");
         }
@@ -491,40 +493,40 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         updateShoppingListTimestamp(db);
     }
 
-    void deleteShoppingItem(String itemId) {
+    public void deleteShoppingItem(String itemId) {
         SQLiteDatabase db = getWritableDatabase();
         db.delete("ShoppingListItem", "itemId=? AND listId=1", new String[]{itemId});
         updateShoppingListTimestamp(db);
     }
 
-    void clearShoppingItems() {
+    public void clearShoppingItems() {
         SQLiteDatabase db = getWritableDatabase();
         db.delete("ShoppingListItem", "listId=1", null);
         updateShoppingListTimestamp(db);
     }
 
-    String getShoppingPlanSnapshot() {
+    public String getShoppingPlanSnapshot() {
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT planSnapshot FROM ShoppingList WHERE listId=1", null)) {
             return cursor.moveToFirst() ? cursor.getString(0) : "";
         }
     }
 
-    void saveShoppingPlanSnapshot(String snapshot) {
+    public void saveShoppingPlanSnapshot(String snapshot) {
         ContentValues values = new ContentValues();
         values.put("planSnapshot", snapshot == null ? "" : snapshot);
         values.put("updatedAt", System.currentTimeMillis());
         getWritableDatabase().update("ShoppingList", values, "listId=1", null);
     }
 
-    List<PantryItem> getPantryItems() {
-        List<PantryItem> items = new ArrayList<>();
+    public List<PantryIngredient> getPantryItems() {
+        List<PantryIngredient> items = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,purchaseDate,updatedAt " +
                         "FROM PantryItem ORDER BY CASE WHEN expiryDate IS NULL THEN 1 ELSE 0 END, " +
                         "expiryDate, name COLLATE NOCASE, rowid", null)) {
             while (cursor.moveToNext()) {
-                items.add(new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                items.add(new PantryIngredient(cursor.getString(0), cursor.getString(1), cursor.getString(2),
                         cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
                         cursor.getString(6), cursor.getString(7), cursor.getString(8), cursor.getLong(9)));
             }
@@ -532,19 +534,19 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return items;
     }
 
-    PantryItem getPantryItem(String itemId) {
+    public PantryIngredient getPantryItem(String itemId) {
         if (itemId == null) return null;
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT itemId,ingredientId,name,amountDecimal,unitId,category,expiryDate,storageLocation,purchaseDate,updatedAt " +
                         "FROM PantryItem WHERE itemId=?", new String[]{itemId})) {
             if (!cursor.moveToFirst()) return null;
-            return new PantryItem(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+            return new PantryIngredient(cursor.getString(0), cursor.getString(1), cursor.getString(2),
                     cursor.isNull(3) ? null : cursor.getString(3), cursor.getString(4), cursor.getString(5),
                     cursor.getString(6), cursor.getString(7), cursor.getString(8), cursor.getLong(9));
         }
     }
 
-    boolean savePantryItem(String itemId, String name, String amount, String unitId,
+    public boolean savePantryItem(String itemId, String name, String amount, String unitId,
                            String category, String expiryDate, String storageLocation, String purchaseDate) {
         String cleanName = cleanDisplayValue(name);
         if (cleanName.isEmpty() || category == null || category.trim().isEmpty()) return false;
@@ -584,16 +586,16 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return true;
     }
 
-    boolean deletePantryItem(String itemId) {
+    public boolean deletePantryItem(String itemId) {
         return getWritableDatabase().delete("PantryItem", "itemId=?", new String[]{itemId}) > 0;
     }
 
-    int deleteAllPantryItems() {
+    public int deleteAllPantryItems() {
         return getWritableDatabase().delete("PantryItem", null, null);
     }
 
-    List<CookingLog> getCookingLogs(String recipeId) {
-        List<CookingLog> logs = new ArrayList<>();
+    public List<CookingLogEntry> getCookingLogs(String recipeId) {
+        List<CookingLogEntry> logs = new ArrayList<>();
         if (recipeId == null) return logs;
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
@@ -604,8 +606,8 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return logs;
     }
 
-    List<CookingLog> getAllCookingLogs() {
-        List<CookingLog> logs = new ArrayList<>();
+    public List<CookingLogEntry> getAllCookingLogs() {
+        List<CookingLogEntry> logs = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
                         "adjustmentNote,photoLocalPath,createdAt,updatedAt FROM CookingLog " +
@@ -615,7 +617,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return logs;
     }
 
-    CookingLog getCookingLog(String logId) {
+    public CookingLogEntry getCookingLog(String logId) {
         if (logId == null) return null;
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT logId,recipeId,title,imageRes,cookedAt,servings,actualDurationMinutes,rating," +
@@ -625,14 +627,14 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    private CookingLog readCookingLog(Cursor cursor) {
-        return new CookingLog(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
+    private CookingLogEntry readCookingLog(Cursor cursor) {
+        return new CookingLogEntry(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
                 cursor.getLong(4), cursor.getInt(5), cursor.isNull(6) ? null : cursor.getInt(6),
                 cursor.isNull(7) ? null : cursor.getInt(7), cursor.getString(8), cursor.getString(9),
                 cursor.getLong(10), cursor.getLong(11));
     }
 
-    boolean saveCookingLog(String logId, MainActivity.RecipePreview recipe, long cookedAt, int servings,
+    public boolean saveCookingLog(String logId, Recipe recipe, long cookedAt, int servings,
                            Integer actualDurationMinutes, Integer rating, String adjustmentNote, String photoLocalPath) {
         if (recipe == null || recipe.id == null || recipe.id.trim().isEmpty()) return false;
         if (servings < 1 || servings > 999 || (actualDurationMinutes != null && actualDurationMinutes < 1)
@@ -653,7 +655,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         values.put("photoLocalPath", photoLocalPath == null ? "" : photoLocalPath);
         if (logId == null) values.put("createdAt", now);
         else {
-            CookingLog existing = getCookingLog(logId);
+            CookingLogEntry existing = getCookingLog(logId);
             if (existing == null) return false;
             values.put("createdAt", existing.createdAt);
         }
@@ -662,7 +664,7 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return true;
     }
 
-    boolean deleteCookingLog(String logId) {
+    public boolean deleteCookingLog(String logId) {
         return getWritableDatabase().delete("CookingLog", "logId=?", new String[]{logId}) > 0;
     }
 
@@ -684,90 +686,15 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         }
     }
 
-    static final class PlannedRecipe {
-        final MainActivity.RecipePreview recipe;
-        final int servings;
-        PlannedRecipe(MainActivity.RecipePreview recipe, int servings) {
-            this.recipe = recipe;
-            this.servings = servings;
-        }
-    }
 
-    static final class ShoppingItem {
-        final String id;
-        final String name;
-        final String amount;
-        final String unit;
-        final String status;
-        final String category;
-        ShoppingItem(String id, String name, String amount, String unit, String status, String category) {
-            this.id = id;
-            this.name = name;
-            this.amount = amount;
-            this.unit = unit;
-            this.status = status;
-            this.category = category;
-        }
-    }
 
-    static final class PantryItem {
-        final String id;
-        final String ingredientId;
-        final String name;
-        final String amountDecimal;
-        final String unitId;
-        final String category;
-        final String expiryDate;
-        final String storageLocation;
-        final String purchaseDate;
-        final long updatedAt;
-        PantryItem(String id, String ingredientId, String name, String amountDecimal, String unitId,
-                   String category, String expiryDate, String storageLocation, String purchaseDate, long updatedAt) {
-            this.id = id;
-            this.ingredientId = ingredientId;
-            this.name = name;
-            this.amountDecimal = amountDecimal;
-            this.unitId = unitId;
-            this.category = category;
-            this.expiryDate = expiryDate;
-            this.storageLocation = storageLocation;
-            this.purchaseDate = purchaseDate;
-            this.updatedAt = updatedAt;
-        }
-    }
 
-    static final class CookingLog {
-        final String id;
-        final String recipeId;
-        final String title;
-        final String imageRes;
-        final long cookedAt;
-        final int servings;
-        final Integer actualDurationMinutes;
-        final Integer rating;
-        final String adjustmentNote;
-        final String photoLocalPath;
-        final long createdAt;
-        final long updatedAt;
-        CookingLog(String id, String recipeId, String title, String imageRes, long cookedAt, int servings,
-                   Integer actualDurationMinutes, Integer rating, String adjustmentNote, String photoLocalPath,
-                   long createdAt, long updatedAt) {
-            this.id = id;
-            this.recipeId = recipeId;
-            this.title = title;
-            this.imageRes = imageRes;
-            this.cookedAt = cookedAt;
-            this.servings = servings;
-            this.actualDurationMinutes = actualDurationMinutes;
-            this.rating = rating;
-            this.adjustmentNote = adjustmentNote;
-            this.photoLocalPath = photoLocalPath;
-            this.createdAt = createdAt;
-            this.updatedAt = updatedAt;
-        }
-    }
 
-    private ContentValues noteValues(MainActivity.RecipePreview recipe) {
+
+
+
+
+    private ContentValues noteValues(Recipe recipe) {
         ContentValues value = new ContentValues();
         value.put("recipeId", recipe.id);
         value.put("title", recipe.title);
@@ -799,14 +726,5 @@ final class PersonalDataDbHelper extends SQLiteOpenHelper {
         return normalized.toString();
     }
 
-    static final class CollectionRow {
-        final long id;
-        final String name;
-        final int recipeCount;
-        CollectionRow(long id, String name, int recipeCount) {
-            this.id = id;
-            this.name = name;
-            this.recipeCount = recipeCount;
-        }
-    }
+
 }

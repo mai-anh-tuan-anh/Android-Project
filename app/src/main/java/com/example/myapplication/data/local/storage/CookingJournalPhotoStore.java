@@ -1,4 +1,4 @@
-package com.example.myapplication;
+package com.example.myapplication.data.local.storage;
 
 import android.content.Context;
 import android.net.Uri;
@@ -10,15 +10,15 @@ import java.io.InputStream;
 import java.util.UUID;
 
 /** Private, device-local image storage for cooking journal entries. */
-final class CookingJournalPhotoStore {
+public final class CookingJournalPhotoStore {
     private static final long MAX_PHOTO_BYTES = 10L * 1024 * 1024;
     private final Context context;
 
-    CookingJournalPhotoStore(Context context) {
+    public CookingJournalPhotoStore(Context context) {
         this.context = context.getApplicationContext();
     }
 
-    CopyResult copy(Uri source) {
+    public CopyResult copy(Uri source) {
         File directory = new File(context.getFilesDir(), "cooking-log-images");
         if (!directory.exists() && !directory.mkdirs()) return new CopyResult(null, false);
         String filename = UUID.randomUUID().toString() + ".img";
@@ -53,7 +53,7 @@ final class CookingJournalPhotoStore {
         return new CopyResult(filename, false);
     }
 
-    File resolve(String filename) {
+    public File resolve(String filename) {
         if (filename == null || filename.isEmpty() || filename.contains("/") || filename.contains("\\")) return null;
         File directory = new File(context.getFilesDir(), "cooking-log-images");
         File file = new File(directory, filename);
@@ -64,14 +64,14 @@ final class CookingJournalPhotoStore {
         }
     }
 
-    void delete(String filename) {
+    public void delete(String filename) {
         File file = resolve(filename);
         if (file != null && file.exists()) file.delete();
     }
 
-    static final class CopyResult {
-        final String filename;
-        final boolean tooLarge;
+    public static final class CopyResult {
+        public final String filename;
+        public final boolean tooLarge;
         CopyResult(String filename, boolean tooLarge) {
             this.filename = filename;
             this.tooLarge = tooLarge;

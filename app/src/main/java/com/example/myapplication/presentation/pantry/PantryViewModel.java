@@ -1,10 +1,10 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.pantry;
 
-import android.app.Application;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
 
+import androidx.lifecycle.ViewModel;
+import com.example.myapplication.domain.model.PantryIngredient;
+import com.example.myapplication.domain.repository.PersonalDataRepository;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -12,29 +12,28 @@ import java.util.List;
 import java.util.Locale;
 
 /** Local pantry state and actions. */
-public final class PantryViewModel extends AndroidViewModel {
+public final class PantryViewModel extends ViewModel {
     private static final int EXPIRING_WITHIN_DAYS = 3;
     private final PersonalDataRepository repository;
 
-    public PantryViewModel(@NonNull Application application) {
-        super(application);
-        repository = PersonalDataRepository.getInstance(application);
+    public PantryViewModel(PersonalDataRepository repository) {
+        this.repository = repository;
     }
 
-    List<PersonalDataDbHelper.PantryItem> getItems() { return repository.getPantryItems(); }
-    PersonalDataDbHelper.PantryItem getItem(String id) { return repository.getPantryItem(id); }
-    boolean saveItem(String id, String name, String amount, String unit, String category,
+    public List<PantryIngredient> getItems() { return repository.getPantryItems(); }
+    public PantryIngredient getItem(String id) { return repository.getPantryItem(id); }
+    public boolean saveItem(String id, String name, String amount, String unit, String category,
                      String expiryDate, String storageLocation, String purchaseDate) {
         return repository.savePantryItem(id, name, amount, unit, category, expiryDate, storageLocation, purchaseDate);
     }
-    boolean deleteItem(String id) { return repository.deletePantryItem(id); }
-    int deleteAllItems() { return repository.deleteAllPantryItems(); }
+    public boolean deleteItem(String id) { return repository.deletePantryItem(id); }
+    public int deleteAllItems() { return repository.deleteAllPantryItems(); }
 
-    String expiryState(String isoDate) {
+    public String expiryState(String isoDate) {
         return expiryStateForDate(isoDate, System.currentTimeMillis());
     }
 
-    static String expiryStateForDate(String isoDate, long nowMillis) {
+    public static String expiryStateForDate(String isoDate, long nowMillis) {
         if (isoDate == null || isoDate.isEmpty()) return "";
         String today = isoDate(nowMillis);
         if (isoDate.compareTo(today) < 0) return "EXPIRED";
@@ -44,7 +43,7 @@ public final class PantryViewModel extends AndroidViewModel {
         return isoDate.compareTo(isoDate(threshold.getTimeInMillis())) <= 0 ? "EXPIRING" : "";
     }
 
-    String availabilityLabel(String expiryDate) {
+    public String availabilityLabel(String expiryDate) {
         String state = expiryState(expiryDate);
         if ("EXPIRED".equals(state)) return "Hết hạn";
         if ("EXPIRING".equals(state)) return "Sắp hết hạn";

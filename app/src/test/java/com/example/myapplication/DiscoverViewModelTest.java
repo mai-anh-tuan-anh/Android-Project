@@ -1,5 +1,8 @@
 package com.example.myapplication;
 
+
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.presentation.discover.DiscoverViewModel;
 import org.junit.Test;
 
 import java.util.Arrays;

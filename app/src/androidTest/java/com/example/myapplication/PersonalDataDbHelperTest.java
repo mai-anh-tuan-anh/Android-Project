@@ -1,5 +1,13 @@
 package com.example.myapplication;
 
+
+
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.data.local.database.PersonalDataDbHelper;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+import com.example.myapplication.domain.catalog.KitchenUnitCatalog;
+import com.example.myapplication.domain.model.Recipe;
 import android.content.Context;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -25,8 +33,8 @@ import static org.junit.Assert.assertTrue;
 @RunWith(AndroidJUnit4.class)
 public class PersonalDataDbHelperTest {
     private static final String TEST_DATABASE = "module5-crud-test.db";
-    private final MainActivity.RecipePreview recipeA = recipe("recipe-a", "Món A");
-    private final MainActivity.RecipePreview recipeB = recipe("recipe-b", "Món B");
+    private final Recipe recipeA = recipe("recipe-a", "Món A");
+    private final Recipe recipeB = recipe("recipe-b", "Món B");
 
     private Context context;
     private PersonalDataDbHelper data;
@@ -63,7 +71,7 @@ public class PersonalDataDbHelperTest {
         Long createdId = data.saveCollectionAndGetId("  Bữa\t\u00a0cơm   nhà  ", Arrays.asList(recipeA, recipeB), null);
         assertTrue(createdId != null);
 
-        PersonalDataDbHelper.CollectionRow collection = data.getCollections().get(0);
+        RecipeCollection collection = data.getCollections().get(0);
         assertEquals(createdId.longValue(), collection.id);
         assertEquals("Bữa cơm nhà", collection.name);
         assertEquals(2, collection.recipeCount);
@@ -75,7 +83,7 @@ public class PersonalDataDbHelperTest {
         assertFalse(data.isCollectionNameAvailable("ĐỒ ĂN", null));
 
         assertTrue(data.saveCollection("Bữa tối", Collections.singletonList(recipeB), collection.id));
-        PersonalDataDbHelper.CollectionRow edited = data.getCollections().get(0);
+        RecipeCollection edited = data.getCollections().get(0);
         assertEquals(collection.id, edited.id);
         assertEquals("Bữa tối", edited.name);
         assertEquals(1, edited.recipeCount);
@@ -115,7 +123,7 @@ public class PersonalDataDbHelperTest {
         }
         data.recordViewedRecipe(recipe("recipe-0", "Món 0"));
 
-        List<MainActivity.RecipePreview> history = data.getHistory();
+        List<Recipe> history = data.getHistory();
         assertEquals(10, history.size());
         assertEquals("recipe-0", history.get(0).id);
         assertFalse(containsRecipe(history, "recipe-1"));
@@ -133,7 +141,7 @@ public class PersonalDataDbHelperTest {
 
         data.recordViewedRecipe(recipeA);
 
-        List<MainActivity.RecipePreview> history = data.getHistory();
+        List<Recipe> history = data.getHistory();
         assertEquals(2, history.size());
         assertEquals(recipeA.id, history.get(0).id);
     }
@@ -152,7 +160,7 @@ public class PersonalDataDbHelperTest {
         data.addMealPlanRecipe(recipeA, 1);
         data.addMealPlanRecipe(recipeA, 5);
 
-        List<PersonalDataDbHelper.PlannedRecipe> plan = data.getMealPlanRecipes();
+        List<PlannedRecipe> plan = data.getMealPlanRecipes();
         assertEquals(1, plan.size());
         assertEquals(1, plan.get(0).servings);
 
@@ -168,16 +176,16 @@ public class PersonalDataDbHelperTest {
         data.addMealPlanRecipe(recipeA, 2);
 
         assertIllegalArgument(() -> data.replaceMealPlanRecipes(Arrays.asList(
-                new PersonalDataDbHelper.PlannedRecipe(recipeB, 3),
-                new PersonalDataDbHelper.PlannedRecipe(recipeA, 1000))));
-        List<PersonalDataDbHelper.PlannedRecipe> afterRollback = data.getMealPlanRecipes();
+                new PlannedRecipe(recipeB, 3),
+                new PlannedRecipe(recipeA, 1000))));
+        List<PlannedRecipe> afterRollback = data.getMealPlanRecipes();
         assertEquals(1, afterRollback.size());
         assertEquals(recipeA.id, afterRollback.get(0).recipe.id);
         assertEquals(2, afterRollback.get(0).servings);
 
         data.replaceMealPlanRecipes(Collections.singletonList(
-                new PersonalDataDbHelper.PlannedRecipe(recipeB, 4)));
-        List<PersonalDataDbHelper.PlannedRecipe> replaced = data.getMealPlanRecipes();
+                new PlannedRecipe(recipeB, 4)));
+        List<PlannedRecipe> replaced = data.getMealPlanRecipes();
         assertEquals(1, replaced.size());
         assertEquals(recipeB.id, replaced.get(0).recipe.id);
         assertEquals(4, replaced.get(0).servings);
@@ -215,7 +223,7 @@ public class PersonalDataDbHelperTest {
     public void shoppingItemMovesBetweenNeedToBuyAndAvailableStates() {
         data.saveShoppingItem(null, "Cà chua", "2", "quả", "Rau củ", "NEED_TO_BUY");
 
-        PersonalDataDbHelper.ShoppingItem item = data.getShoppingItems().get(0);
+        ShoppingListItem item = data.getShoppingItems().get(0);
         assertEquals("NEED_TO_BUY", item.status);
         data.setShoppingItemStatus(item.id, "AVAILABLE");
         assertEquals("AVAILABLE", data.getShoppingItems().get(0).status);
@@ -230,7 +238,7 @@ public class PersonalDataDbHelperTest {
         expiringSoon.setTimeInMillis(now);
         expiringSoon.add(Calendar.DAY_OF_YEAR, 2);
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
-        List<PersonalDataDbHelper.PantryItem> pantry = Arrays.asList(
+        List<PantryIngredient> pantry = Arrays.asList(
                 pantryItem("cam-a", null, "  CAM ", "1", "QUA", format.format(expiringSoon.getTime())),
                 pantryItem("cam-b", null, "cam", "1", "QUA", null),
                 pantryItem("cam-expired", null, "cam", "20", "QUA", "2000-01-01"),
@@ -255,7 +263,7 @@ public class PersonalDataDbHelperTest {
     public void pantryKeepsUnknownQuantityAndPurchaseDateWithoutManualStatus() {
         assertTrue(data.savePantryItem(null, "Muối", "", "", "Gia vị", null, "Tủ bếp",
                 "2026-11-20"));
-        PersonalDataDbHelper.PantryItem item = data.getPantryItems().get(0);
+        PantryIngredient item = data.getPantryItems().get(0);
         assertEquals(null, item.amountDecimal);
         assertEquals("2026-11-20", item.purchaseDate);
 
@@ -285,7 +293,7 @@ public class PersonalDataDbHelperTest {
         legacy.close();
 
         data = new PersonalDataDbHelper(context, TEST_DATABASE);
-        PersonalDataDbHelper.PantryItem migrated = data.getPantryItem("pantry-a");
+        PantryIngredient migrated = data.getPantryItem("pantry-a");
         assertTrue(migrated != null);
         assertEquals("Gạo", migrated.name);
         assertEquals("2", migrated.amountDecimal);
@@ -315,7 +323,7 @@ public class PersonalDataDbHelperTest {
         legacy.close();
 
         data = new PersonalDataDbHelper(context, TEST_DATABASE);
-        PersonalDataDbHelper.PantryItem migrated = data.getPantryItem("pantry-old");
+        PantryIngredient migrated = data.getPantryItem("pantry-old");
         assertTrue(migrated != null);
         assertEquals("Đậu xanh", migrated.name);
         assertEquals("500", migrated.amountDecimal);
@@ -364,20 +372,20 @@ public class PersonalDataDbHelperTest {
         }
     }
 
-    private static PersonalDataDbHelper.PantryItem pantryItem(String id, String ingredientId, String name,
+    private static PantryIngredient pantryItem(String id, String ingredientId, String name,
                                                                String amount, String unit, String expiryDate) {
-        return new PersonalDataDbHelper.PantryItem(id, ingredientId, name, amount, unit, "Khác",
+        return new PantryIngredient(id, ingredientId, name, amount, unit, "Khác",
                 expiryDate, "", null, 1L);
     }
 
-    private static boolean containsRecipe(List<MainActivity.RecipePreview> recipes, String recipeId) {
-        for (MainActivity.RecipePreview recipe : recipes) {
+    private static boolean containsRecipe(List<Recipe> recipes, String recipeId) {
+        for (Recipe recipe : recipes) {
             if (recipe.id.equals(recipeId)) return true;
         }
         return false;
     }
 
-    private static MainActivity.RecipePreview recipe(String id, String title) {
-        return new MainActivity.RecipePreview(id, title, "recipe_mi_y", "20 phút", "Dễ");
+    private static Recipe recipe(String id, String title) {
+        return new Recipe(id, title, "recipe_mi_y", "20 phút", "Dễ");
     }
 }

@@ -1,35 +1,31 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.discover;
 
-import android.app.Application;
-import android.content.Context;
-import android.content.SharedPreferences;
+import androidx.lifecycle.ViewModel;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
+import com.example.myapplication.domain.catalog.IngredientSuggestionMatcher;
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.domain.repository.SearchHistoryRepository;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.Iterator;
+import java.util.Set;
 
 /**
  * Presentation state and business filtering actions for Module 2 (Search and Filter).
  */
-public final class DiscoverSearchViewModel extends AndroidViewModel {
-    private static final String PREFS_NAME = "discover_search_prefs";
-    private static final String KEY_RECENT_SEARCHES = "recent_searches";
+public final class DiscoverSearchViewModel extends ViewModel {
     private static final int MAX_RECENT_SEARCHES = 8;
 
     private static final List<String> DEFAULT_SUGGESTIONS = Arrays.asList("cà chua", "món nhanh", "cá");
     private static final long RECENT_SEARCH_TTL_MS = 60L * 60L * 1000L;
 
-    private final SharedPreferences prefs;
+    private final SearchHistoryRepository searchHistoryRepository;
     private final List<String> recentSearches = new ArrayList<>();
     private final java.util.Map<String, Long> recentSearchTimes = new java.util.LinkedHashMap<>();
 
@@ -50,16 +46,15 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
     private String draftExcludeIngredient = "";
     private final Set<String> selectedCookingIngredients = new LinkedHashSet<>();
 
-    public DiscoverSearchViewModel(@NonNull Application application) {
-        super(application);
-        prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository) {
+        this.searchHistoryRepository = searchHistoryRepository;
         loadRecentSearches();
     }
 
     private void loadRecentSearches() {
         recentSearches.clear();
         recentSearchTimes.clear();
-        String raw = prefs.getString(KEY_RECENT_SEARCHES, null);
+        String raw = searchHistoryRepository.readSerializedSearchHistory();
         long now = System.currentTimeMillis();
         boolean changed = false;
         if (raw != null && !raw.trim().isEmpty()) {
@@ -88,7 +83,7 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
             sb.append(recentSearchTimes.getOrDefault(query, System.currentTimeMillis()))
                     .append('\t').append(query);
         }
-        prefs.edit().putString(KEY_RECENT_SEARCHES, sb.toString()).apply();
+        searchHistoryRepository.writeSerializedSearchHistory(sb.toString());
     }
 
     private void expireRecentSearches() {
@@ -164,37 +159,37 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
 
     public void clearCookingIngredients() { selectedCookingIngredients.clear(); }
 
-    public List<MainActivity.RecipePreview> suggestRecipes(List<MainActivity.RecipePreview> recipes) {
+    public List<Recipe> suggestRecipes(List<Recipe> recipes) {
         return IngredientSuggestionMatcher.suggest(recipes, selectedCookingIngredients,
                 recipe -> recipe.ingredients, recipe -> recipe.ingredientListComplete,
                 recipe -> recipe.difficulty, recipe -> recipe.durationMinutes,
                 recipe -> recipe.title, recipe -> recipe.id);
     }
 
-    public int availableIngredientCount(MainActivity.RecipePreview recipe) {
+    public int availableIngredientCount(Recipe recipe) {
         return IngredientSuggestionMatcher.countAvailable(recipe.ingredients,
                 IngredientSuggestionMatcher.normalizeSet(selectedCookingIngredients));
     }
 
-    public List<String> missingIngredients(MainActivity.RecipePreview recipe) {
+    public List<String> missingIngredients(Recipe recipe) {
         return IngredientSuggestionMatcher.missing(recipe.ingredients, selectedCookingIngredients);
     }
 
-    public int totalIngredientCount(MainActivity.RecipePreview recipe) {
+    public int totalIngredientCount(Recipe recipe) {
         return IngredientSuggestionMatcher.total(recipe.ingredients);
     }
 
-    public boolean hasCompleteRecipeIngredients(List<MainActivity.RecipePreview> recipes) {
+    public boolean hasCompleteRecipeIngredients(List<Recipe> recipes) {
         if (recipes == null) return false;
-        for (MainActivity.RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             if (recipe.ingredientListComplete) return true;
         }
         return false;
     }
 
-    public boolean hasIncompleteRecipeIngredients(List<MainActivity.RecipePreview> recipes) {
+    public boolean hasIncompleteRecipeIngredients(List<Recipe> recipes) {
         if (recipes == null) return false;
-        for (MainActivity.RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             if (!recipe.ingredientListComplete) return true;
         }
         return false;
@@ -315,14 +310,14 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
     public String getExcludeIngredient() { return excludeIngredient; }
 
     // --- Search & Filtering Logic ---
-    public List<MainActivity.RecipePreview> filterRecipes(List<MainActivity.RecipePreview> allRecipes) {
+    public List<Recipe> filterRecipes(List<Recipe> allRecipes) {
         if (allRecipes == null) return Collections.emptyList();
-        List<MainActivity.RecipePreview> results = new ArrayList<>();
+        List<Recipe> results = new ArrayList<>();
         String normQuery = normalize(searchQuery);
         String normInclude = normalize(includeIngredient);
         String normExclude = normalize(excludeIngredient);
 
-        for (MainActivity.RecipePreview recipe : allRecipes) {
+        for (Recipe recipe : allRecipes) {
             // 1. Query match (title, category, or ingredients)
             if (!normQuery.isEmpty()) {
                 boolean matchTitle = normalize(recipe.title).contains(normQuery);

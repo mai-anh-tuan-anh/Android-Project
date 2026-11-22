@@ -1,5 +1,13 @@
 package com.example.myapplication;
 
+import com.example.myapplication.presentation.main.MainActivity;
+import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+
+
+
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.domain.model.Recipe;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
@@ -76,8 +84,8 @@ public class MainActivityStateTest {
                     openPicker.invoke(activity);
                     assertEquals(1, viewModel.getPickerServings());
 
-                    PersonalDataDbHelper.PlannedRecipe existing = new PersonalDataDbHelper.PlannedRecipe(
-                            MainActivity.DESIGN_RECIPES.get(2), 3);
+                    PlannedRecipe existing = new PlannedRecipe(
+                            PreviewRecipeCatalog.designRecipes().get(2), 3);
                     assertEquals(2, MealPlanViewModel.servingsForSelection(2, null));
                     assertEquals(3, MealPlanViewModel.servingsForSelection(2, existing));
                     assertEquals(5, MealPlanViewModel.servingsForSelection(5, null));
