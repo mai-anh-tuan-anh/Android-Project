@@ -69,6 +69,7 @@ Người 2 phải áp dụng cùng cấu trúc và quy tắc trên khi triển k
 5. Cấp dependency qua `AppContainer`/factory hiện có; không tạo singleton song song hoặc gọi module khác qua Activity nội bộ.
 6. Giữ Java/XML, giao diện đã duyệt, responsive behavior và test hiện có. Thêm test cho nghiệp vụ mới và migration nếu schema thay đổi.
 7. Mỗi PR ghi rõ module, package được sửa, schema/API contract, test chạy và giới hạn tích hợp còn lại.
+8. Nếu feature hiển thị thanh tab cấp cao của app, dùng `core/ui/BottomNavigationBar` và chuyển lựa chọn tab về Host callback; không tự dựng bản sao thanh điều hướng trong Fragment.
 
 ## Hợp đồng triển khai cho module khác (bắt buộc với Người 2)
 
