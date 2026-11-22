@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import com.example.myapplication.presentation.main.MainActivity;
+import com.example.myapplication.presentation.discover.DiscoverFragment;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
 import com.example.myapplication.presentation.mealplan.MealPlanFragment;
 import com.example.myapplication.domain.model.Recipe;
@@ -16,6 +17,7 @@ import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.CookingLogEntry;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingFragment;
 import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
 import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
@@ -205,7 +207,11 @@ public class MainActivityStateTest {
                     Method openShoppingForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
                     openShoppingForm.setAccessible(true);
                     openShoppingForm.invoke(activity, new Object[]{null});
-                    View shoppingCategory = (View) getField(activity, "shoppingCategoryInput");
+                    ShoppingFragment shopping = (ShoppingFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(ShoppingFragment.class.getName());
+                    if (shopping == null || shopping.getView() == null)
+                        throw new AssertionError("Shopping form Fragment is not attached");
+                    View shoppingCategory = (View) getField(shopping, "categoryInput");
                     assertMinimumDpHeight(shoppingCategory, density, 56);
 
                     Method openPantry = MainActivity.class.getDeclaredMethod("openPantry", MainActivity.Screen.class);
@@ -251,6 +257,61 @@ public class MainActivityStateTest {
                         .designRecipes().get(0));
                 assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
                 assertTrue(containsText(fragment.getView(), "Ghi chú sau khi nấu"));
+            });
+        }
+    }
+
+    @Test
+    public void shoppingItemFormDraftSurvivesActivityRecreation() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    Method openForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
+                    openForm.setAccessible(true);
+                    openForm.invoke(activity, new Object[]{null});
+                    ShoppingFragment fragment = (ShoppingFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(ShoppingFragment.class.getName());
+                    ((android.widget.EditText) getField(fragment, "nameInput")).setText("Cà chua");
+                    ((android.widget.EditText) getField(fragment, "amountInput")).setText("2");
+                    ((android.widget.EditText) getField(fragment, "unitInput")).setText("quả");
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+            scenario.recreate();
+            scenario.onActivity(activity -> {
+                ShoppingFragment fragment = (ShoppingFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(ShoppingFragment.class.getName());
+                assertTrue(fragment != null && fragment.isFormShowing());
+                assertEquals(MainActivity.Screen.SHOPPING_ITEM_FORM, getFieldUnchecked(activity, "screen"));
+                try {
+                    assertEquals("Cà chua", ((android.widget.EditText) getField(fragment, "nameInput")).getText().toString());
+                    assertEquals("2", ((android.widget.EditText) getField(fragment, "amountInput")).getText().toString());
+                    assertEquals("quả", ((android.widget.EditText) getField(fragment, "unitInput")).getText().toString());
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void discoverScreensAreOwnedByFeatureFragmentAndBackStaysInFeature() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                DiscoverFragment fragment = (DiscoverFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(DiscoverFragment.class.getName());
+                if (fragment == null || fragment.getView() == null)
+                    throw new AssertionError("Discover screens are not hosted by DiscoverFragment");
+                assertTrue(containsText(fragment.getView(), "Bếp nhà"));
+                TextView searchEntry = findTextView(fragment.getView(), "Tìm công thức, nguyên liệu...");
+                if (searchEntry == null) throw new AssertionError("Discover search entry is missing");
+                ((View) searchEntry.getParent()).performClick();
+                assertEquals(MainActivity.Screen.SEARCH, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Tìm kiếm gần đây"));
+                fragment.handleBackPressed();
+                assertEquals(MainActivity.Screen.DISCOVER, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Bếp nhà"));
             });
         }
     }
