@@ -27,6 +27,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import com.example.myapplication.core.ui.BottomNavigationBar;
 
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
@@ -1433,34 +1434,9 @@ public final class DiscoverFragment extends Fragment {
     }
 
     private void addBottomNavigation(int selectedTab) {
-        LinearLayout nav = new LinearLayout(requireContext());
-        nav.setGravity(Gravity.CENTER_VERTICAL);
-        nav.setBackgroundColor(WHITE);
-        nav.setPadding(dp(7), dp(5), dp(7), dp(2));
-        View line = new View(requireContext());
-        line.setBackgroundColor(BORDER);
-        pageRoot.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
-        String[] names = {"Khám phá", "Nấu hôm nay", "Mua sắm", "Kho của tôi"};
-        int[] icons = {
-            R.drawable.ic_home_outline,
-            R.drawable.ic_calendar_outline,
-            R.drawable.ic_cart_outline,
-            R.drawable.ic_star_outline
-        };
-        for (int i = 0; i < names.length; i++) {
-            final int index = i;
-            LinearLayout tab = vertical();
-            tab.setGravity(Gravity.CENTER);
-            ImageView glyph = iconView(icons[i], i == selectedTab ? GREEN : MUTED);
-            if (i == selectedTab) glyph.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-            tab.addView(glyph, new LinearLayout.LayoutParams(dp(52), dp(30)));
-            TextView label = text(names[i], 10, i == selectedTab ? GREEN : MUTED, i == selectedTab);
-            label.setGravity(Gravity.CENTER);
-            tab.addView(label);
-            nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
-            tab.setOnClickListener(v -> host.onDiscoverNavigateTab(index));
-        }
-        pageRoot.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
+        BottomNavigationBar navigation =
+                new BottomNavigationBar(requireContext(), selectedTab, host::onDiscoverNavigateTab);
+        pageRoot.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void addBackTitle(LinearLayout parent, String title) {

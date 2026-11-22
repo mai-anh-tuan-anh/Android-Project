@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import com.example.myapplication.presentation.main.MainActivity;
+import com.example.myapplication.core.ui.BottomNavigationBar;
 import com.example.myapplication.presentation.discover.DiscoverFragment;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
 import com.example.myapplication.presentation.mealplan.MealPlanFragment;
@@ -46,6 +47,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,6 +60,25 @@ import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivityStateTest {
+
+    @Test
+    public void sharedBottomNavigationPreservesFourTabsAndForwardsSelection() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                float density = activity.getResources().getDisplayMetrics().density;
+                AtomicInteger selected = new AtomicInteger(-1);
+                BottomNavigationBar navigation = new BottomNavigationBar(
+                        activity, 2, selected::set);
+                assertEquals(4, navigation.getNavigationStrip().getChildCount());
+                navigation.measure(
+                        View.MeasureSpec.makeMeasureSpec(Math.round(360 * density), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                assertEquals(65, Math.round(navigation.getMeasuredHeight() / density));
+                navigation.getNavigationStrip().getChildAt(2).performClick();
+                assertEquals(2, selected.get());
+            });
+        }
+    }
     @Test
     public void mealPlanPickerDraftSurvivesActivityRecreation() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {

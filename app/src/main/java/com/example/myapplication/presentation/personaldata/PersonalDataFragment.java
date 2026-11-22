@@ -26,6 +26,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import com.example.myapplication.core.ui.BottomNavigationBar;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
@@ -1041,34 +1042,9 @@ public final class PersonalDataFragment extends Fragment {
   }
 
   private void addBottomNavigation() {
-    LinearLayout nav = new LinearLayout(requireContext());
-    nav.setGravity(Gravity.CENTER_VERTICAL);
-    nav.setBackgroundColor(WHITE);
-    nav.setPadding(dp(7), dp(5), dp(7), dp(2));
-    View line = new View(requireContext());
-    line.setBackgroundColor(BORDER);
-    root.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
-    String[] names = {"Khám phá", "Nấu hôm nay", "Mua sắm", "Kho của tôi"};
-    int[] ids = {
-      R.drawable.ic_home_outline,
-      R.drawable.ic_calendar_outline,
-      R.drawable.ic_cart_outline,
-      R.drawable.ic_star_outline
-    };
-    for (int i = 0; i < names.length; i++) {
-      final int index = i;
-      LinearLayout tab = vertical();
-      tab.setGravity(Gravity.CENTER);
-      ImageView icon = icon(ids[i], i == 3 ? GREEN : MUTED);
-      if (i == 3) icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-      tab.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(30)));
-      TextView label = text(names[i], 10, i == 3 ? GREEN : MUTED, i == 3);
-      label.setGravity(Gravity.CENTER);
-      tab.addView(label);
-      nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
-      tab.setOnClickListener(v -> host.onPersonalNavigateTab(index));
-    }
-    root.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
+    BottomNavigationBar navigation =
+        new BottomNavigationBar(requireContext(), 3, host::onPersonalNavigateTab);
+    root.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
   }
 
   private TextView button(String value, boolean primary) {

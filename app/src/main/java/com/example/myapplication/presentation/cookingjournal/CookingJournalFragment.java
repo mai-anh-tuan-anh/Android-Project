@@ -29,6 +29,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import com.example.myapplication.core.ui.BottomNavigationBar;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
@@ -817,36 +818,9 @@ public final class CookingJournalFragment extends Fragment {
   }
 
   private void addBottomNavigation(LinearLayout parent, int selected) {
-    LinearLayout nav = new LinearLayout(requireContext());
-    nav.setGravity(Gravity.CENTER_VERTICAL);
-    nav.setBackgroundColor(WHITE);
-    nav.setPadding(dp(7), dp(5), dp(7), dp(2));
-    View line = new View(requireContext());
-    line.setBackgroundColor(BORDER);
-    parent.addView(line, new LinearLayout.LayoutParams(-1, dp(1)));
-    String[] names = {"Khám phá", "Nấu hôm nay", "Mua sắm", "Kho của tôi"};
-    int[] icons = {
-      R.drawable.ic_home_outline,
-      R.drawable.ic_calendar_outline,
-      R.drawable.ic_cart_outline,
-      R.drawable.ic_star_outline
-    };
-    for (int i = 0; i < names.length; i++) {
-      final int tab = i;
-      LinearLayout item = vertical();
-      item.setGravity(Gravity.CENTER);
-      ImageView icon = new ImageView(requireContext());
-      icon.setImageResource(icons[i]);
-      icon.setColorFilter(i == selected ? GREEN : MUTED);
-      if (i == selected) icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-      item.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(30)));
-      TextView label = text(names[i], 10, i == selected ? GREEN : MUTED, i == selected);
-      label.setGravity(Gravity.CENTER);
-      item.addView(label);
-      nav.addView(item, new LinearLayout.LayoutParams(0, dp(58), 1));
-      item.setOnClickListener(v -> host.onJournalNavigateTab(tab));
-    }
-    parent.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
+    BottomNavigationBar navigation =
+        new BottomNavigationBar(requireContext(), selected, host::onJournalNavigateTab);
+    parent.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
   }
 
   private void addBackTitle(LinearLayout parent, String title) {
