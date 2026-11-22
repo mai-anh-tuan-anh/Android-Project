@@ -11,6 +11,9 @@ import com.example.myapplication.presentation.pantry.PantryFragment;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
+import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.CookingLogEntry;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.domain.model.ShoppingListItem;
@@ -21,6 +24,7 @@ import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
 
 import com.example.myapplication.domain.model.*;
 import com.example.myapplication.domain.model.Recipe;
+import androidx.lifecycle.ViewModelProvider;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
@@ -143,47 +147,51 @@ public class MainActivityStateTest {
 
     @Test
     public void clearingOneJournalDateKeepsTheOtherDate() {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            scenario.onActivity(activity -> {
-                try {
-                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
-                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
-                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
-                    Method render = MainActivity.class.getDeclaredMethod("render");
-                    render.setAccessible(true);
-                    render.invoke(activity);
-                    View clearStartDate = findViewWithDescription(activity.getWindow().getDecorView(),
-                            "Xóa ngày bắt đầu");
-                    if (clearStartDate == null) throw new AssertionError("Start-date clear button is missing");
-                    clearStartDate.performClick();
-                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
-                    assertEquals(1_795_478_400_000L, getField(activity, "cookingJournalToDate"));
-                } catch (ReflectiveOperationException e) {
-                    throw new AssertionError(e);
-                }
-            });
-        }
+        CookingJournalFragment fragment = CookingJournalFragment.newInstance("COOKING_JOURNAL", null);
+        setFieldUnchecked(fragment, "fromDate", 1_795_392_000_000L);
+        setFieldUnchecked(fragment, "toDate", 1_795_478_400_000L);
+        try {
+            Method clearDate = CookingJournalFragment.class.getDeclaredMethod("clearDateFilter", boolean.class);
+            clearDate.setAccessible(true);
+            clearDate.invoke(fragment, true);
+            assertEquals(0L, getField(fragment, "fromDate"));
+            assertEquals(1_795_478_400_000L, getField(fragment, "toDate"));
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
 
     @Test
     public void leavingCookingJournalClearsBothDateBoundaries() {
+        CookingJournalFragment fragment = CookingJournalFragment.newInstance("COOKING_JOURNAL", null);
+        setFieldUnchecked(fragment, "fromDate", 1_795_392_000_000L);
+        setFieldUnchecked(fragment, "toDate", 1_795_478_400_000L);
+        try {
+            Method clearRange = CookingJournalFragment.class.getDeclaredMethod("clearDateRangeForExit");
+            clearRange.setAccessible(true);
+            clearRange.invoke(fragment);
+            assertEquals(0L, getField(fragment, "fromDate"));
+            assertEquals(0L, getField(fragment, "toDate"));
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+
+    @Test
+    public void cookingJournalFormReturnsToPersonalNoteWhenDismissed() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
-                try {
-                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
-                    setField(activity, "cookingLogReturnScreen", MainActivity.Screen.LIBRARY);
-                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
-                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
-                    Method render = MainActivity.class.getDeclaredMethod("render");
-                    render.setAccessible(true);
-                    render.invoke(activity);
-                    activity.getOnBackPressedDispatcher().onBackPressed();
-                    assertEquals(MainActivity.Screen.LIBRARY, getField(activity, "screen"));
-                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
-                    assertEquals(0L, getField(activity, "cookingJournalToDate"));
-                } catch (ReflectiveOperationException e) {
-                    throw new AssertionError(e);
-                }
+                Recipe recipe = PreviewRecipeCatalog.designRecipes().get(0);
+                activity.onPersonalOpenNote(recipe);
+                activity.onPersonalCreateCookingLog(recipe.id);
+                CookingJournalFragment journal = (CookingJournalFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(CookingJournalFragment.class.getName());
+                if (journal == null || journal.getView() == null)
+                    throw new AssertionError("Cooking journal form Fragment is not attached");
+                assertTrue(containsText(journal.getView(), "Lưu lần nấu"));
+                journal.handleBackPressed();
+                assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
+                PersonalDataFragment personal = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (personal == null || personal.getView() == null)
+                    throw new AssertionError("Personal note Fragment was not restored");
+                assertTrue(containsText(personal.getView(), "Ghi chú sau khi nấu"));
             });
         }
     }
@@ -516,8 +524,9 @@ public class MainActivityStateTest {
             AtomicReference<CookingJournalViewModel> viewModelRef = new AtomicReference<>();
             CountDownLatch loaded = new CountDownLatch(1);
             scenario.onActivity(activity -> {
-                CookingJournalViewModel viewModel = (CookingJournalViewModel) getFieldUnchecked(activity,
-                        "cookingJournalViewModel");
+                CookingJournalViewModel viewModel = new ViewModelProvider(activity,
+                        new AppViewModelFactory((BepNhaApplication) activity.getApplication()))
+                        .get(CookingJournalViewModel.class);
                 viewModelRef.set(viewModel);
                 viewModel.journalState().observe(activity, state -> {
                     if (state != null && !state.loading) loaded.countDown();

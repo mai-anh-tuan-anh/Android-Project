@@ -1,75 +1,70 @@
 package com.example.myapplication.presentation.main;
 
-import com.example.myapplication.BepNhaApplication;
-import com.example.myapplication.R;
-import com.example.myapplication.di.AppViewModelFactory;
-import com.example.myapplication.domain.catalog.*;
-import com.example.myapplication.domain.model.*;
-import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
-import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
-import com.example.myapplication.presentation.discover.DiscoverViewModel;
-import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
-import com.example.myapplication.presentation.mealplan.MealPlanFragment;
-import com.example.myapplication.presentation.pantry.PantryViewModel;
-import com.example.myapplication.presentation.pantry.PantryFragment;
-import com.example.myapplication.presentation.shopping.ShoppingFragment;
-import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
-import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
-import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
-import android.text.Spannable;
 import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.BaseInputConnection;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.app.DatePickerDialog;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.fragment.app.Fragment;
 import androidx.activity.OnBackPressedCallback;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.lifecycle.ViewModelProvider;
-import com.google.android.material.snackbar.Snackbar;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.fragment.app.Fragment;
+import androidx.lifecycle.ViewModelProvider;
 
+import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.R;
+import com.example.myapplication.di.AppViewModelFactory;
+import com.example.myapplication.domain.catalog.*;
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
+import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
+import com.example.myapplication.presentation.discover.DiscoverViewModel;
+import com.example.myapplication.presentation.mealplan.MealPlanFragment;
+import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.pantry.PantryFragment;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
+import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingFragment;
+import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+
+import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import java.util.Calendar;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.text.Normalizer;
 
 /** Local personal data, meal planning, shopping, pantry, and cooking journal. */
-public class MainActivity extends AppCompatActivity implements PantryFragment.Host, ShoppingFragment.Host,
-        MealPlanFragment.Host, PersonalDataFragment.Host {
+public class MainActivity extends AppCompatActivity
+        implements PantryFragment.Host,
+                ShoppingFragment.Host,
+                MealPlanFragment.Host,
+                PersonalDataFragment.Host,
+                CookingJournalFragment.Host {
     private static final String STATE_APP_SCREEN = "app.currentScreen";
+    private static final String STATE_JOURNAL_RETURN_SCREEN = "journal.returnScreen";
+    private static final String STATE_JOURNAL_RECIPE_ID = "journal.recipeId";
+    private static final String STATE_JOURNAL_LOG_ID = "journal.logId";
+    private static final String STATE_JOURNAL_FORM_RETURN = "journal.formReturn";
     private static final String STATE_SELECTED_CATEGORY = "discover.selectedCategory";
     private static final String STATE_DISCOVER_SEARCH_QUERY = "discover.searchQuery";
     private static final String STATE_DETAIL_RECIPE_ID = "discover.detailRecipeId";
@@ -89,21 +84,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private static final String STATE_SHOPPING_CATEGORY = "module7.category";
     private static final String STATE_SHOPPING_FILTER = "module7.filter";
     private static final String STATE_SHOPPING_RETURN_SCREEN = "module7.returnScreen";
-    private static final String STATE_LOG_SCREEN = "journal.screen";
-    private static final String STATE_LOG_RECIPE_ID = "journal.recipeId";
-    private static final String STATE_LOG_ID = "journal.id";
-    private static final String STATE_LOG_DATE = "journal.date";
-    private static final String STATE_LOG_SERVINGS = "journal.servings";
-    private static final String STATE_LOG_DURATION = "journal.duration";
-    private static final String STATE_LOG_RATING = "journal.rating";
-    private static final String STATE_LOG_NOTE = "journal.note";
-    private static final String STATE_LOG_PHOTO = "journal.photo";
-    private static final String STATE_LOG_RETURN_SCREEN = "journal.returnScreen";
-    private static final String STATE_LOG_FORM_RETURN_SCREEN = "journal.formReturnScreen";
-    private static final String STATE_LOG_SEARCH = "journal.search";
-    private static final String STATE_LOG_FROM_DATE = "journal.fromDate";
-    private static final String STATE_LOG_TO_DATE = "journal.toDate";
-    private static final String STATE_LOG_FILTER_RATING = "journal.filterRating";
     private static final int CREAM = Color.rgb(250, 249, 246);
     private static final int GREEN = Color.rgb(50, 108, 79);
     private static final int PALE_GREEN = Color.rgb(232, 242, 233);
@@ -117,10 +97,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private MealPlanViewModel mealPlanViewModel;
     private ShoppingViewModel shoppingViewModel;
     private PantryViewModel pantryViewModel;
-    private CookingJournalViewModel cookingJournalViewModel;
     private DiscoverSearchViewModel searchViewModel;
     private DiscoverViewModel discoverViewModel;
-    private ActivityResultLauncher<String> cookingPhotoPicker;
     private LinearLayout appRoot;
     private FrameLayout mainContent;
     private FrameLayout fragmentContainer;
@@ -128,9 +106,15 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private ShoppingFragment shoppingFragment;
     private MealPlanFragment mealPlanFragment;
     private PersonalDataFragment personalDataFragment;
+    private CookingJournalFragment cookingJournalFragment;
+    private Screen cookingLogReturnScreen = Screen.NOTE;
+    private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
+    private String cookingLogRecipeId;
+    private String editingCookingLogId;
     private View bottomNavigationBar;
     private Screen screen = Screen.DISCOVER;
     private boolean animateNextScreen;
+    private boolean renderPending;
     private Screen noteReturnScreen = Screen.LIBRARY;
     private Screen collectionReturnScreen = Screen.LIBRARY;
     private Screen detailReturnScreen = Screen.DISCOVER;
@@ -154,36 +138,34 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private String shoppingDraftCategory = ShoppingCategoryCatalog.OTHER;
     private String shoppingStatusFilter;
     private Screen pantryReturnScreen = Screen.SHOPPING;
-    private Screen cookingLogReturnScreen = Screen.NOTE;
-    private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
-    private String cookingLogRecipeId;
-    private String editingCookingLogId;
-    private long cookingLogCookedAt = System.currentTimeMillis();
-    private int cookingLogServings = 1;
-    private String cookingLogDuration = "";
-    private Integer cookingLogRating;
-    private String cookingLogAdjustment = "";
-    private String cookingLogPhotoPath = "";
-    private String originalCookingLogPhotoPath = "";
-    private EditText cookingLogServingsInput;
-    private EditText cookingLogDurationInput;
-    private EditText cookingLogAdjustmentInput;
-    private TextView cookingLogDateInput;
-    private LinearLayout cookingLogRatingRow;
-    private TextView cookingLogPhotoButton;
-    private String cookingJournalSearch = "";
-    private long cookingJournalFromDate;
-    private long cookingJournalToDate;
-    private int cookingJournalRatingFilter;
-    private List<CookingLogEntry> cookingJournalAllLogs = new ArrayList<>();
 
-    public enum Screen { DISCOVER, CATEGORY_LIST, CATEGORY_RECIPES, NEW_RECIPES, SEARCH, SEARCH_FILTER, SEARCH_RESULTS,
-        WHAT_TO_COOK_INGREDIENTS, WHAT_TO_COOK_RESULTS, RECIPE_DETAIL,
-        LIBRARY, FAVORITES, COLLECTION_LIST, COLLECTION, COLLECTION_FORM, NOTE, MEAL_PLAN,
-        MEAL_PLAN_PICKER, SHOPPING, SHOPPING_ITEM_FORM, PANTRY, PANTRY_FORM, COOKING_JOURNAL,
-        COOKING_LOGS, COOKING_LOG_FORM }
-
-
+    public enum Screen {
+        DISCOVER,
+        CATEGORY_LIST,
+        CATEGORY_RECIPES,
+        NEW_RECIPES,
+        SEARCH,
+        SEARCH_FILTER,
+        SEARCH_RESULTS,
+        WHAT_TO_COOK_INGREDIENTS,
+        WHAT_TO_COOK_RESULTS,
+        RECIPE_DETAIL,
+        LIBRARY,
+        FAVORITES,
+        COLLECTION_LIST,
+        COLLECTION,
+        COLLECTION_FORM,
+        NOTE,
+        MEAL_PLAN,
+        MEAL_PLAN_PICKER,
+        SHOPPING,
+        SHOPPING_ITEM_FORM,
+        PANTRY,
+        PANTRY_FORM,
+        COOKING_JOURNAL,
+        COOKING_LOGS,
+        COOKING_LOG_FORM
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -192,152 +174,149 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         mainContent = findViewById(R.id.main_content);
         fragmentContainer = findViewById(R.id.main_fragment_container);
         configureSystemBars();
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (screen == Screen.DISCOVER) {
-                    finish();
-                    return;
-                } else if (isPantryScreen()) {
-                    PantryFragment fragment = activePantryFragment();
-                    if (fragment != null) { fragment.handleBackPressed(); return; }
-                } else if (screen == Screen.SEARCH_FILTER || screen == Screen.SEARCH_RESULTS) {
-                    screen = Screen.SEARCH;
-                } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
-                    screen = Screen.WHAT_TO_COOK_INGREDIENTS;
-                } else if (screen == Screen.CATEGORY_RECIPES || screen == Screen.NEW_RECIPES
-                        || screen == Screen.CATEGORY_LIST || screen == Screen.SEARCH
-                        || screen == Screen.WHAT_TO_COOK_INGREDIENTS) {
-                    screen = Screen.DISCOVER;
-                } else if (screen == Screen.CATEGORY_RECIPES) {
-                    screen = Screen.CATEGORY_LIST;
-                } else if (screen == Screen.RECIPE_DETAIL) {
-                    screen = detailReturnScreen == Screen.RECIPE_DETAIL ? Screen.DISCOVER : detailReturnScreen;
-                } else if (screen == Screen.PANTRY_FORM) {
-                    screen = Screen.PANTRY;
-                } else if (screen == Screen.PANTRY) {
-                    screen = pantryReturnScreen;
-                } else if (screen == Screen.COOKING_LOG_FORM) {
-                    discardCookingLogDraftPhoto();
-                    screen = cookingLogFormReturnScreen;
-                } else if (screen == Screen.COOKING_JOURNAL) {
-                    clearCookingJournalDateRange();
-                    screen = cookingLogReturnScreen;
-                } else if (screen == Screen.COOKING_LOGS) {
-                    screen = cookingLogReturnScreen;
-                } else if (screen == Screen.COLLECTION_FORM) {
-                    screen = selectedCollectionId > 0 ? Screen.COLLECTION : collectionReturnScreen;
-                } else if (screen == Screen.COLLECTION) {
-                    screen = collectionReturnScreen;
-                } else if (screen == Screen.NOTE) {
-                    screen = noteReturnScreen;
-                } else if (screen == Screen.MEAL_PLAN_PICKER) {
-                    screen = Screen.MEAL_PLAN;
-                } else if (screen == Screen.SHOPPING_ITEM_FORM) {
-                    screen = Screen.SHOPPING;
-                } else if (screen == Screen.SHOPPING) {
-                    screen = shoppingReturnScreen == Screen.SHOPPING ? Screen.DISCOVER : shoppingReturnScreen;
-                } else if (screen == Screen.MEAL_PLAN || screen == Screen.LIBRARY) {
-                    screen = Screen.DISCOVER;
-                } else {
-                    screen = Screen.DISCOVER;
-                }
-                render();
-            }
-        });
-        AppViewModelFactory viewModelFactory = new AppViewModelFactory((BepNhaApplication) getApplication());
-        personalDataViewModel = new ViewModelProvider(this, viewModelFactory).get(PersonalDataViewModel.class);
-        mealPlanViewModel = new ViewModelProvider(this, viewModelFactory).get(MealPlanViewModel.class);
-        shoppingViewModel = new ViewModelProvider(this, viewModelFactory).get(ShoppingViewModel.class);
+        getOnBackPressedDispatcher()
+                .addCallback(
+                        this,
+                        new OnBackPressedCallback(true) {
+                            @Override
+                            public void handleOnBackPressed() {
+                                if (screen == Screen.DISCOVER) {
+                                    finish();
+                                    return;
+                                } else if (isCookingJournalScreen()) {
+                                    CookingJournalFragment fragment =
+                                            activeCookingJournalFragment();
+                                    if (fragment != null) {
+                                        fragment.handleBackPressed();
+                                        return;
+                                    }
+                                } else if (isPantryScreen()) {
+                                    PantryFragment fragment = activePantryFragment();
+                                    if (fragment != null) {
+                                        fragment.handleBackPressed();
+                                        return;
+                                    }
+                                } else if (screen == Screen.SEARCH_FILTER
+                                        || screen == Screen.SEARCH_RESULTS) {
+                                    screen = Screen.SEARCH;
+                                } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
+                                    screen = Screen.WHAT_TO_COOK_INGREDIENTS;
+                                } else if (screen == Screen.CATEGORY_RECIPES
+                                        || screen == Screen.NEW_RECIPES
+                                        || screen == Screen.CATEGORY_LIST
+                                        || screen == Screen.SEARCH
+                                        || screen == Screen.WHAT_TO_COOK_INGREDIENTS) {
+                                    screen = Screen.DISCOVER;
+                                } else if (screen == Screen.CATEGORY_RECIPES) {
+                                    screen = Screen.CATEGORY_LIST;
+                                } else if (screen == Screen.RECIPE_DETAIL) {
+                                    screen =
+                                            detailReturnScreen == Screen.RECIPE_DETAIL
+                                                    ? Screen.DISCOVER
+                                                    : detailReturnScreen;
+                                } else if (screen == Screen.PANTRY_FORM) {
+                                    screen = Screen.PANTRY;
+                                } else if (screen == Screen.PANTRY) {
+                                    screen = pantryReturnScreen;
+                                } else if (screen == Screen.COLLECTION_FORM) {
+                                    screen =
+                                            selectedCollectionId > 0
+                                                    ? Screen.COLLECTION
+                                                    : collectionReturnScreen;
+                                } else if (screen == Screen.COLLECTION) {
+                                    screen = collectionReturnScreen;
+                                } else if (screen == Screen.NOTE) {
+                                    screen = noteReturnScreen;
+                                } else if (screen == Screen.MEAL_PLAN_PICKER) {
+                                    screen = Screen.MEAL_PLAN;
+                                } else if (screen == Screen.SHOPPING_ITEM_FORM) {
+                                    screen = Screen.SHOPPING;
+                                } else if (screen == Screen.SHOPPING) {
+                                    screen =
+                                            shoppingReturnScreen == Screen.SHOPPING
+                                                    ? Screen.DISCOVER
+                                                    : shoppingReturnScreen;
+                                } else if (screen == Screen.MEAL_PLAN || screen == Screen.LIBRARY) {
+                                    screen = Screen.DISCOVER;
+                                } else {
+                                    screen = Screen.DISCOVER;
+                                }
+                                render();
+                            }
+                        });
+        AppViewModelFactory viewModelFactory =
+                new AppViewModelFactory((BepNhaApplication) getApplication());
+        personalDataViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(PersonalDataViewModel.class);
+        mealPlanViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(MealPlanViewModel.class);
+        shoppingViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(ShoppingViewModel.class);
         pantryViewModel = new ViewModelProvider(this, viewModelFactory).get(PantryViewModel.class);
-        cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
-        searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
-        discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
-        searchViewModel.recentSearchState().observe(this, state -> {
-            if (state != null && !state.loading && screen == Screen.SEARCH
-                    && (discoverSearchInput == null || !discoverSearchInput.hasFocus())) render();
-        });
-        cookingJournalViewModel.journalState().observe(this, state -> {
-            if (state == null || state.loading) return;
-            cookingJournalAllLogs = state.logs;
-            if (screen == Screen.COOKING_JOURNAL
-                    || screen == Screen.COOKING_LOGS) render();
-        });
-        cookingJournalViewModel.mutationResult().observe(this, result -> {
-            if (result == null) return;
-            cookingJournalViewModel.clearMutationResult();
-            if (CookingJournalViewModel.MutationResult.PHOTO.equals(result.operation)) {
-                if (result.success) {
-                    if (screen == Screen.COOKING_LOG_FORM) {
-                        if (!originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) {
-                            cookingJournalViewModel.deletePhoto(cookingLogPhotoPath);
-                        }
-                        cookingLogPhotoPath = result.filename;
-                        render();
-                    } else {
-                        cookingJournalViewModel.deletePhoto(result.filename);
-                    }
-                } else if (!result.success) {
-                    Toast.makeText(this, result.message == null ? "Không thể lưu ảnh đã chọn." : result.message,
-                            Toast.LENGTH_SHORT).show();
-                }
-            } else if (CookingJournalViewModel.MutationResult.SAVE.equals(result.operation)) {
-                if (result.success && screen == Screen.COOKING_LOG_FORM) {
-                    if (!originalCookingLogPhotoPath.isEmpty()
-                            && !originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) {
-                        cookingJournalViewModel.deletePhoto(originalCookingLogPhotoPath);
-                    }
-                    originalCookingLogPhotoPath = cookingLogPhotoPath;
-                    editingCookingLogId = null;
-                    screen = cookingLogFormReturnScreen;
-                    render();
-                    Toast.makeText(this, "Đã lưu lần nấu.", Toast.LENGTH_SHORT).show();
-                } else if (!result.success) {
-                    Toast.makeText(this, result.message == null ? "Không thể lưu lần nấu." : result.message,
-                            Toast.LENGTH_SHORT).show();
-                }
-            } else if (!result.success) {
-                Toast.makeText(this, result.message == null ? "Không thể cập nhật nhật ký nấu." : result.message,
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-        personalDataViewModel.personalDataState().observe(this, state -> {
-            if (state == null || state.loading) return;
-            if (screen == Screen.RECIPE_DETAIL) {
-                render();
-            }
-        });
-        shoppingViewModel.saveResult().observe(this, result -> {
-            if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
-            shoppingViewModel.clearSaveResult();
-            if (result.success) {
-                shoppingStatusFilter = result.status;
-                screen = Screen.SHOPPING;
-                render();
-            } else {
-                Toast.makeText(this, result.error == null ? "Không thể lưu nguyên liệu." : result.error,
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
-        shoppingViewModel.planUpdate().observe(this, update -> {
-            if (update == null || screen != Screen.SHOPPING) return;
-            shoppingViewModel.clearPlanUpdate();
-            if (!update.changes.isEmpty()) showShoppingPlanUpdate(update);
-            else if (update.message != null && !update.message.isEmpty()) {
-                Toast.makeText(this, update.message, Toast.LENGTH_SHORT).show();
-            }
-        });
-        cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-            if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
-            cookingJournalViewModel.savePhotoAsync(uri.toString());
-        });
+        searchViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
+        discoverViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        searchViewModel
+                .recentSearchState()
+                .observe(
+                        this,
+                        state -> {
+                            if (state != null
+                                    && !state.loading
+                                    && screen == Screen.SEARCH
+                                    && (discoverSearchInput == null
+                                            || !discoverSearchInput.hasFocus())) render();
+                        });
+        personalDataViewModel
+                .personalDataState()
+                .observe(
+                        this,
+                        state -> {
+                            if (state == null || state.loading) return;
+                            if (screen == Screen.RECIPE_DETAIL) {
+                                render();
+                            }
+                        });
+        shoppingViewModel
+                .saveResult()
+                .observe(
+                        this,
+                        result -> {
+                            if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
+                            shoppingViewModel.clearSaveResult();
+                            if (result.success) {
+                                shoppingStatusFilter = result.status;
+                                screen = Screen.SHOPPING;
+                                render();
+                            } else {
+                                Toast.makeText(
+                                                this,
+                                                result.error == null
+                                                        ? "Không thể lưu nguyên liệu."
+                                                        : result.error,
+                                                Toast.LENGTH_SHORT)
+                                        .show();
+                            }
+                        });
+        shoppingViewModel
+                .planUpdate()
+                .observe(
+                        this,
+                        update -> {
+                            if (update == null || screen != Screen.SHOPPING) return;
+                            shoppingViewModel.clearPlanUpdate();
+                            if (!update.changes.isEmpty()) showShoppingPlanUpdate(update);
+                            else if (update.message != null && !update.message.isEmpty()) {
+                                Toast.makeText(this, update.message, Toast.LENGTH_SHORT).show();
+                            }
+                        });
         personalDataViewModel.seedDesignPreviewIfNeeded(PreviewRecipeCatalog.designRecipes());
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
-        restoreOfflineFeatureState(savedInstanceState);
-        cookingJournalViewModel.refresh();
         if (screen == Screen.PANTRY) pantryViewModel.refreshItems();
-        if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) mealPlanViewModel.refresh();
+        if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER)
+            mealPlanViewModel.refresh();
         if (screen == Screen.SHOPPING) shoppingViewModel.refreshItems();
         render();
     }
@@ -345,9 +324,28 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     private void restoreAppState(Bundle state) {
         if (state == null) return;
         selectedCategory = state.getString(STATE_SELECTED_CATEGORY, "");
+        try {
+            cookingLogReturnScreen =
+                    Screen.valueOf(
+                            state.getString(STATE_JOURNAL_RETURN_SCREEN, Screen.NOTE.name()));
+        } catch (IllegalArgumentException invalid) {
+            cookingLogReturnScreen = Screen.NOTE;
+        }
+        cookingLogRecipeId = state.getString(STATE_JOURNAL_RECIPE_ID);
+        editingCookingLogId = state.getString(STATE_JOURNAL_LOG_ID);
+        try {
+            cookingLogFormReturnScreen =
+                    Screen.valueOf(
+                            state.getString(STATE_JOURNAL_FORM_RETURN, Screen.COOKING_LOGS.name()));
+        } catch (IllegalArgumentException invalid) {
+            cookingLogFormReturnScreen = Screen.COOKING_LOGS;
+        }
         discoverSearchQuery = state.getString(STATE_DISCOVER_SEARCH_QUERY, "");
-        detailRecipeId = state.getString(STATE_DETAIL_RECIPE_ID, PreviewRecipeCatalog.designRecipes().get(0).id);
-        String savedDetailReturn = state.getString(STATE_DETAIL_RETURN_SCREEN, Screen.DISCOVER.name());
+        detailRecipeId =
+                state.getString(
+                        STATE_DETAIL_RECIPE_ID, PreviewRecipeCatalog.designRecipes().get(0).id);
+        String savedDetailReturn =
+                state.getString(STATE_DETAIL_RETURN_SCREEN, Screen.DISCOVER.name());
         try {
             detailReturnScreen = Screen.valueOf(savedDetailReturn);
         } catch (IllegalArgumentException e) {
@@ -357,7 +355,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (savedScreen != null) {
             try {
                 screen = Screen.valueOf(savedScreen);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException ignored) {
+            }
         }
     }
 
@@ -373,13 +372,18 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             shoppingDraftAmount = state.getString(STATE_SHOPPING_AMOUNT, "");
             shoppingDraftUnit = state.getString(STATE_SHOPPING_UNIT, "");
             shoppingDraftUnitId = state.getString(STATE_SHOPPING_UNIT_ID, "");
-            shoppingDraftCategory = state.getString(STATE_SHOPPING_CATEGORY, ShoppingCategoryCatalog.OTHER);
+            shoppingDraftCategory =
+                    state.getString(STATE_SHOPPING_CATEGORY, ShoppingCategoryCatalog.OTHER);
             String restoredShoppingFilter = state.getString(STATE_SHOPPING_FILTER);
-            shoppingStatusFilter = ShoppingViewModel.AVAILABLE.equals(restoredShoppingFilter)
-                    ? ShoppingViewModel.AVAILABLE : ShoppingViewModel.NEED_TO_BUY;
+            shoppingStatusFilter =
+                    ShoppingViewModel.AVAILABLE.equals(restoredShoppingFilter)
+                            ? ShoppingViewModel.AVAILABLE
+                            : ShoppingViewModel.NEED_TO_BUY;
             try {
-                shoppingReturnScreen = Screen.valueOf(state.getString(STATE_SHOPPING_RETURN_SCREEN,
-                        Screen.MEAL_PLAN.name()));
+                shoppingReturnScreen =
+                        Screen.valueOf(
+                                state.getString(
+                                        STATE_SHOPPING_RETURN_SCREEN, Screen.MEAL_PLAN.name()));
             } catch (IllegalArgumentException invalidScreen) {
                 shoppingReturnScreen = Screen.MEAL_PLAN;
             }
@@ -391,50 +395,24 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (screen == Screen.MEAL_PLAN_PICKER) {
             ArrayList<String> savedIds = state.getStringArrayList(STATE_PICKED_RECIPE_IDS);
             MealPlanViewModel.PickerSource savedSource;
-            String savedSourceName = state.getString(STATE_PICKER_SOURCE,
-                    MealPlanViewModel.PickerSource.ALL.name());
+            String savedSourceName =
+                    state.getString(STATE_PICKER_SOURCE, MealPlanViewModel.PickerSource.ALL.name());
             try {
-                savedSource = MealPlanViewModel.PickerSource.valueOf(savedSourceName == null
-                        ? MealPlanViewModel.PickerSource.ALL.name() : savedSourceName);
+                savedSource =
+                        MealPlanViewModel.PickerSource.valueOf(
+                                savedSourceName == null
+                                        ? MealPlanViewModel.PickerSource.ALL.name()
+                                        : savedSourceName);
             } catch (IllegalArgumentException invalidSource) {
                 savedSource = MealPlanViewModel.PickerSource.ALL;
             }
-            mealPlanViewModel.restorePickerDraft(savedIds,
+            mealPlanViewModel.restorePickerDraft(
+                    savedIds,
                     state.getInt(STATE_PICKER_SERVINGS, MealPlanViewModel.MIN_SERVINGS),
-                    state.getString(STATE_SEARCH_QUERY, ""), savedSource,
+                    state.getString(STATE_SEARCH_QUERY, ""),
+                    savedSource,
                     state.getLong(STATE_PICKER_COLLECTION_ID, -1L));
         } else {
-        }
-    }
-
-    private void restoreOfflineFeatureState(Bundle state) {
-        if (state == null) return;
-        String savedLogScreen = state.getString(STATE_LOG_SCREEN);
-        if (Screen.COOKING_JOURNAL.name().equals(savedLogScreen)
-                || Screen.COOKING_LOGS.name().equals(savedLogScreen)
-                || Screen.COOKING_LOG_FORM.name().equals(savedLogScreen)) {
-            screen = Screen.valueOf(savedLogScreen);
-            cookingLogRecipeId = state.getString(STATE_LOG_RECIPE_ID);
-            editingCookingLogId = state.getString(STATE_LOG_ID);
-            cookingLogCookedAt = state.getLong(STATE_LOG_DATE, System.currentTimeMillis());
-            cookingLogServings = Math.max(1, Math.min(999, state.getInt(STATE_LOG_SERVINGS, 1)));
-            cookingLogDuration = state.getString(STATE_LOG_DURATION, "");
-            int rating = state.getInt(STATE_LOG_RATING, 0);
-            cookingLogRating = rating >= 1 && rating <= 5 ? rating : null;
-            cookingLogAdjustment = state.getString(STATE_LOG_NOTE, "");
-            cookingLogPhotoPath = state.getString(STATE_LOG_PHOTO, "");
-            CookingLogEntry original = cookingJournalViewModel.getLog(editingCookingLogId);
-            originalCookingLogPhotoPath = original == null ? "" : original.photoLocalPath;
-            String savedReturn = state.getString(STATE_LOG_RETURN_SCREEN, Screen.NOTE.name());
-            try { cookingLogReturnScreen = Screen.valueOf(savedReturn); }
-            catch (IllegalArgumentException invalid) { cookingLogReturnScreen = Screen.NOTE; }
-            String savedFormReturn = state.getString(STATE_LOG_FORM_RETURN_SCREEN, Screen.COOKING_LOGS.name());
-            try { cookingLogFormReturnScreen = Screen.valueOf(savedFormReturn); }
-            catch (IllegalArgumentException invalid) { cookingLogFormReturnScreen = Screen.COOKING_LOGS; }
-            cookingJournalSearch = state.getString(STATE_LOG_SEARCH, "");
-            cookingJournalFromDate = state.getLong(STATE_LOG_FROM_DATE, 0L);
-            cookingJournalToDate = state.getLong(STATE_LOG_TO_DATE, 0L);
-            cookingJournalRatingFilter = state.getInt(STATE_LOG_FILTER_RATING, 0);
         }
     }
 
@@ -443,11 +421,13 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
             outState.putString(STATE_SCREEN, screen.name());
             if (screen == Screen.MEAL_PLAN_PICKER) {
-                outState.putStringArrayList(STATE_PICKED_RECIPE_IDS,
+                outState.putStringArrayList(
+                        STATE_PICKED_RECIPE_IDS,
                         new ArrayList<>(mealPlanViewModel.getSelectedRecipeIds()));
                 outState.putInt(STATE_PICKER_SERVINGS, mealPlanViewModel.getPickerServings());
                 outState.putString(STATE_PICKER_SOURCE, mealPlanViewModel.getPickerSource().name());
-                outState.putLong(STATE_PICKER_COLLECTION_ID, mealPlanViewModel.getPickerCollectionId());
+                outState.putLong(
+                        STATE_PICKER_COLLECTION_ID, mealPlanViewModel.getPickerCollectionId());
                 outState.putString(STATE_SEARCH_QUERY, mealPlanViewModel.getSearchQuery());
             }
         }
@@ -455,41 +435,37 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (screen == Screen.SHOPPING || screen == Screen.SHOPPING_ITEM_FORM) {
             outState.putString(STATE_SHOPPING_SCREEN, screen.name());
             outState.putString(STATE_SHOPPING_ITEM_ID, editingShoppingItemId);
-            outState.putString(STATE_SHOPPING_NAME, shoppingNameInput == null
-                    ? shoppingDraftName : shoppingNameInput.getText().toString());
-            outState.putString(STATE_SHOPPING_AMOUNT, shoppingAmountInput == null
-                    ? shoppingDraftAmount : shoppingAmountInput.getText().toString());
-            outState.putString(STATE_SHOPPING_UNIT, shoppingUnitInput == null
-                    ? shoppingDraftUnit : shoppingUnitInput.getText().toString());
+            outState.putString(
+                    STATE_SHOPPING_NAME,
+                    shoppingNameInput == null
+                            ? shoppingDraftName
+                            : shoppingNameInput.getText().toString());
+            outState.putString(
+                    STATE_SHOPPING_AMOUNT,
+                    shoppingAmountInput == null
+                            ? shoppingDraftAmount
+                            : shoppingAmountInput.getText().toString());
+            outState.putString(
+                    STATE_SHOPPING_UNIT,
+                    shoppingUnitInput == null
+                            ? shoppingDraftUnit
+                            : shoppingUnitInput.getText().toString());
             outState.putString(STATE_SHOPPING_UNIT_ID, shoppingDraftUnitId);
             outState.putString(STATE_SHOPPING_CATEGORY, shoppingDraftCategory);
             outState.putString(STATE_SHOPPING_FILTER, shoppingStatusFilter);
             outState.putString(STATE_SHOPPING_RETURN_SCREEN, shoppingReturnScreen.name());
         }
-        if (screen == Screen.COOKING_JOURNAL || screen == Screen.COOKING_LOGS || screen == Screen.COOKING_LOG_FORM) {
-            outState.putString(STATE_LOG_SCREEN, screen.name());
-            outState.putString(STATE_LOG_RECIPE_ID, cookingLogRecipeId);
-            outState.putString(STATE_LOG_ID, editingCookingLogId);
-            outState.putLong(STATE_LOG_DATE, cookingLogCookedAt);
-            outState.putInt(STATE_LOG_SERVINGS, cookingLogServingsInput == null ? cookingLogServings
-                    : parseInteger(cookingLogServingsInput.getText().toString(), cookingLogServings));
-            outState.putString(STATE_LOG_DURATION, cookingLogDurationInput == null ? cookingLogDuration
-                    : cookingLogDurationInput.getText().toString());
-            outState.putInt(STATE_LOG_RATING, cookingLogRating == null ? 0 : cookingLogRating);
-            outState.putString(STATE_LOG_NOTE, cookingLogAdjustmentInput == null ? cookingLogAdjustment
-                    : cookingLogAdjustmentInput.getText().toString());
-            outState.putString(STATE_LOG_PHOTO, cookingLogPhotoPath);
-            outState.putString(STATE_LOG_RETURN_SCREEN, cookingLogReturnScreen.name());
-            outState.putString(STATE_LOG_FORM_RETURN_SCREEN, cookingLogFormReturnScreen.name());
-            outState.putString(STATE_LOG_SEARCH, cookingJournalSearch);
-            outState.putLong(STATE_LOG_FROM_DATE, cookingJournalFromDate);
-            outState.putLong(STATE_LOG_TO_DATE, cookingJournalToDate);
-            outState.putInt(STATE_LOG_FILTER_RATING, cookingJournalRatingFilter);
+        outState.putString(STATE_JOURNAL_RETURN_SCREEN, cookingLogReturnScreen.name());
+        if (isCookingJournalScreen()) {
+            outState.putString(STATE_JOURNAL_RECIPE_ID, cookingLogRecipeId);
+            outState.putString(STATE_JOURNAL_LOG_ID, editingCookingLogId);
+            outState.putString(STATE_JOURNAL_FORM_RETURN, cookingLogFormReturnScreen.name());
         }
         outState.putString(STATE_APP_SCREEN, screen.name());
         outState.putString(STATE_SELECTED_CATEGORY, selectedCategory);
-        outState.putString(STATE_DISCOVER_SEARCH_QUERY, searchViewModel == null
-                ? discoverSearchQuery : searchViewModel.getSearchQuery());
+        outState.putString(
+                STATE_DISCOVER_SEARCH_QUERY,
+                searchViewModel == null ? discoverSearchQuery : searchViewModel.getSearchQuery());
         outState.putString(STATE_DETAIL_RECIPE_ID, detailRecipeId);
         outState.putString(STATE_DETAIL_RETURN_SCREEN, detailReturnScreen.name());
         super.onSaveInstanceState(outState);
@@ -502,89 +478,174 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             window.setStatusBarContrastEnforced(false);
             window.setNavigationBarContrastEnforced(false);
         }
-        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(window, window.getDecorView());
         controller.setAppearanceLightStatusBars(true);
         controller.setAppearanceLightNavigationBars(true);
     }
 
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+        if (renderPending) {
+            renderPending = false;
+            render();
+        }
+    }
+
     private void render() {
+        if (getSupportFragmentManager().isStateSaved()) {
+            renderPending = true;
+            return;
+        }
+        if (isCookingJournalScreen()) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            Fragment restored =
+                    getSupportFragmentManager()
+                            .findFragmentByTag(CookingJournalFragment.class.getName());
+            if (restored instanceof CookingJournalFragment) {
+                cookingJournalFragment = (CookingJournalFragment) restored;
+                if (screen == Screen.COOKING_LOG_FORM && !cookingJournalFragment.isFormShowing())
+                    cookingJournalFragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
+                else cookingJournalFragment.showScreen(screen.name(), cookingLogRecipeId);
+                return;
+            }
+            String initialJournalScreen =
+                    screen == Screen.COOKING_LOG_FORM
+                            ? cookingLogFormReturnScreen.name()
+                            : screen.name();
+            cookingJournalFragment =
+                    CookingJournalFragment.newInstance(initialJournalScreen, cookingLogRecipeId);
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.main_fragment_container,
+                            cookingJournalFragment,
+                            CookingJournalFragment.class.getName())
+                    .commitNow();
+            if (screen == Screen.COOKING_LOG_FORM)
+                cookingJournalFragment.openLogForm(editingCookingLogId, cookingLogRecipeId);
+            return;
+        }
         if (isPantryScreen()) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
-            Fragment restored = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+            Fragment restored =
+                    getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
             if (restored instanceof PantryFragment) {
                 pantryFragment = (PantryFragment) restored;
                 return;
             }
             pantryFragment = PantryFragment.newInstance(createPantryFragmentArguments());
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.main_fragment_container, pantryFragment, PantryFragment.class.getName())
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.main_fragment_container,
+                            pantryFragment,
+                            PantryFragment.class.getName())
                     .commitNow();
             return;
         }
         if (screen == Screen.SHOPPING) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
-            Fragment restored = getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
+            Fragment restored =
+                    getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
             if (restored instanceof ShoppingFragment) {
                 shoppingFragment = (ShoppingFragment) restored;
                 return;
             }
-            shoppingFragment = ShoppingFragment.newInstance(shoppingStatusFilter == null
-                    ? ShoppingViewModel.NEED_TO_BUY : shoppingStatusFilter);
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.main_fragment_container, shoppingFragment, ShoppingFragment.class.getName())
+            shoppingFragment =
+                    ShoppingFragment.newInstance(
+                            shoppingStatusFilter == null
+                                    ? ShoppingViewModel.NEED_TO_BUY
+                                    : shoppingStatusFilter);
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.main_fragment_container,
+                            shoppingFragment,
+                            ShoppingFragment.class.getName())
                     .commitNow();
             return;
         }
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
-            Fragment restored = getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
+            Fragment restored =
+                    getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
             if (restored instanceof MealPlanFragment) {
                 mealPlanFragment = (MealPlanFragment) restored;
                 mealPlanFragment.showPicker(screen == Screen.MEAL_PLAN_PICKER);
                 return;
             }
             mealPlanFragment = MealPlanFragment.newInstance(screen == Screen.MEAL_PLAN_PICKER);
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.main_fragment_container, mealPlanFragment, MealPlanFragment.class.getName())
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.main_fragment_container,
+                            mealPlanFragment,
+                            MealPlanFragment.class.getName())
                     .commitNow();
             return;
         }
-        if (screen == Screen.LIBRARY || screen == Screen.FAVORITES || screen == Screen.COLLECTION_LIST
-                || screen == Screen.COLLECTION || screen == Screen.COLLECTION_FORM || screen == Screen.NOTE) {
+        if (screen == Screen.LIBRARY
+                || screen == Screen.FAVORITES
+                || screen == Screen.COLLECTION_LIST
+                || screen == Screen.COLLECTION
+                || screen == Screen.COLLECTION_FORM
+                || screen == Screen.NOTE) {
             removeLegacyContent();
             fragmentContainer.setVisibility(View.VISIBLE);
-            Fragment restored = getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
+            Fragment restored =
+                    getSupportFragmentManager()
+                            .findFragmentByTag(PersonalDataFragment.class.getName());
             if (restored instanceof PersonalDataFragment) {
                 personalDataFragment = (PersonalDataFragment) restored;
-                personalDataFragment.showScreen(personalDataSection(), selectedCollectionId, noteRecipeId);
+                personalDataFragment.showScreen(
+                        personalDataSection(), selectedCollectionId, noteRecipeId);
                 return;
             }
-            personalDataFragment = PersonalDataFragment.newInstance(
-                    personalDataSection(), selectedCollectionId, noteRecipeId);
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.main_fragment_container, personalDataFragment, PersonalDataFragment.class.getName())
+            personalDataFragment =
+                    PersonalDataFragment.newInstance(
+                            personalDataSection(), selectedCollectionId, noteRecipeId);
+            getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(
+                            R.id.main_fragment_container,
+                            personalDataFragment,
+                            PersonalDataFragment.class.getName())
                     .commitNow();
             return;
         }
-        Fragment existingPantry = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+        Fragment existingPantry =
+                getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
         if (existingPantry != null) {
             getSupportFragmentManager().beginTransaction().remove(existingPantry).commitNow();
             pantryFragment = null;
         }
-        Fragment existingShopping = getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
+        Fragment existingShopping =
+                getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
         if (existingShopping != null) {
             getSupportFragmentManager().beginTransaction().remove(existingShopping).commitNow();
             shoppingFragment = null;
         }
-        Fragment existingMealPlan = getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
+        Fragment existingMealPlan =
+                getSupportFragmentManager().findFragmentByTag(MealPlanFragment.class.getName());
         if (existingMealPlan != null) {
             getSupportFragmentManager().beginTransaction().remove(existingMealPlan).commitNow();
             mealPlanFragment = null;
         }
-        Fragment existingPersonalData = getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
+        Fragment existingJournal =
+                getSupportFragmentManager()
+                        .findFragmentByTag(CookingJournalFragment.class.getName());
+        if (existingJournal != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingJournal).commitNow();
+            cookingJournalFragment = null;
+        }
+        Fragment existingPersonalData =
+                getSupportFragmentManager().findFragmentByTag(PersonalDataFragment.class.getName());
         if (existingPersonalData != null) {
             getSupportFragmentManager().beginTransaction().remove(existingPersonalData).commitNow();
             personalDataFragment = null;
@@ -598,13 +659,19 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         appRoot.setBackgroundColor(CREAM);
         frame.addView(appRoot, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout root = appRoot;
-        ViewCompat.setOnApplyWindowInsetsListener(frame, (view, windowInsets) -> {
-            Insets systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
-            root.setPadding(systemBars.left, systemBars.top, systemBars.right,
-                    Math.max(systemBars.bottom, ime.bottom));
-            return windowInsets;
-        });
+        ViewCompat.setOnApplyWindowInsetsListener(
+                frame,
+                (view, windowInsets) -> {
+                    Insets systemBars =
+                            windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+                    root.setPadding(
+                            systemBars.left,
+                            systemBars.top,
+                            systemBars.right,
+                            Math.max(systemBars.bottom, ime.bottom));
+                    return windowInsets;
+                });
 
         if (screen == Screen.DISCOVER) renderDiscover();
         else if (screen == Screen.CATEGORY_LIST) renderCategoryList();
@@ -617,9 +684,7 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         else if (screen == Screen.WHAT_TO_COOK_RESULTS) renderWhatToCookResults();
         else if (screen == Screen.RECIPE_DETAIL) renderRecipeDetail();
         else if (screen == Screen.SHOPPING_ITEM_FORM) renderShoppingItemForm();
-        else if (screen == Screen.COOKING_JOURNAL) renderAllCookingLogs();
-        else if (screen == Screen.COOKING_LOGS) renderCookingLogs();
-        else renderCookingLogForm();
+        else renderDiscover();
         if (mainContent != null) mainContent.addView(frame, new FrameLayout.LayoutParams(-1, -1));
         if (animateNextScreen) {
             animateNextScreen = false;
@@ -678,7 +743,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         bannerHeader.addView(bannerBadge);
         banner.addView(bannerHeader);
 
-        TextView bannerDesc = text("Gợi ý món ngon từ các nguyên liệu sẵn có trong tủ lạnh của bạn.", 13, TEXT, false);
+        TextView bannerDesc =
+                text(
+                        "Gợi ý món ngon từ các nguyên liệu sẵn có trong tủ lạnh của bạn.",
+                        13,
+                        TEXT,
+                        false);
         bannerDesc.setPadding(0, dp(6), 0, dp(12));
         banner.addView(bannerDesc);
 
@@ -690,16 +760,23 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         });
         content.addView(banner, bannerParams);
 
-        addSectionHeader(content, "Danh mục món ăn", "Xem tất cả ›", () -> {
-            screen = Screen.CATEGORY_LIST;
-            render();
-        }, 24);
+        addSectionHeader(
+                content,
+                "Danh mục món ăn",
+                "Xem tất cả ›",
+                () -> {
+                    screen = Screen.CATEGORY_LIST;
+                    render();
+                },
+                24);
 
         HorizontalScrollView catScroll = new HorizontalScrollView(this);
         catScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout catRow = new LinearLayout(this);
         catRow.setOrientation(LinearLayout.HORIZONTAL);
-        String[] categories = {"Món Việt", "Món Á", "Món Âu", "Bữa sáng", "Món chay", "Món nhanh", "Dễ làm"};
+        String[] categories = {
+            "Món Việt", "Món Á", "Món Âu", "Bữa sáng", "Món chay", "Món nhanh", "Dễ làm"
+        };
         for (String cat : categories) {
             TextView chip = text(cat, 13, TEXT, true);
             chip.setPadding(dp(14), dp(8), dp(14), dp(8));
@@ -716,12 +793,18 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         catScroll.addView(catRow);
         content.addView(catScroll, new LinearLayout.LayoutParams(-1, -2));
 
-        addSectionHeader(content, "Món mới công bố", "Xem tất cả ›", () -> {
-            screen = Screen.NEW_RECIPES;
-            render();
-        }, 24);
-        List<Recipe> newRecipes = discoverViewModel.newlyPublished(
-                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
+        addSectionHeader(
+                content,
+                "Món mới công bố",
+                "Xem tất cả ›",
+                () -> {
+                    screen = Screen.NEW_RECIPES;
+                    render();
+                },
+                24);
+        List<Recipe> newRecipes =
+                discoverViewModel.newlyPublished(
+                        PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
             addText(content, "Chưa có món mới công bố.", 13, MUTED, false, 0, 0, 0, 0);
         } else {
@@ -729,9 +812,13 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         }
 
         addSectionHeader(content, "Món nhanh & Dễ làm", "", () -> {}, 24);
-        List<Recipe> quickRecipes = discoverViewModel.quickAndEasy(
-                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.durationMinutes, recipe -> recipe.difficulty);
-        if (quickRecipes.isEmpty()) addText(content, "Chưa có món vừa nhanh vừa dễ.", 13, MUTED, false, 0, 0, 0, 0);
+        List<Recipe> quickRecipes =
+                discoverViewModel.quickAndEasy(
+                        PreviewRecipeCatalog.designRecipes(),
+                        recipe -> recipe.durationMinutes,
+                        recipe -> recipe.difficulty);
+        if (quickRecipes.isEmpty())
+            addText(content, "Chưa có món vừa nhanh vừa dễ.", 13, MUTED, false, 0, 0, 0, 0);
         else addRecipeGrid(content, quickRecipes, true, true);
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -746,24 +833,26 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
         String[][] categories = {
-                {"Món Việt", "category_vietnamese"},
-                {"Món chính", "category_main"},
-                {"Canh & súp", "category_soup"},
-                {"Món nhanh", "category_quick"},
-                {"Món chay", "category_vegetarian"},
-                {"Bữa sáng", "category_breakfast"}
+            {"Món Việt", "category_vietnamese"},
+            {"Món chính", "category_main"},
+            {"Canh & súp", "category_soup"},
+            {"Món nhanh", "category_quick"},
+            {"Món chay", "category_vegetarian"},
+            {"Bữa sáng", "category_breakfast"}
         };
         for (int i = 0; i < categories.length; i += 2) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
             rowParams.bottomMargin = dp(20);
-            row.addView(createCategoryTile(categories[i][0], categories[i][1]),
+            row.addView(
+                    createCategoryTile(categories[i][0], categories[i][1]),
                     new LinearLayout.LayoutParams(0, -2, 1));
             View gap = new View(this);
             row.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
             if (i + 1 < categories.length) {
-                row.addView(createCategoryTile(categories[i + 1][0], categories[i + 1][1]),
+                row.addView(
+                        createCategoryTile(categories[i + 1][0], categories[i + 1][1]),
                         new LinearLayout.LayoutParams(0, -2, 1));
             } else {
                 row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
@@ -805,9 +894,13 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, selectedCategory.isEmpty() ? "Danh mục món ăn" : selectedCategory);
         addText(page, "Các công thức phù hợp thuộc danh mục.", 14, MUTED, false, 0, 0, 0, 16);
-        List<Recipe> matches = discoverViewModel.recipesInCategory(
-                PreviewRecipeCatalog.designRecipes(), selectedCategory, recipe -> recipe.categories);
-        if (matches.isEmpty()) addText(page, "Danh mục này hiện chưa có món nào.", 14, MUTED, false, 0, 8, 0, 0);
+        List<Recipe> matches =
+                discoverViewModel.recipesInCategory(
+                        PreviewRecipeCatalog.designRecipes(),
+                        selectedCategory,
+                        recipe -> recipe.categories);
+        if (matches.isEmpty())
+            addText(page, "Danh mục này hiện chưa có món nào.", 14, MUTED, false, 0, 8, 0, 0);
         else addRecipeGrid(page, matches, true, true);
         scroll.addView(page);
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -820,11 +913,15 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addText(page, "Món mới", 28, TEXT, true, 0, 0, 0, 0);
         addText(page, "Sắp xếp theo ngày công bố gần nhất.", 14, MUTED, false, 0, 4, 0, 20);
-        List<Recipe> newRecipes = discoverViewModel.newlyPublished(
-                PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
+        List<Recipe> newRecipes =
+                discoverViewModel.newlyPublished(
+                        PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
-            addEmptyCard(page, "Chưa có món mới công bố",
-                    "Món sẽ xuất hiện tại đây sau khi kho công thức cung cấp thời điểm công bố.", () -> {
+            addEmptyCard(
+                    page,
+                    "Chưa có món mới công bố",
+                    "Món sẽ xuất hiện tại đây sau khi kho công thức cung cấp thời điểm công bố.",
+                    () -> {
                         screen = Screen.DISCOVER;
                         render();
                     });
@@ -885,7 +982,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
 
         ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
         clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
-        clearIcon.setVisibility(searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
+        clearIcon.setVisibility(
+                searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
         clearIcon.setOnClickListener(v -> {
             searchViewModel.setSearchQuery("");
             searchInput.setText("");
@@ -896,7 +994,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         page.addView(searchBox, new LinearLayout.LayoutParams(-1, -2));
 
         searchInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH
+                    || actionId == EditorInfo.IME_ACTION_DONE) {
                 String q = searchInput.getText().toString();
                 searchViewModel.submitSearch(q);
                 screen = Screen.SEARCH_RESULTS;
@@ -1031,7 +1130,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             boolean selected = currentRange != null && currentRange == t;
             TextView chip = text(timeLabels[i], 13, selected ? GREEN : TEXT, selected);
             chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
+            chip.setBackground(
+                    roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = dp(8);
             chip.setOnClickListener(v -> {
@@ -1051,7 +1151,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             boolean selected = d.equalsIgnoreCase(currentDiff);
             TextView chip = text(d, 13, selected ? GREEN : TEXT, selected);
             chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
+            chip.setBackground(
+                    roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = dp(8);
             chip.setOnClickListener(v -> {
@@ -1071,7 +1172,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             boolean selected = dt.equalsIgnoreCase(currentDiet);
             TextView chip = text(dt, 13, selected ? GREEN : TEXT, selected);
             chip.setPadding(dp(16), dp(8), dp(16), dp(8));
-            chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
+            chip.setBackground(
+                    roundRect(selected ? PALE_GREEN : WHITE, selected ? GREEN : BORDER, 16));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.rightMargin = dp(8);
             chip.setOnClickListener(v -> {
@@ -1088,13 +1190,20 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         incInput.setBackground(roundRect(WHITE, BORDER, 14));
         incInput.setPadding(dp(14), dp(10), dp(14), dp(10));
         incInput.setSingleLine(true);
-        incInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchViewModel.setDraftIncludeIngredient(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        incInput.addTextChangedListener(
+                new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(
+                            CharSequence s, int start, int count, int after) {}
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        searchViewModel.setDraftIncludeIngredient(s.toString());
+                    }
+
+                    @Override
+                    public void afterTextChanged(Editable s) {}
+                });
         page.addView(incInput, new LinearLayout.LayoutParams(-1, -2));
 
         addText(page, "Nguyên liệu cần loại trừ", 14, TEXT, true, 0, 16, 0, 8);
@@ -1103,13 +1212,20 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         excInput.setBackground(roundRect(WHITE, BORDER, 14));
         excInput.setPadding(dp(14), dp(10), dp(14), dp(10));
         excInput.setSingleLine(true);
-        excInput.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                searchViewModel.setDraftExcludeIngredient(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        excInput.addTextChangedListener(
+                new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(
+                            CharSequence s, int start, int count, int after) {}
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        searchViewModel.setDraftExcludeIngredient(s.toString());
+                    }
+
+                    @Override
+                    public void afterTextChanged(Editable s) {}
+                });
         page.addView(excInput, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout actionRow = new LinearLayout(this);
@@ -1173,7 +1289,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
 
         ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
         clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
-        clearIcon.setVisibility(searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
+        clearIcon.setVisibility(
+                searchViewModel.getSearchQuery().isEmpty() ? View.GONE : View.VISIBLE);
         clearIcon.setOnClickListener(v -> {
             searchViewModel.setSearchQuery("");
             searchInput.setText("");
@@ -1182,7 +1299,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         searchBox.addView(clearIcon, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
         searchInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH
+                    || actionId == EditorInfo.IME_ACTION_DONE) {
                 String q = searchInput.getText().toString();
                 searchViewModel.submitSearch(q);
                 render();
@@ -1253,7 +1371,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             FrameLayout iconBg = new FrameLayout(this);
             iconBg.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 24));
             ImageView searchEmptyIcon = iconView(R.drawable.ic_search_outline, GREEN);
-            iconBg.addView(searchEmptyIcon, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+            iconBg.addView(
+                    searchEmptyIcon, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
             empty.addView(iconBg, new LinearLayout.LayoutParams(dp(72), dp(72)));
 
             TextView emptyTitle = text("Không tìm thấy món", 20, TEXT, true);
@@ -1262,7 +1381,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             etParams.topMargin = dp(20);
             empty.addView(emptyTitle, etParams);
 
-            TextView emptyDesc = text("Thử từ khóa khác hoặc bỏ bớt bộ lọc để mở rộng kết quả.", 14, MUTED, false);
+            TextView emptyDesc =
+                    text(
+                            "Thử từ khóa khác hoặc bỏ bớt bộ lọc để mở rộng kết quả.",
+                            14,
+                            MUTED,
+                            false);
             emptyDesc.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams edParams = new LinearLayout.LayoutParams(-1, -2);
             edParams.topMargin = dp(8);
@@ -1292,13 +1416,32 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Có gì nấu nấy");
-        addText(page, "Chọn nguyên liệu bạn đang có để nhận gợi ý món ăn.", 14, MUTED, false, 0, 0, 0, 16);
+        addText(
+                page,
+                "Chọn nguyên liệu bạn đang có để nhận gợi ý món ăn.",
+                14,
+                MUTED,
+                false,
+                0,
+                0,
+                0,
+                16);
 
         String[][] ingredientGroups = {
-                {"Thịt / Hải sản", "Thịt bò", "Thịt lợn", "Thịt gà", "Cá basa"},
-                {"Rau củ", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ", "Xà lách", "Dưa chuột", "Hành tây", "Hành lá"},
-                {"Trứng / Đậu", "Trứng gà", "Đậu phụ"},
-                {"Gia vị", "Nước mắm", "Tỏi", "Đường", "Hành khô"}
+            {"Thịt / Hải sản", "Thịt bò", "Thịt lợn", "Thịt gà", "Cá basa"},
+            {
+                "Rau củ",
+                "Cà chua",
+                "Dứa",
+                "Đậu bắp",
+                "Giá đỗ",
+                "Xà lách",
+                "Dưa chuột",
+                "Hành tây",
+                "Hành lá"
+            },
+            {"Trứng / Đậu", "Trứng gà", "Đậu phụ"},
+            {"Gia vị", "Nước mắm", "Tỏi", "Đường", "Hành khô"}
         };
         LinearLayout ingSection = vertical();
         ingSection.setBackground(roundRect(WHITE, BORDER, 16));
@@ -1325,8 +1468,18 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         page.addView(ingSection, new LinearLayout.LayoutParams(-1, -2));
 
         Set<String> selectedIngredients = searchViewModel.getSelectedCookingIngredients();
-        addText(page, selectedIngredients.isEmpty() ? "Chưa chọn nguyên liệu"
-                : "Đã chọn " + selectedIngredients.size() + " nguyên liệu", 13, MUTED, false, 0, 12, 0, 0);
+        addText(
+                page,
+                selectedIngredients.isEmpty()
+                        ? "Chưa chọn nguyên liệu"
+                        : "Đã chọn " + selectedIngredients.size() + " nguyên liệu",
+                13,
+                MUTED,
+                false,
+                0,
+                12,
+                0,
+                0);
         if (!selectedIngredients.isEmpty()) {
             TextView clearSelection = text("Bỏ chọn tất cả", 12, GREEN, true);
             clearSelection.setPadding(0, dp(6), 0, dp(4));
@@ -1389,15 +1542,22 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         int availableCount = searchViewModel.availableIngredientCount(recipe);
         int totalCount = searchViewModel.totalIngredientCount(recipe);
         List<String> missing = searchViewModel.missingIngredients(recipe);
-        TextView availableBadge = text("✓ Đã có " + availableCount + "/" + totalCount, 11, GREEN, true);
+        TextView availableBadge =
+                text("✓ Đã có " + availableCount + "/" + totalCount, 11, GREEN, true);
         availableBadge.setPadding(dp(8), dp(5), dp(8), dp(5));
         availableBadge.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 12));
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(-2, -2);
         badgeLp.topMargin = dp(8);
         content.addView(availableBadge, badgeLp);
 
-        TextView missingBadge = text(missing.isEmpty() ? "Đủ nguyên liệu"
-                : "Thiếu " + missing.size() + " nguyên liệu", 11, missing.isEmpty() ? GREEN : TEXT, true);
+        TextView missingBadge =
+                text(
+                        missing.isEmpty()
+                                ? "Đủ nguyên liệu"
+                                : "Thiếu " + missing.size() + " nguyên liệu",
+                        11,
+                        missing.isEmpty() ? GREEN : TEXT,
+                        true);
         missingBadge.setPadding(dp(8), dp(5), dp(8), dp(5));
         missingBadge.setBackground(roundRect(missing.isEmpty() ? PALE_GREEN : CREAM, BORDER, 12));
         LinearLayout.LayoutParams missingLp = new LinearLayout.LayoutParams(-2, -2);
@@ -1423,29 +1583,60 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         addBackTitle(page, "Món gợi ý phù hợp");
         Set<String> available = searchViewModel.getSelectedCookingIngredients();
         if (available.isEmpty()) {
-            addEmptyCard(page, "Chưa chọn nguyên liệu",
-                    "Quay lại để chọn ít nhất một nguyên liệu bạn đang có.", () -> {
+            addEmptyCard(
+                    page,
+                    "Chưa chọn nguyên liệu",
+                    "Quay lại để chọn ít nhất một nguyên liệu bạn đang có.",
+                    () -> {
                         screen = Screen.WHAT_TO_COOK_INGREDIENTS;
                         render();
                     });
         } else {
-            List<Recipe> matches = searchViewModel.suggestRecipes(PreviewRecipeCatalog.designRecipes());
-            if (!searchViewModel.hasCompleteRecipeIngredients(PreviewRecipeCatalog.designRecipes())) {
-                addEmptyCard(page, "Chưa có đủ dữ liệu nguyên liệu",
-                        "Gợi ý sẽ xuất hiện khi kho công thức cung cấp đầy đủ nguyên liệu cho món.", () -> {
+            List<Recipe> matches =
+                    searchViewModel.suggestRecipes(PreviewRecipeCatalog.designRecipes());
+            if (!searchViewModel.hasCompleteRecipeIngredients(
+                    PreviewRecipeCatalog.designRecipes())) {
+                addEmptyCard(
+                        page,
+                        "Chưa có đủ dữ liệu nguyên liệu",
+                        "Gợi ý sẽ xuất hiện khi kho công thức cung cấp đầy đủ nguyên liệu cho món.",
+                        () -> {
                             screen = Screen.WHAT_TO_COOK_INGREDIENTS;
                             render();
                         });
             } else if (matches.isEmpty()) {
-                addEmptyCard(page, "Không có món phù hợp",
-                        "Thử chọn thêm nguyên liệu để tìm được nhiều món hơn.", () -> {
+                addEmptyCard(
+                        page,
+                        "Không có món phù hợp",
+                        "Thử chọn thêm nguyên liệu để tìm được nhiều món hơn.",
+                        () -> {
                             screen = Screen.WHAT_TO_COOK_INGREDIENTS;
                             render();
                         });
             } else {
-                addText(page, "Món đủ nguyên liệu đứng trước; các món còn lại xếp theo số nguyên liệu thiếu.", 13, MUTED, false, 0, 0, 0, 16);
-                if (searchViewModel.hasIncompleteRecipeIngredients(PreviewRecipeCatalog.designRecipes())) {
-                    addText(page, "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.", 12, MUTED, false, 0, 0, 0, 12);
+                addText(
+                        page,
+                        "Món đủ nguyên liệu đứng trước; các món còn lại xếp theo số nguyên liệu"
+                            + " thiếu.",
+                        13,
+                        MUTED,
+                        false,
+                        0,
+                        0,
+                        0,
+                        16);
+                if (searchViewModel.hasIncompleteRecipeIngredients(
+                        PreviewRecipeCatalog.designRecipes())) {
+                    addText(
+                            page,
+                            "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.",
+                            12,
+                            MUTED,
+                            false,
+                            0,
+                            0,
+                            0,
+                            12);
                 }
                 for (Recipe recipe : matches) {
                     addSuggestionCard(page, recipe);
@@ -1475,10 +1666,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         imgFrame.addView(img, new FrameLayout.LayoutParams(-1, dp(180)));
 
         boolean favorite = personalDataViewModel.isFavorite(recipe.id);
-        ImageView star = iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
+        ImageView star =
+                iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
         star.setBackground(roundRect(WHITE, WHITE, 18));
         star.setPadding(dp(8), dp(8), dp(8), dp(8));
-        FrameLayout.LayoutParams starParams = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END | Gravity.TOP);
+        FrameLayout.LayoutParams starParams =
+                new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END | Gravity.TOP);
         starParams.setMargins(0, dp(12), dp(12), 0);
         imgFrame.addView(star, starParams);
         star.setOnClickListener(v -> {
@@ -1494,7 +1687,16 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         LinearLayout infoRow = new LinearLayout(this);
         infoRow.setPadding(dp(16), dp(14), dp(16), dp(14));
         infoRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView metaText = text("⏱ " + recipe.duration + "   •   📊 Độ khó: " + recipe.difficulty + "   •   👥 2-4 người", 13, TEXT, false);
+        TextView metaText =
+                text(
+                        "⏱ "
+                                + recipe.duration
+                                + "   •   📊 Độ khó: "
+                                + recipe.difficulty
+                                + "   •   👥 2-4 người",
+                        13,
+                        TEXT,
+                        false);
         infoRow.addView(metaText);
         card.addView(infoRow);
         page.addView(card, new LinearLayout.LayoutParams(-1, -2));
@@ -1528,14 +1730,33 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         LinearLayout ingCard = vertical();
         ingCard.setBackground(roundRect(WHITE, BORDER, 14));
         ingCard.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addText(ingCard, "Định lượng nguyên liệu chi tiết theo khẩu phần (Module 3 của Người 2 đang hoàn thiện).", 13, MUTED, false, 0, 0, 0, 0);
+        addText(
+                ingCard,
+                "Định lượng nguyên liệu chi tiết theo khẩu phần (Module 3 của Người 2 đang hoàn"
+                    + " thiện).",
+                13,
+                MUTED,
+                false,
+                0,
+                0,
+                0,
+                0);
         page.addView(ingCard, new LinearLayout.LayoutParams(-1, -2));
 
         addSectionHeader(page, "Các bước nấu", "", () -> {}, 24);
         LinearLayout stepCard = vertical();
         stepCard.setBackground(roundRect(WHITE, BORDER, 14));
         stepCard.setPadding(dp(16), dp(14), dp(16), dp(14));
-        addText(stepCard, "Hướng dẫn từng bước kèm hẹn giờ nấu (Module 4 của Người 2 đang hoàn thiện).", 13, MUTED, false, 0, 0, 0, 0);
+        addText(
+                stepCard,
+                "Hướng dẫn từng bước kèm hẹn giờ nấu (Module 4 của Người 2 đang hoàn thiện).",
+                13,
+                MUTED,
+                false,
+                0,
+                0,
+                0,
+                0);
         page.addView(stepCard, new LinearLayout.LayoutParams(-1, -2));
 
         appRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -1543,8 +1764,10 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
     }
 
     private static String normalizeRecipeSearch(String value) {
-        String decomposed = java.text.Normalizer.normalize(value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
-                java.text.Normalizer.Form.NFD);
+        String decomposed =
+                java.text.Normalizer.normalize(
+                        value == null ? "" : value.trim().toLowerCase(Locale.ROOT),
+                        java.text.Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "").replace('đ', 'd');
     }
 
@@ -1572,9 +1795,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         params.bottomMargin = dp(bottom);
         return params;
     }
-
-
-
 
     private void openShoppingItemForm(String itemId) {
         editingShoppingItemId = itemId;
@@ -1656,11 +1876,14 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         int selected = ShoppingCategoryCatalog.ORDER.indexOf(shoppingDraftCategory);
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Chọn danh mục")
-                .setSingleChoiceItems(categories, Math.max(0, selected), (dialog, which) -> {
-                    shoppingDraftCategory = categories[which];
-                    shoppingCategoryInput.setText(shoppingDraftCategory + "     ▾");
-                    dialog.dismiss();
-                })
+                .setSingleChoiceItems(
+                        categories,
+                        Math.max(0, selected),
+                        (dialog, which) -> {
+                            shoppingDraftCategory = categories[which];
+                            shoppingCategoryInput.setText(shoppingDraftCategory + "     ▾");
+                            dialog.dismiss();
+                        })
                 .setNegativeButton("Hủy", null)
                 .show();
     }
@@ -1669,9 +1892,11 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         shoppingDraftName = shoppingNameInput.getText().toString();
         shoppingDraftAmount = shoppingAmountInput.getText().toString();
         shoppingDraftUnit = shoppingUnitInput.getText().toString();
-        String canonicalUnit = shoppingDraftUnit.equals(shoppingUnitInput.getText().toString())
-                && !shoppingDraftUnitId.isEmpty()
-                ? shoppingDraftUnitId : KitchenUnitCatalog.canonicalId(shoppingDraftUnit);
+        String canonicalUnit =
+                shoppingDraftUnit.equals(shoppingUnitInput.getText().toString())
+                                && !shoppingDraftUnitId.isEmpty()
+                        ? shoppingDraftUnitId
+                        : KitchenUnitCatalog.canonicalId(shoppingDraftUnit);
         String status;
         if (editingShoppingItemId == null) {
             status = null; // The ViewModel checks known pantry stock asynchronously.
@@ -1679,8 +1904,13 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             ShoppingListItem existing = shoppingViewModel.findItem(editingShoppingItemId);
             status = existing == null ? ShoppingViewModel.NEED_TO_BUY : existing.status;
         }
-        if (!shoppingViewModel.saveItem(editingShoppingItemId, shoppingDraftName, shoppingDraftAmount,
-                canonicalUnit, shoppingDraftCategory, status)) {
+        if (!shoppingViewModel.saveItem(
+                editingShoppingItemId,
+                shoppingDraftName,
+                shoppingDraftAmount,
+                canonicalUnit,
+                shoppingDraftCategory,
+                status)) {
             return;
         }
     }
@@ -1692,11 +1922,14 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
                 .setTitle("Xóa nguyên liệu?")
                 .setMessage("Xóa “" + item.name + "” khỏi danh sách mua sắm?")
                 .setNegativeButton("Hủy", null)
-                .setPositiveButton("Xóa", (dialog, which) -> {
-                    shoppingViewModel.deleteItem(itemId);
-                    screen = Screen.SHOPPING;
-                    render();
-                }).show();
+                .setPositiveButton(
+                        "Xóa",
+                        (dialog, which) -> {
+                            shoppingViewModel.deleteItem(itemId);
+                            screen = Screen.SHOPPING;
+                            render();
+                        })
+                .show();
     }
 
     private void showShoppingPlanUpdate(ShoppingViewModel.PlanUpdate update) {
@@ -1724,9 +1957,14 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         close.setOnClickListener(v -> dialog.dismiss());
         sheet.addView(titleRow);
 
-        TextView description = text(update.message +
-                " Chưa có dữ liệu định lượng trong công thức; cập nhật sẽ ghi nhận kế hoạch mới và giữ nguyên các mục mua thủ công.",
-                15, MUTED, false);
+        TextView description =
+                text(
+                        update.message
+                                + " Chưa có dữ liệu định lượng trong công thức; cập nhật sẽ ghi"
+                                + " nhận kế hoạch mới và giữ nguyên các mục mua thủ công.",
+                        15,
+                        MUTED,
+                        false);
         description.setLineSpacing(dp(4), 1f);
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
         descriptionParams.topMargin = dp(10);
@@ -1774,8 +2012,11 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         refresh.setOnClickListener(v -> {
             shoppingViewModel.acceptPlanUpdate(update);
             dialog.dismiss();
-            Toast.makeText(this, "Đã ghi nhận kế hoạch mới; mục nhập tay được giữ nguyên.",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(
+                            this,
+                            "Đã ghi nhận kế hoạch mới; mục nhập tay được giữ nguyên.",
+                            Toast.LENGTH_SHORT)
+                    .show();
         });
         dialog.setContentView(sheet);
         dialog.show();
@@ -1790,26 +2031,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         render();
     }
 
-
-
-
-
-
-
     private void openMealPlanPicker() {
         mealPlanViewModel.beginPicker();
         mealPlanViewModel.refresh();
         screen = Screen.MEAL_PLAN_PICKER;
         render();
     }
-
-
-
-
-
-
-
-
 
     private void openPantry(Screen returnScreen) {
         pantryReturnScreen = returnScreen == Screen.PANTRY ? Screen.SHOPPING : returnScreen;
@@ -1818,62 +2045,90 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         render();
     }
 
-    private boolean isPantryScreen() { return screen == Screen.PANTRY || screen == Screen.PANTRY_FORM; }
+    private boolean isPantryScreen() {
+        return screen == Screen.PANTRY || screen == Screen.PANTRY_FORM;
+    }
 
     private PantryFragment activePantryFragment() {
-        Fragment fragment = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+        Fragment fragment =
+                getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
         return fragment instanceof PantryFragment ? (PantryFragment) fragment : pantryFragment;
     }
 
-    @Override public void onShoppingBack() {
+    @Override
+    public void onShoppingBack() {
         screen = shoppingReturnScreen == Screen.SHOPPING ? Screen.DISCOVER : shoppingReturnScreen;
         render();
     }
 
-    @Override public void onShoppingNavigateTab(int tab) {
+    @Override
+    public void onShoppingNavigateTab(int tab) {
         animateNextScreen = true;
-        clearCookingJournalDateRangeIfLeavingJournal();
         if (tab == 0) screen = Screen.DISCOVER;
-        else if (tab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
-        else if (tab == 2) return;
+        else if (tab == 1) {
+            screen = Screen.MEAL_PLAN;
+            mealPlanViewModel.refresh();
+        } else if (tab == 2) return;
         else screen = Screen.LIBRARY;
         render();
     }
 
-    @Override public void onShoppingOpenPantry() {
+    @Override
+    public void onShoppingOpenPantry() {
         pantryReturnScreen = Screen.SHOPPING;
         screen = Screen.PANTRY;
         pantryViewModel.refreshItems();
         render();
     }
 
-    @Override public void onShoppingEditItem(String id) { openShoppingItemForm(id); }
+    @Override
+    public void onShoppingEditItem(String id) {
+        openShoppingItemForm(id);
+    }
 
-    @Override public void onShoppingFilterChanged(String status) { shoppingStatusFilter = status; }
+    @Override
+    public void onShoppingFilterChanged(String status) {
+        shoppingStatusFilter = status;
+    }
 
-    @Override public void onMealPlanOpenPicker() { openMealPlanPicker(); }
+    @Override
+    public void onMealPlanOpenPicker() {
+        openMealPlanPicker();
+    }
 
-    @Override public void onMealPlanBackFromPicker() {
+    @Override
+    public void onMealPlanBackFromPicker() {
         screen = Screen.MEAL_PLAN;
         render();
     }
 
-    @Override public void onMealPlanSelectionSaved() {
+    @Override
+    public void onMealPlanSelectionSaved() {
         screen = Screen.MEAL_PLAN;
         render();
     }
 
-    @Override public void onMealPlanOpenShopping() { openShoppingList(Screen.MEAL_PLAN); }
+    @Override
+    public void onMealPlanOpenShopping() {
+        openShoppingList(Screen.MEAL_PLAN);
+    }
 
-    @Override public void onMealPlanOpenRecipe(Recipe recipe) { openRecipeDetail(recipe); }
+    @Override
+    public void onMealPlanOpenRecipe(Recipe recipe) {
+        openRecipeDetail(recipe);
+    }
 
-    @Override public void onMealPlanNavigateTab(int tab) {
+    @Override
+    public void onMealPlanNavigateTab(int tab) {
         animateNextScreen = true;
-        clearCookingJournalDateRangeIfLeavingJournal();
         if (tab == 0) screen = Screen.DISCOVER;
-        else if (tab == 1) { mealPlanViewModel.refresh(); return; }
-        else if (tab == 2) { openShoppingList(Screen.MEAL_PLAN); return; }
-        else screen = Screen.LIBRARY;
+        else if (tab == 1) {
+            mealPlanViewModel.refresh();
+            return;
+        } else if (tab == 2) {
+            openShoppingList(Screen.MEAL_PLAN);
+            return;
+        } else screen = Screen.LIBRARY;
         render();
     }
 
@@ -1886,57 +2141,159 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         return "LIBRARY";
     }
 
-    @Override public void onPersonalOpenFavorites() { screen = Screen.FAVORITES; render(); }
+    @Override
+    public void onPersonalOpenFavorites() {
+        screen = Screen.FAVORITES;
+        render();
+    }
 
-    @Override public void onPersonalOpenCollections() { screen = Screen.COLLECTION_LIST; render(); }
+    @Override
+    public void onPersonalOpenCollections() {
+        screen = Screen.COLLECTION_LIST;
+        render();
+    }
 
-    @Override public void onPersonalCreateCollection() { openCollectionForm(null); }
+    @Override
+    public void onPersonalCreateCollection() {
+        openCollectionForm(null);
+    }
 
-    @Override public void onPersonalEditCollection(long collectionId) { openCollectionForm(collectionId); }
+    @Override
+    public void onPersonalEditCollection(long collectionId) {
+        openCollectionForm(collectionId);
+    }
 
-    @Override public void onPersonalDeleteCollection(long collectionId) {
+    @Override
+    public void onPersonalDeleteCollection(long collectionId) {
         personalDataViewModel.deleteCollection(collectionId);
         selectedCollectionId = -1L;
         screen = collectionReturnScreen;
         render();
     }
 
-    @Override public void onPersonalCollectionSaved(long collectionId) {
+    @Override
+    public void onPersonalCollectionSaved(long collectionId) {
         selectedCollectionId = collectionId;
         screen = Screen.COLLECTION;
         render();
     }
 
-    @Override public void onPersonalOpenCollection(long collectionId) {
+    @Override
+    public void onPersonalOpenCollection(long collectionId) {
         selectedCollectionId = collectionId;
         collectionReturnScreen = Screen.LIBRARY;
         screen = Screen.COLLECTION;
         render();
     }
 
-    @Override public void onPersonalOpenRecipe(Recipe recipe) { openRecipeDetail(recipe); }
+    @Override
+    public void onPersonalOpenRecipe(Recipe recipe) {
+        openRecipeDetail(recipe);
+    }
 
-    @Override public void onPersonalOpenNote(Recipe recipe) { openRecipeNote(recipe); }
+    @Override
+    public void onPersonalOpenNote(Recipe recipe) {
+        openRecipeNote(recipe);
+    }
 
-    @Override public Recipe onPersonalResolveRecipe(String recipeId) { return recipeById(recipeId); }
+    @Override
+    public Recipe onPersonalResolveRecipe(String recipeId) {
+        return recipeById(recipeId);
+    }
 
-    @Override public void onPersonalOpenRecipeLogs(String recipeId) { openCookingLogs(recipeId, Screen.NOTE); }
+    @Override
+    public void onPersonalOpenRecipeLogs(String recipeId) {
+        openCookingLogs(recipeId, Screen.NOTE);
+    }
 
-    @Override public void onPersonalCreateCookingLog(String recipeId) { openCookingLogForm(null, recipeId); }
+    @Override
+    public void onPersonalCreateCookingLog(String recipeId) {
+        openCookingLogForm(null, recipeId);
+    }
 
-    @Override public void onPersonalOpenJournal() { openAllCookingLogs(Screen.LIBRARY); }
+    @Override
+    public void onPersonalOpenJournal() {
+        openAllCookingLogs(Screen.LIBRARY);
+    }
 
-    @Override public void onPersonalNavigateTab(int tab) {
+    @Override
+    public void onPersonalNavigateTab(int tab) {
         animateNextScreen = true;
-        clearCookingJournalDateRangeIfLeavingJournal();
         if (tab == 0) screen = Screen.DISCOVER;
-        else if (tab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
-        else if (tab == 2) { openShoppingList(Screen.LIBRARY); return; }
-        else screen = Screen.LIBRARY;
+        else if (tab == 1) {
+            screen = Screen.MEAL_PLAN;
+            mealPlanViewModel.refresh();
+        } else if (tab == 2) {
+            openShoppingList(Screen.LIBRARY);
+            return;
+        } else screen = Screen.LIBRARY;
         render();
     }
 
-    @Override public void onPersonalBack() { getOnBackPressedDispatcher().onBackPressed(); }
+    @Override
+    public void onPersonalBack() {
+        getOnBackPressedDispatcher().onBackPressed();
+    }
+
+    @Override
+    public Recipe onJournalResolveRecipe(String recipeId) {
+        return recipeById(recipeId);
+    }
+
+    @Override
+    public void onJournalBack(String currentScreen) {
+        if (Screen.COOKING_JOURNAL.name().equals(currentScreen)) screen = cookingLogReturnScreen;
+        else screen = Screen.NOTE;
+        render();
+    }
+
+    @Override
+    public void onJournalOpenRecipeNote(String recipeId) {
+        noteRecipeId = recipeId;
+        noteReturnScreen = Screen.LIBRARY;
+        screen = Screen.NOTE;
+        render();
+    }
+
+    @Override
+    public void onJournalNavigateTab(int tab) {
+        animateNextScreen = true;
+        if (tab == 0) screen = Screen.DISCOVER;
+        else if (tab == 1) {
+            screen = Screen.MEAL_PLAN;
+            mealPlanViewModel.refresh();
+        } else if (tab == 2) {
+            openShoppingList(Screen.COOKING_JOURNAL);
+            return;
+        } else screen = Screen.LIBRARY;
+        render();
+    }
+
+    @Override
+    public void onJournalScreenChanged(String route, String recipeId) {
+        try {
+            screen = Screen.valueOf(route);
+        } catch (IllegalArgumentException invalid) {
+            screen = Screen.COOKING_JOURNAL;
+        }
+        cookingLogRecipeId = recipeId;
+        if (!isCookingJournalScreen()) render();
+    }
+
+    private CookingJournalFragment activeCookingJournalFragment() {
+        Fragment fragment =
+                getSupportFragmentManager()
+                        .findFragmentByTag(CookingJournalFragment.class.getName());
+        return fragment instanceof CookingJournalFragment
+                ? (CookingJournalFragment) fragment
+                : null;
+    }
+
+    private boolean isCookingJournalScreen() {
+        return screen == Screen.COOKING_JOURNAL
+                || screen == Screen.COOKING_LOGS
+                || screen == Screen.COOKING_LOG_FORM;
+    }
 
     private Bundle createPantryFragmentArguments() {
         Bundle args = new Bundle();
@@ -1944,31 +2301,43 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         return args;
     }
 
-    @Override public void onPantryClose() {
+    @Override
+    public void onPantryClose() {
         screen = pantryReturnScreen;
         render();
     }
 
-    @Override public void onPantryScreenChanged(boolean showingForm) {
+    @Override
+    public void onPantryScreenChanged(boolean showingForm) {
         screen = showingForm ? Screen.PANTRY_FORM : Screen.PANTRY;
     }
 
-    @Override public void onPantryNavigateTab(int selectedTab) {
+    @Override
+    public void onPantryNavigateTab(int selectedTab) {
         animateNextScreen = true;
-        clearCookingJournalDateRangeIfLeavingJournal();
         if (selectedTab == 0) screen = Screen.DISCOVER;
-        else if (selectedTab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
-        else if (selectedTab == 2) { openShoppingList(Screen.PANTRY); return; }
-        else screen = Screen.LIBRARY;
+        else if (selectedTab == 1) {
+            screen = Screen.MEAL_PLAN;
+            mealPlanViewModel.refresh();
+        } else if (selectedTab == 2) {
+            openShoppingList(Screen.PANTRY);
+            return;
+        } else screen = Screen.LIBRARY;
         render();
     }
-
 
     private void openCookingLogs(String recipeId, Screen returnScreen) {
         cookingLogRecipeId = recipeId;
         cookingLogReturnScreen = returnScreen;
         screen = Screen.COOKING_LOGS;
-        cookingJournalViewModel.refresh();
+        render();
+    }
+
+    private void openCookingLogForm(String logId, String recipeId) {
+        cookingLogFormReturnScreen = screen;
+        cookingLogRecipeId = recipeId;
+        editingCookingLogId = logId;
+        screen = Screen.COOKING_LOG_FORM;
         render();
     }
 
@@ -1976,571 +2345,29 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         cookingLogRecipeId = null;
         cookingLogReturnScreen = returnScreen;
         screen = Screen.COOKING_JOURNAL;
-        cookingJournalViewModel.refresh();
         render();
-    }
-
-    private void renderAllCookingLogs() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(12));
-        addBackTitle(page, "Nhật ký nấu của tôi");
-        addText(page, "Tìm lại những lần bạn đã nấu.", 14, MUTED, false, 0, 0, 0, 14);
-
-        List<CookingLogEntry> allLogs = cookingJournalViewModel.getAllLogs();
-        cookingJournalAllLogs = allLogs;
-        addJournalStatsCard(page, cookingJournalViewModel.getStats());
-
-        FrameLayout searchBox = createRecipeSearchBox(cookingJournalSearch, "Tìm món hoặc ghi chú",
-                new TextWatcher() {
-                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                        cookingJournalSearch = s.toString();
-                        populateAllCookingLogs(logRows, allLogs.size());
-                    }
-                    @Override public void afterTextChanged(Editable s) { }
-                });
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
-        searchParams.topMargin = dp(16);
-        searchParams.bottomMargin = dp(10);
-        page.addView(searchBox, searchParams);
-
-        LinearLayout dateFilters = new LinearLayout(this);
-        dateFilters.setGravity(Gravity.CENTER_VERTICAL);
-        dateFilters.addView(createJournalDateFilter(true), new LinearLayout.LayoutParams(0, dp(54), 1));
-        View dateGap = new View(this);
-        dateFilters.addView(dateGap, new LinearLayout.LayoutParams(dp(8), 1));
-        dateFilters.addView(createJournalDateFilter(false), new LinearLayout.LayoutParams(0, dp(54), 1));
-        page.addView(dateFilters);
-
-        LinearLayout ratingFilters = new LinearLayout(this);
-        addJournalRatingChip(ratingFilters, "Tất cả", 0);
-        for (int rating = 5; rating >= 1; rating--) addJournalRatingChip(ratingFilters, rating + " ★", rating);
-        HorizontalScrollView ratingScroll = new HorizontalScrollView(this);
-        ratingScroll.setHorizontalScrollBarEnabled(false);
-        ratingScroll.addView(ratingFilters, new HorizontalScrollView.LayoutParams(-2, -2));
-        LinearLayout.LayoutParams ratingParams = new LinearLayout.LayoutParams(-1, dp(46));
-        ratingParams.topMargin = dp(8);
-        page.addView(ratingScroll, ratingParams);
-
-        if (cookingJournalFromDate > 0 || cookingJournalToDate > 0 || cookingJournalRatingFilter > 0
-                || !cookingJournalSearch.trim().isEmpty()) {
-            TextView clearFilters = text("Xóa bộ lọc", 13, GREEN, true);
-            clearFilters.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-1, dp(36));
-            clearParams.bottomMargin = dp(4);
-            page.addView(clearFilters, clearParams);
-            clearFilters.setOnClickListener(v -> {
-                cookingJournalSearch = "";
-                cookingJournalFromDate = 0;
-                cookingJournalToDate = 0;
-                cookingJournalRatingFilter = 0;
-                render();
-            });
-        }
-
-        ScrollView scroll = scrollContent();
-        logRows = vertical();
-        logRows.setPadding(0, dp(8), 0, dp(12));
-        scroll.addView(logRows);
-        populateAllCookingLogs(logRows, allLogs.size());
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(3);
-    }
-
-    private LinearLayout logRows;
-
-    private void addJournalStatsCard(LinearLayout parent, CookingJournalViewModel.JournalStats stats) {
-        LinearLayout card = vertical();
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
-        card.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 16));
-        addJournalStatRow(card, "Món nấu nhiều nhất", stats.mostCookedCount == 0
-                ? "Chưa có" : stats.mostCookedRecipe + " · " + stats.mostCookedCount + " lần");
-        addJournalStatRow(card, "Lần nấu gần nhất", stats.lastCookedAt == null
-                ? "Chưa có" : formatDate(stats.lastCookedAt));
-        addJournalStatRow(card, "Đánh giá gần nhất", stats.latestRating == null
-                ? "Chưa đánh giá" : ratingStars(stats.latestRating));
-        parent.addView(card, new LinearLayout.LayoutParams(-1, -2));
-    }
-
-    private void addJournalStatRow(LinearLayout card, String label, String value) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView labelView = text(label, 12, MUTED, false);
-        row.addView(labelView, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView valueView = text(value, 13, TEXT, true);
-        valueView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        valueView.setMaxLines(2);
-        valueView.setMaxWidth(dp(200));
-        row.addView(valueView, new LinearLayout.LayoutParams(0, -2, 1));
-        card.addView(row);
-        if (!"Đánh giá gần nhất".equals(label)) {
-            View divider = new View(this);
-            divider.setBackgroundColor(Color.rgb(211, 226, 212));
-            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1));
-            dividerParams.topMargin = dp(7);
-            dividerParams.bottomMargin = dp(7);
-            card.addView(divider, dividerParams);
-        }
-    }
-
-    private LinearLayout createJournalDateFilter(boolean startDate) {
-        long selectedDate = startDate ? cookingJournalFromDate : cookingJournalToDate;
-        String title = startDate ? "Từ ngày" : "Đến ngày";
-        TextView field = text(title + "\n" + (selectedDate == 0 ? "Chọn ngày" : formatDate(selectedDate)),
-                12, selectedDate == 0 ? MUTED : TEXT, true);
-        field.setGravity(Gravity.CENTER_VERTICAL);
-        field.setPadding(dp(12), dp(5), dp(6), dp(5));
-        field.setOnClickListener(v -> showJournalDatePicker(startDate));
-        LinearLayout container = new LinearLayout(this);
-        container.setGravity(Gravity.CENTER_VERTICAL);
-        container.setBackground(roundRect(WHITE, BORDER, 14));
-        container.addView(field, new LinearLayout.LayoutParams(0, -1, 1));
-        if (selectedDate > 0) {
-            TextView clear = text("×", 20, MUTED, true);
-            clear.setGravity(Gravity.CENTER);
-            clear.setContentDescription(startDate ? "Xóa ngày bắt đầu" : "Xóa ngày kết thúc");
-            container.addView(clear, new LinearLayout.LayoutParams(dp(38), dp(44)));
-            clear.setOnClickListener(v -> {
-                if (startDate) cookingJournalFromDate = 0;
-                else cookingJournalToDate = 0;
-                render();
-            });
-        }
-        return container;
-    }
-
-    private void clearCookingJournalDateRange() {
-        cookingJournalFromDate = 0;
-        cookingJournalToDate = 0;
-    }
-
-    private void showJournalDatePicker(boolean startDate) {
-        long selectedDate = startDate ? cookingJournalFromDate : cookingJournalToDate;
-        Calendar selected = Calendar.getInstance();
-        if (selectedDate > 0) selected.setTimeInMillis(selectedDate);
-        new DatePickerDialog(this, (picker, year, month, day) -> {
-            Calendar picked = Calendar.getInstance();
-            picked.clear();
-            picked.set(year, month, day);
-            long value = picked.getTimeInMillis();
-            if (startDate) cookingJournalFromDate = value;
-            else cookingJournalToDate = value;
-            render();
-        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show();
-    }
-
-    private void addJournalRatingChip(LinearLayout parent, String label, int rating) {
-        boolean selected = cookingJournalRatingFilter == rating;
-        TextView chip = text(label, 12, selected ? GREEN : MUTED, true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(11), 0, dp(11), 0);
-        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? PALE_GREEN : BORDER, 20));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(34));
-        params.rightMargin = dp(7);
-        parent.addView(chip, params);
-        chip.setOnClickListener(v -> {
-            cookingJournalRatingFilter = rating;
-            render();
-        });
-    }
-
-    private void populateAllCookingLogs(LinearLayout rows, int totalCount) {
-        if (rows == null) return;
-        rows.removeAllViews();
-        long fromInclusive = cookingJournalFromDate;
-        long toExclusive = 0;
-        if (cookingJournalToDate > 0) {
-            Calendar nextDay = Calendar.getInstance();
-            nextDay.setTimeInMillis(cookingJournalToDate);
-            nextDay.add(Calendar.DAY_OF_YEAR, 1);
-            toExclusive = nextDay.getTimeInMillis();
-        }
-        if (fromInclusive > 0 && toExclusive > 0 && fromInclusive >= toExclusive) {
-            addEmptyCard(rows, "Khoảng ngày chưa hợp lệ", "Ngày bắt đầu phải trước hoặc cùng ngày kết thúc.", () -> {
-                cookingJournalFromDate = 0;
-                cookingJournalToDate = 0;
-                render();
-            });
-            return;
-        }
-        List<CookingLogEntry> filtered = cookingJournalViewModel.filterLogs(
-                cookingJournalAllLogs, cookingJournalSearch, fromInclusive, toExclusive, cookingJournalRatingFilter);
-        addText(rows, filtered.size() + " lần nấu",
-                13, MUTED, false, 0, 4, 0, 8);
-        if (filtered.isEmpty()) {
-            if (totalCount == 0) {
-                addEmptyCard(rows, "Chưa có lần nấu nào", "Mở ghi chú của một món để ghi lại lần nấu đầu tiên.",
-                        () -> { screen = Screen.LIBRARY; render(); });
-            } else {
-                addEmptyCard(rows, "Không tìm thấy lần nấu phù hợp", "Thử đổi từ khóa hoặc điều kiện lọc.", () -> {
-                    cookingJournalSearch = "";
-                    cookingJournalFromDate = 0;
-                    cookingJournalToDate = 0;
-                    cookingJournalRatingFilter = 0;
-                    render();
-                });
-            }
-            return;
-        }
-        for (CookingLogEntry log : filtered) addCookingLogCard(rows, log, true);
-    }
-
-    private void renderCookingLogs() {
-        Recipe recipe = recipeById(cookingLogRecipeId);
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(12));
-        addBackTitle(page, "Nhật ký nấu");
-        LinearLayout recipeCard = new LinearLayout(this);
-        recipeCard.setGravity(Gravity.CENTER_VERTICAL);
-        recipeCard.setPadding(dp(8), dp(7), dp(12), dp(7));
-        recipeCard.setBackground(roundRect(WHITE, BORDER, 14));
-        recipeCard.addView(recipeImage(recipe), new LinearLayout.LayoutParams(dp(58), dp(52)));
-        LinearLayout recipeLabels = vertical();
-        recipeLabels.setPadding(dp(12), 0, 0, 0);
-        recipeLabels.addView(text(recipe.title, 14, TEXT, true));
-        recipeLabels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
-        recipeCard.addView(recipeLabels, new LinearLayout.LayoutParams(0, -2, 1));
-        LinearLayout.LayoutParams recipeParams = new LinearLayout.LayoutParams(-1, -2);
-        recipeParams.topMargin = dp(18);
-        page.addView(recipeCard, recipeParams);
-
-        List<CookingLogEntry> logs = cookingJournalViewModel.getLogs(recipe.id);
-        addText(page, "Đã nấu " + logs.size() + (logs.size() == 1 ? " lần" : " lần"),
-                14, MUTED, false, 0, 12, 0, 10);
-        ScrollView scroll = scrollContent();
-        LinearLayout content = vertical();
-        content.setPadding(0, 0, 0, dp(12));
-        scroll.addView(content);
-        if (logs.isEmpty()) {
-            addEmptyCard(content, "Chưa có lần nấu nào", "Lưu lại cách bạn đã nấu để dễ xem lại lần sau.",
-                    () -> openCookingLogForm(null, recipe.id));
-        } else {
-            for (CookingLogEntry log : logs) addCookingLogCard(content, log);
-        }
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addButton(page, "+   Ghi lại lần nấu", true, () -> openCookingLogForm(null, recipe.id), 8);
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-    }
-
-    private void addCookingLogPreviewRow(LinearLayout parent, CookingLogEntry log) {
-        LinearLayout card = vertical();
-        card.setPadding(dp(12), dp(10), dp(12), dp(10));
-        card.setBackground(roundRect(WHITE, BORDER, 14));
-        String summary = formatDate(log.cookedAt) + " · " + log.servings + " người" +
-                (log.rating == null ? "" : " · " + ratingStars(log.rating));
-        card.addView(text(summary, 12, MUTED, true));
-        if (!log.adjustmentNote.isEmpty()) {
-            TextView note = text(log.adjustmentNote, 13, TEXT, false);
-            note.setMaxLines(2);
-            LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
-            noteParams.topMargin = dp(4);
-            card.addView(note, noteParams);
-        }
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.topMargin = dp(8);
-        parent.addView(card, params);
-        card.setOnClickListener(v -> openCookingLogs(log.recipeId, Screen.NOTE));
-    }
-
-    private void addCookingLogCard(LinearLayout parent, CookingLogEntry log) {
-        addCookingLogCard(parent, log, false);
-    }
-
-    private void addCookingLogCard(LinearLayout parent, CookingLogEntry log, boolean showRecipeTitle) {
-        LinearLayout card = new LinearLayout(this);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(10), dp(10));
-        card.setBackground(roundRect(WHITE, BORDER, 16));
-        ImageView photo = new ImageView(this);
-        android.graphics.Bitmap imageBitmap = cookingJournalViewModel.getPhotoBitmap(log.photoLocalPath);
-        if (imageBitmap != null) photo.setImageBitmap(imageBitmap);
-        else photo.setImageResource(recipeDrawable(log.recipeId));
-        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        photo.setBackground(roundRect(BORDER, BORDER, 12));
-        photo.setClipToOutline(true);
-        card.addView(photo, new LinearLayout.LayoutParams(dp(64), dp(64)));
-        LinearLayout details = vertical();
-        details.setPadding(dp(10), 0, dp(4), 0);
-        if (showRecipeTitle) details.addView(text(log.title, 14, TEXT, true));
-        details.addView(text(formatDate(log.cookedAt), showRecipeTitle ? 12 : 14,
-                showRecipeTitle ? MUTED : TEXT, !showRecipeTitle));
-        String info = log.servings + " người" + (log.actualDurationMinutes == null ? ""
-                : " · " + log.actualDurationMinutes + " phút");
-        TextView detail = text(info, 12, MUTED, false);
-        LinearLayout.LayoutParams infoParams = new LinearLayout.LayoutParams(-1, -2);
-        infoParams.topMargin = dp(3);
-        details.addView(detail, infoParams);
-        if (log.rating != null) {
-            TextView stars = text(ratingStars(log.rating), 12, GREEN, true);
-            LinearLayout.LayoutParams starsParams = new LinearLayout.LayoutParams(-1, -2);
-            starsParams.topMargin = dp(2);
-            details.addView(stars, starsParams);
-        }
-        if (!log.adjustmentNote.isEmpty()) {
-            TextView note = text(log.adjustmentNote, 12, MUTED, false);
-            note.setMaxLines(2);
-            LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
-            noteParams.topMargin = dp(3);
-            details.addView(note, noteParams);
-        }
-        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView delete = text("×", 24, ERROR, false);
-        delete.setGravity(Gravity.CENTER);
-        card.addView(delete, new LinearLayout.LayoutParams(dp(40), dp(48)));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.bottomMargin = dp(10);
-        parent.addView(card, params);
-        card.setOnClickListener(v -> openCookingLogForm(log.id, log.recipeId));
-        delete.setContentDescription("Xóa lần nấu ngày " + formatDate(log.cookedAt));
-        delete.setOnClickListener(v -> confirmDeleteCookingLog(log));
-    }
-
-    private void openCookingLogForm(String logId, String recipeId) {
-        if (screen == Screen.NOTE) cookingLogReturnScreen = Screen.NOTE;
-        cookingLogFormReturnScreen = screen == Screen.COOKING_JOURNAL
-                ? Screen.COOKING_JOURNAL : Screen.COOKING_LOGS;
-        cookingLogRecipeId = recipeId;
-        editingCookingLogId = logId;
-        CookingLogEntry log = cookingJournalViewModel.getLog(logId);
-        if (log == null) {
-            cookingLogCookedAt = System.currentTimeMillis();
-            cookingLogServings = 1;
-            cookingLogDuration = "";
-            cookingLogRating = null;
-            cookingLogAdjustment = "";
-            cookingLogPhotoPath = "";
-            originalCookingLogPhotoPath = "";
-        } else {
-            cookingLogRecipeId = log.recipeId;
-            cookingLogCookedAt = log.cookedAt;
-            cookingLogServings = log.servings;
-            cookingLogDuration = log.actualDurationMinutes == null ? "" : String.valueOf(log.actualDurationMinutes);
-            cookingLogRating = log.rating;
-            cookingLogAdjustment = log.adjustmentNote;
-            cookingLogPhotoPath = log.photoLocalPath;
-            originalCookingLogPhotoPath = log.photoLocalPath;
-        }
-        screen = Screen.COOKING_LOG_FORM;
-        render();
-    }
-
-    private void renderCookingLogForm() {
-        Recipe recipe = recipeById(cookingLogRecipeId);
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(14));
-        addBackTitle(page, editingCookingLogId == null ? "Ghi lại lần nấu" : "Sửa lần nấu");
-        ScrollView scroll = scrollContent();
-        LinearLayout fields = vertical();
-        fields.setPadding(0, dp(16), 0, dp(18));
-        scroll.addView(fields);
-        LinearLayout recipeCard = new LinearLayout(this);
-        recipeCard.setGravity(Gravity.CENTER_VERTICAL);
-        recipeCard.setPadding(dp(8), dp(6), dp(10), dp(6));
-        recipeCard.setBackground(roundRect(WHITE, BORDER, 14));
-        recipeCard.addView(recipeImage(recipeById(cookingLogRecipeId)), new LinearLayout.LayoutParams(dp(56), dp(50)));
-        TextView title = text(recipe.title, 14, TEXT, true);
-        title.setPadding(dp(10), 0, 0, 0);
-        recipeCard.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        fields.addView(recipeCard);
-
-        addText(fields, "Ngày nấu", 14, TEXT, true, 0, 20, 0, 7);
-        cookingLogDateInput = text(formatDate(cookingLogCookedAt) + "     ▾", 15, TEXT, false);
-        cookingLogDateInput.setPadding(dp(14), 0, dp(14), 0);
-        cookingLogDateInput.setBackground(roundRect(WHITE, BORDER, 14));
-        fields.addView(cookingLogDateInput, new LinearLayout.LayoutParams(-1, dp(50)));
-        cookingLogDateInput.setOnClickListener(v -> showCookingLogDatePicker());
-
-        addText(fields, "Khẩu phần", 14, TEXT, true, 0, 18, 0, 7);
-        cookingLogServingsInput = editField(String.valueOf(cookingLogServings), 16, 50);
-        cookingLogServingsInput.setSingleLine(true);
-        cookingLogServingsInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        cookingLogServingsInput.setHint("Số người");
-        fields.addView(cookingLogServingsInput, new LinearLayout.LayoutParams(-1, -2));
-
-        addText(fields, "Thời gian thực tế (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-        cookingLogDurationInput = editField(cookingLogDuration, 16, 50);
-        cookingLogDurationInput.setSingleLine(true);
-        cookingLogDurationInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        cookingLogDurationInput.setHint("Số phút");
-        fields.addView(cookingLogDurationInput, new LinearLayout.LayoutParams(-1, -2));
-
-        addText(fields, "Bạn đánh giá món này (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-        cookingLogRatingRow = new LinearLayout(this);
-        cookingLogRatingRow.setGravity(Gravity.CENTER_VERTICAL);
-        fields.addView(cookingLogRatingRow, new LinearLayout.LayoutParams(-1, dp(48)));
-        populateCookingLogRating();
-
-        addText(fields, "Điều chỉnh lần này (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-        cookingLogAdjustmentInput = editField(cookingLogAdjustment, 15, 100);
-        cookingLogAdjustmentInput.setGravity(Gravity.TOP | Gravity.START);
-        cookingLogAdjustmentInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        cookingLogAdjustmentInput.setHint("Ví dụ: giảm me, thêm rau thơm...");
-        fields.addView(cookingLogAdjustmentInput, new LinearLayout.LayoutParams(-1, dp(104)));
-
-        addText(fields, "Ảnh món đã nấu (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-        cookingLogPhotoButton = text(cookingLogPhotoPath.isEmpty() ? "+   Thêm ảnh" : "Đổi ảnh", 14, GREEN, true);
-        cookingLogPhotoButton.setGravity(Gravity.CENTER);
-        cookingLogPhotoButton.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 14));
-        fields.addView(cookingLogPhotoButton, new LinearLayout.LayoutParams(-1, dp(48)));
-        cookingLogPhotoButton.setOnClickListener(v -> {
-            captureCookingLogDraft();
-            cookingPhotoPicker.launch("image/*");
-        });
-        if (!cookingLogPhotoPath.isEmpty()) {
-            ImageView preview = new ImageView(this);
-            android.graphics.Bitmap photo = cookingJournalViewModel.getPhotoBitmap(cookingLogPhotoPath);
-            if (photo != null) preview.setImageBitmap(photo);
-            preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            preview.setBackground(roundRect(BORDER, BORDER, 14));
-            preview.setClipToOutline(true);
-            LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, dp(160));
-            previewParams.topMargin = dp(8);
-            fields.addView(preview, previewParams);
-            TextView removePhoto = text("Xóa ảnh", 13, ERROR, true);
-            removePhoto.setGravity(Gravity.CENTER);
-            fields.addView(removePhoto, new LinearLayout.LayoutParams(-1, dp(40)));
-            removePhoto.setOnClickListener(v -> {
-                captureCookingLogDraft();
-                if (!originalCookingLogPhotoPath.equals(cookingLogPhotoPath)) cookingJournalViewModel.deletePhoto(cookingLogPhotoPath);
-                cookingLogPhotoPath = "";
-                render();
-            });
-        }
-
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addButton(page, editingCookingLogId == null ? "Lưu lần nấu" : "Lưu thay đổi", true,
-                this::saveCookingLogForm, 8);
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-    }
-
-    private void populateCookingLogRating() {
-        if (cookingLogRatingRow == null) return;
-        cookingLogRatingRow.removeAllViews();
-        for (int value = 1; value <= 5; value++) {
-            final int rating = value;
-            TextView star = text(value <= (cookingLogRating == null ? 0 : cookingLogRating) ? "★" : "☆",
-                    27, value <= (cookingLogRating == null ? 0 : cookingLogRating) ? GREEN : MUTED, true);
-            star.setGravity(Gravity.CENTER);
-            cookingLogRatingRow.addView(star, new LinearLayout.LayoutParams(dp(44), dp(44)));
-            star.setContentDescription("Đánh giá " + value + " trên 5 sao");
-            star.setOnClickListener(v -> {
-                captureCookingLogDraft();
-                cookingLogRating = cookingLogRating != null && cookingLogRating == rating ? null : rating;
-                render();
-            });
-        }
-        if (cookingLogRating != null) {
-            TextView clear = text("Bỏ", 12, MUTED, false);
-            clear.setGravity(Gravity.CENTER);
-            cookingLogRatingRow.addView(clear, new LinearLayout.LayoutParams(dp(42), dp(44)));
-            clear.setOnClickListener(v -> {
-                captureCookingLogDraft();
-                cookingLogRating = null;
-                render();
-            });
-        }
-    }
-
-    private void captureCookingLogDraft() {
-        if (cookingLogServingsInput != null) cookingLogServings = parseInteger(cookingLogServingsInput.getText().toString(), cookingLogServings);
-        if (cookingLogDurationInput != null) cookingLogDuration = cookingLogDurationInput.getText().toString();
-        if (cookingLogAdjustmentInput != null) cookingLogAdjustment = cookingLogAdjustmentInput.getText().toString();
-    }
-
-    private void showCookingLogDatePicker() {
-        captureCookingLogDraft();
-        Calendar selected = Calendar.getInstance();
-        selected.setTimeInMillis(cookingLogCookedAt);
-        new DatePickerDialog(this, (view, year, month, day) -> {
-            Calendar date = Calendar.getInstance();
-            date.clear();
-            date.set(year, month, day);
-            cookingLogCookedAt = date.getTimeInMillis();
-            render();
-        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show();
-    }
-
-    private void saveCookingLogForm() {
-        captureCookingLogDraft();
-        if (cookingLogServings < 1 || cookingLogServings > 999) {
-            Toast.makeText(this, "Khẩu phần phải từ 1 đến 999.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Integer duration = null;
-        String durationText = cookingLogDuration.trim();
-        if (!durationText.isEmpty()) {
-            try {
-                duration = Integer.parseInt(durationText);
-                if (duration < 1) throw new NumberFormatException();
-            } catch (NumberFormatException invalid) {
-                Toast.makeText(this, "Thời gian phải là số phút lớn hơn 0.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }
-        Recipe recipe = recipeById(cookingLogRecipeId);
-        if (!cookingJournalViewModel.save(editingCookingLogId, recipe, cookingLogCookedAt,
-                cookingLogServings, duration, cookingLogRating, cookingLogAdjustment, cookingLogPhotoPath)) {
-            Toast.makeText(this, "Không thể lưu lần nấu. Vui lòng kiểm tra thông tin.", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void confirmDeleteCookingLog(CookingLogEntry log) {
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Xóa lần nấu?")
-                .setMessage("Xóa nhật ký nấu ngày " + formatDate(log.cookedAt) + "? Công thức và ghi chú chung vẫn được giữ.")
-                .setNegativeButton("Hủy", null)
-                .setPositiveButton("Xóa", (dialog, which) -> {
-                    cookingJournalViewModel.delete(log.id);
-                    cookingJournalViewModel.deletePhoto(log.photoLocalPath);
-                }).show();
-    }
-
-    private void deleteCookingLogPhoto(String filename) {
-        cookingJournalViewModel.deletePhoto(filename);
-    }
-
-    private void discardCookingLogDraftPhoto() {
-        if (!cookingLogPhotoPath.isEmpty() && !cookingLogPhotoPath.equals(originalCookingLogPhotoPath)) {
-            deleteCookingLogPhoto(cookingLogPhotoPath);
-        }
-    }
-
-    private String formatIsoDate(long millis) {
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date(millis));
-    }
-
-    private String displayIsoDate(String isoDate) {
-        try {
-            Date date = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(isoDate);
-            return date == null ? isoDate : new SimpleDateFormat("dd/MM/yyyy", new Locale("vi", "VN")).format(date);
-        } catch (java.text.ParseException invalid) {
-            return isoDate;
-        }
-    }
-
-    private String formatDate(long millis) {
-        return new SimpleDateFormat("dd/MM/yyyy", new Locale("vi", "VN")).format(new Date(millis));
-    }
-
-    private String ratingStars(int rating) {
-        StringBuilder stars = new StringBuilder();
-        for (int i = 1; i <= 5; i++) stars.append(i <= rating ? '★' : '☆');
-        return stars.toString();
     }
 
     private String normalizeSearchText(String value) {
-        String decomposed = Normalizer.normalize(value == null ? "" : value.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "").replace('đ', 'd');
+        String decomposed =
+                Normalizer.normalize(
+                                value == null ? "" : value.toLowerCase(Locale.ROOT),
+                                Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}+", "")
+                        .replace('đ', 'd');
         return decomposed.replaceAll("\\s+", " ").trim();
     }
 
     private int parseInteger(String value, int fallback) {
-        try { return Integer.parseInt(value == null ? "" : value.trim()); }
-        catch (NumberFormatException invalid) { return fallback; }
+        try {
+            return Integer.parseInt(value == null ? "" : value.trim());
+        } catch (NumberFormatException invalid) {
+            return fallback;
+        }
     }
 
-    private void addRecipeGrid(LinearLayout parent, List<Recipe> recipes, boolean showFavorite, boolean removable) {
+    private void addRecipeGrid(
+            LinearLayout parent, List<Recipe> recipes, boolean showFavorite, boolean removable) {
         if (recipes.isEmpty()) return;
         GridLayout grid = new GridLayout(this);
         grid.setColumnCount(2);
@@ -2566,18 +2393,24 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         imageFrame.addView(image, new FrameLayout.LayoutParams(-1, dp(96)));
         if (showFavorite) {
             boolean favorite = personalDataViewModel.isFavorite(recipe.id);
-            ImageView star = iconView(favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline, GREEN);
+            ImageView star =
+                    iconView(
+                            favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline,
+                            GREEN);
             star.setBackground(roundRect(WHITE, WHITE, 18));
             FrameLayout starTouchTarget = new FrameLayout(this);
             starTouchTarget.setFocusable(true);
             starTouchTarget.setContentDescription(favorite ? "Bỏ yêu thích" : "Lưu yêu thích");
-            FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER);
+            FrameLayout.LayoutParams iconParams =
+                    new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER);
             starTouchTarget.addView(star, iconParams);
-            FrameLayout.LayoutParams touchParams = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
+            FrameLayout.LayoutParams touchParams =
+                    new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.END);
             touchParams.setMargins(0, dp(2), dp(2), 0);
             imageFrame.addView(starTouchTarget, touchParams);
             starTouchTarget.setOnClickListener(v -> {
-                if (personalDataViewModel.isFavorite(recipe.id)) personalDataViewModel.removeFavorite(recipe.id);
+                if (personalDataViewModel.isFavorite(recipe.id))
+                    personalDataViewModel.removeFavorite(recipe.id);
                 else personalDataViewModel.addFavorite(recipe);
                 render();
             });
@@ -2591,9 +2424,10 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         TextView meta = text(recipe.duration + " · " + recipe.difficulty, 11, MUTED, false);
         meta.setPadding(dp(9), dp(6), dp(8), dp(11));
         card.addView(meta);
-        if (removable) card.setOnClickListener(v -> {
-            openRecipeDetail(recipe);
-        });
+        if (removable)
+            card.setOnClickListener(v -> {
+                openRecipeDetail(recipe);
+            });
         return card;
     }
 
@@ -2605,7 +2439,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         render();
     }
 
-    private void addSectionHeader(LinearLayout parent, String title, String action, Runnable onAction, int top) {
+    private void addSectionHeader(
+            LinearLayout parent, String title, String action, Runnable onAction, int top) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         TextView heading = text(title, 19, TEXT, true);
@@ -2647,11 +2482,10 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         if (top > 0) item.setTranslationY(dp(0));
     }
 
-
-
-
-    private static void updateFavoriteToggleDescription(FrameLayout button, boolean favorite, Recipe recipe) {
-        button.setContentDescription((favorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
+    private static void updateFavoriteToggleDescription(
+            FrameLayout button, boolean favorite, Recipe recipe) {
+        button.setContentDescription(
+                (favorite ? "Bỏ yêu thích " : "Thêm vào yêu thích ") + recipe.title);
     }
 
     private void addSelectableRecipeRow(LinearLayout parent, Recipe recipe) {
@@ -2690,8 +2524,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         topLine.setBackgroundColor(BORDER);
         appRoot.addView(topLine, new LinearLayout.LayoutParams(-1, dp(1)));
         String[] names = {"Khám phá", "Nấu hôm nay", "Mua sắm", "Kho của tôi"};
-        int[] icons = {R.drawable.ic_home_outline, R.drawable.ic_calendar_outline,
-                R.drawable.ic_cart_outline, R.drawable.ic_star_outline};
+        int[] icons = {
+            R.drawable.ic_home_outline,
+            R.drawable.ic_calendar_outline,
+            R.drawable.ic_cart_outline,
+            R.drawable.ic_star_outline
+        };
         for (int i = 0; i < names.length; i++) {
             final int index = i;
             LinearLayout tab = vertical();
@@ -2706,29 +2544,21 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
             tab.setOnClickListener(v -> {
                 animateNextScreen = true;
                 if (index == 0) {
-                    clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.DISCOVER;
                     render();
                 } else if (index == 3) {
-                    clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.LIBRARY;
                     render();
                 } else if (index == 1) {
-                    clearCookingJournalDateRangeIfLeavingJournal();
                     screen = Screen.MEAL_PLAN;
                     mealPlanViewModel.refresh();
                     render();
                 } else if (index == 2) {
-                    clearCookingJournalDateRangeIfLeavingJournal();
                     openShoppingList(screen);
                 }
             });
         }
         appRoot.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
-    }
-
-    private void clearCookingJournalDateRangeIfLeavingJournal() {
-        if (screen == Screen.COOKING_JOURNAL) clearCookingJournalDateRange();
     }
 
     private void addBackTitle(LinearLayout parent, String title) {
@@ -2741,11 +2571,12 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         row.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
         back.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         TextView heading = text(title, 23, TEXT, true);
-        float screenWidthDp = getResources().getDisplayMetrics().widthPixels /
-                getResources().getDisplayMetrics().density;
+        float screenWidthDp =
+                getResources().getDisplayMetrics().widthPixels
+                        / getResources().getDisplayMetrics().density;
         float availableWidthDp = Math.max(160, screenWidthDp - 108);
-        float titleWidthDp = heading.getPaint().measureText(title) /
-                getResources().getDisplayMetrics().density;
+        float titleWidthDp =
+                heading.getPaint().measureText(title) / getResources().getDisplayMetrics().density;
         if (titleWidthDp > availableWidthDp) {
             heading.setTextSize(Math.max(17, 23 * availableWidthDp / titleWidthDp));
         }
@@ -2754,7 +2585,8 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
     }
 
-    private TextView addButton(LinearLayout parent, String label, boolean primary, Runnable action, int top) {
+    private TextView addButton(
+            LinearLayout parent, String label, boolean primary, Runnable action, int top) {
         TextView button = text(label, 15, primary ? WHITE : GREEN, true);
         button.setGravity(Gravity.CENTER);
         button.setBackground(roundRect(primary ? GREEN : WHITE, primary ? GREEN : BORDER, 14));
@@ -2764,9 +2596,6 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         button.setOnClickListener(v -> action.run());
         return button;
     }
-
-
-
 
     private void openCollectionForm(Long collectionId) {
         if (collectionId == null && screen != Screen.COLLECTION) collectionReturnScreen = screen;
@@ -2785,16 +2614,15 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
 
     private void openRecipeNote(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
-        cookingJournalViewModel.refresh();
         noteReturnScreen = screen;
         noteRecipeId = recipe.id;
         screen = Screen.NOTE;
         render();
     }
 
-
     private RecipeCollection findCollection(long id) {
-        for (RecipeCollection row : personalDataViewModel.getCollections()) if (row.id == id) return row;
+        for (RecipeCollection row : personalDataViewModel.getCollections())
+            if (row.id == id) return row;
         return null;
     }
 
@@ -2860,12 +2688,18 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
 
     private int recipeDrawable(String recipeId) {
         switch (recipeId) {
-            case "sample-canh-chua-ca": return R.drawable.recipe_canh_chua;
-            case "sample-ga-chien-nuoc-mam": return R.drawable.recipe_ga_chien;
-            case "sample-mi-y-sot-bo-bam": return R.drawable.recipe_mi_y;
-            case "sample-com-rang-dua-bo": return R.drawable.recipe_com_rang;
-            case "sample-salad-rau-cu": return R.drawable.recipe_salad;
-            default: return R.drawable.recipe_canh_chua;
+            case "sample-canh-chua-ca":
+                return R.drawable.recipe_canh_chua;
+            case "sample-ga-chien-nuoc-mam":
+                return R.drawable.recipe_ga_chien;
+            case "sample-mi-y-sot-bo-bam":
+                return R.drawable.recipe_mi_y;
+            case "sample-com-rang-dua-bo":
+                return R.drawable.recipe_com_rang;
+            case "sample-salad-rau-cu":
+                return R.drawable.recipe_salad;
+            default:
+                return R.drawable.recipe_canh_chua;
         }
     }
 
@@ -2887,8 +2721,16 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         return text;
     }
 
-    private void addText(LinearLayout parent, String value, int size, int color, boolean bold,
-                         int left, int top, int right, int bottom) {
+    private void addText(
+            LinearLayout parent,
+            String value,
+            int size,
+            int color,
+            boolean bold,
+            int left,
+            int top,
+            int right,
+            int bottom) {
         TextView text = text(value, size, color, bold);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.setMargins(dp(left), dp(top), dp(right), dp(bottom));
@@ -2909,10 +2751,13 @@ public class MainActivity extends AppCompatActivity implements PantryFragment.Ho
         return drawable;
     }
 
-    private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
 
     private Recipe recipeById(String id) {
-        for (Recipe recipe : PreviewRecipeCatalog.designRecipes()) if (recipe.id.equals(id)) return recipe;
+        for (Recipe recipe : PreviewRecipeCatalog.designRecipes())
+            if (recipe.id.equals(id)) return recipe;
         return PreviewRecipeCatalog.designRecipes().get(0);
     }
 }
