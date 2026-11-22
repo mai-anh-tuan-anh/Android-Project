@@ -6,6 +6,7 @@ import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.PantryIngredient;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.pantry.PantryFragment;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.domain.model.CookingLogEntry;
@@ -189,10 +190,15 @@ public class MainActivityStateTest {
                     View shoppingCategory = (View) getField(activity, "shoppingCategoryInput");
                     assertMinimumDpHeight(shoppingCategory, density, 56);
 
-                    Method openPantryForm = MainActivity.class.getDeclaredMethod("openPantryForm", String.class);
+                    Method openPantry = MainActivity.class.getDeclaredMethod("openPantry", MainActivity.Screen.class);
+                    openPantry.setAccessible(true);
+                    openPantry.invoke(activity, MainActivity.Screen.SHOPPING);
+                    PantryFragment pantry = (PantryFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(PantryFragment.class.getName());
+                    Method openPantryForm = PantryFragment.class.getDeclaredMethod("openForm", String.class);
                     openPantryForm.setAccessible(true);
-                    openPantryForm.invoke(activity, new Object[]{null});
-                    View pantryCategory = (View) getField(activity, "pantryCategoryInput");
+                    openPantryForm.invoke(pantry, new Object[]{null});
+                    View pantryCategory = (View) getField(pantry, "categoryInput");
                     assertMinimumDpHeight(pantryCategory, density, 52);
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);

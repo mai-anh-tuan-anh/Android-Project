@@ -10,14 +10,14 @@ import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
 import com.example.myapplication.presentation.discover.DiscoverViewModel;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.pantry.PantryFragment;
+import com.example.myapplication.presentation.shopping.ShoppingFragment;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.Spannable;
@@ -39,6 +39,7 @@ import android.widget.Toast;
 import android.app.DatePickerDialog;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.Fragment;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -64,7 +65,7 @@ import java.util.Date;
 import java.text.Normalizer;
 
 /** Local personal data, meal planning, shopping, pantry, and cooking journal. */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements PantryFragment.Host, ShoppingFragment.Host {
     private static final String STATE_APP_SCREEN = "app.currentScreen";
     private static final String STATE_SELECTED_CATEGORY = "discover.selectedCategory";
     private static final String STATE_DISCOVER_SEARCH_QUERY = "discover.searchQuery";
@@ -87,17 +88,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String STATE_SHOPPING_CATEGORY = "module7.category";
     private static final String STATE_SHOPPING_FILTER = "module7.filter";
     private static final String STATE_SHOPPING_RETURN_SCREEN = "module7.returnScreen";
-    private static final String STATE_PANTRY_SCREEN = "pantry.screen";
-    private static final String STATE_PANTRY_ID = "pantry.id";
-    private static final String STATE_PANTRY_NAME = "pantry.name";
-    private static final String STATE_PANTRY_AMOUNT = "pantry.amount";
-    private static final String STATE_PANTRY_UNIT = "pantry.unit";
-    private static final String STATE_PANTRY_CATEGORY = "pantry.category";
-    private static final String STATE_PANTRY_EXPIRY = "pantry.expiry";
-    private static final String STATE_PANTRY_LOCATION = "pantry.location";
-    private static final String STATE_PANTRY_PURCHASE_DATE = "pantry.purchaseDate";
-    private static final String STATE_PANTRY_FILTER = "pantry.filter";
-    private static final String STATE_PANTRY_QUERY = "pantry.query";
     private static final String STATE_LOG_SCREEN = "journal.screen";
     private static final String STATE_LOG_RECIPE_ID = "journal.recipeId";
     private static final String STATE_LOG_ID = "journal.id";
@@ -131,6 +121,10 @@ public class MainActivity extends AppCompatActivity {
     private DiscoverViewModel discoverViewModel;
     private ActivityResultLauncher<String> cookingPhotoPicker;
     private LinearLayout appRoot;
+    private FrameLayout mainContent;
+    private FrameLayout fragmentContainer;
+    private PantryFragment pantryFragment;
+    private ShoppingFragment shoppingFragment;
     private View bottomNavigationBar;
     private Screen screen = Screen.DISCOVER;
     private boolean animateNextScreen;
@@ -174,26 +168,6 @@ public class MainActivity extends AppCompatActivity {
     private String shoppingDraftCategory = ShoppingCategoryCatalog.OTHER;
     private String shoppingStatusFilter;
     private Screen pantryReturnScreen = Screen.SHOPPING;
-    private String editingPantryItemId;
-    private String pantryDraftName = "";
-    private String pantryDraftAmount = "";
-    private String pantryDraftUnit = "";
-    private String pantryDraftUnitId = "";
-    private String pantryDraftCategory = ShoppingCategoryCatalog.OTHER;
-    private String pantryDraftExpiry = "";
-    private String pantryDraftLocation = "";
-    private String pantryDraftPurchaseDate = "";
-    private String pantryFilter = "ALL";
-    private String pantrySearchQuery = "";
-    private EditText pantryNameInput;
-    private EditText pantryAmountInput;
-    private EditText pantryUnitInput;
-    private EditText pantryLocationInput;
-    private TextView pantryCategoryInput;
-    private TextView pantryExpiryInput;
-    private TextView pantryPurchaseDateInput;
-    private final Handler pantryExpiryHandler = new Handler(Looper.getMainLooper());
-    private Runnable pantryExpiryRefresh;
     private Screen cookingLogReturnScreen = Screen.NOTE;
     private Screen cookingLogFormReturnScreen = Screen.COOKING_LOGS;
     private String cookingLogRecipeId;
@@ -228,6 +202,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        mainContent = findViewById(R.id.main_content);
+        fragmentContainer = findViewById(R.id.main_fragment_container);
         configureSystemBars();
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -235,6 +212,9 @@ public class MainActivity extends AppCompatActivity {
                 if (screen == Screen.DISCOVER) {
                     finish();
                     return;
+                } else if (isPantryScreen()) {
+                    PantryFragment fragment = activePantryFragment();
+                    if (fragment != null) { fragment.handleBackPressed(); return; }
                 } else if (screen == Screen.SEARCH_FILTER || screen == Screen.SEARCH_RESULTS) {
                     screen = Screen.SEARCH;
                 } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
@@ -369,27 +349,9 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
             }
         });
-        pantryViewModel.pantryState().observe(this, state -> {
-            if (state != null && !state.loading && screen == Screen.PANTRY) render();
-        });
-        pantryViewModel.mutationResult().observe(this, result -> {
-            if (result == null) return;
-            pantryViewModel.clearMutationResult();
-            if (!result.success) {
-                Toast.makeText(this, result.error == null ? "Không thể cập nhật tủ nguyên liệu." : result.error,
-                        Toast.LENGTH_SHORT).show();
-            } else if (PantryViewModel.MutationResult.SAVE.equals(result.operation)
-                    && screen == Screen.PANTRY_FORM) {
-                screen = Screen.PANTRY;
-                render();
-            }
-        });
         mealPlanViewModel.planState().observe(this, state -> {
             if (state != null && !state.loading
                     && (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER)) render();
-        });
-        shoppingViewModel.shoppingState().observe(this, state -> {
-            if (screen == Screen.SHOPPING && state != null && !state.loading) render();
         });
         shoppingViewModel.saveResult().observe(this, result -> {
             if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
@@ -445,18 +407,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (screen == Screen.PANTRY && appRoot != null) render();
-    }
-
-    @Override
-    protected void onPause() {
-        if (pantryExpiryRefresh != null) pantryExpiryHandler.removeCallbacks(pantryExpiryRefresh);
-        super.onPause();
-    }
-
     private void restoreMealPlanState(Bundle state) {
         if (state == null) return;
         String savedScreen = state.getString(STATE_SCREEN);
@@ -507,21 +457,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void restoreOfflineFeatureState(Bundle state) {
         if (state == null) return;
-        String savedPantryScreen = state.getString(STATE_PANTRY_SCREEN);
-        if (Screen.PANTRY.name().equals(savedPantryScreen) || Screen.PANTRY_FORM.name().equals(savedPantryScreen)) {
-            screen = Screen.valueOf(savedPantryScreen);
-            editingPantryItemId = state.getString(STATE_PANTRY_ID);
-            pantryDraftName = state.getString(STATE_PANTRY_NAME, "");
-            pantryDraftAmount = state.getString(STATE_PANTRY_AMOUNT, "");
-            pantryDraftUnit = state.getString(STATE_PANTRY_UNIT, "");
-            pantryDraftCategory = state.getString(STATE_PANTRY_CATEGORY, ShoppingCategoryCatalog.OTHER);
-            pantryDraftExpiry = state.getString(STATE_PANTRY_EXPIRY, "");
-            pantryDraftLocation = state.getString(STATE_PANTRY_LOCATION, "");
-            pantryDraftPurchaseDate = state.getString(STATE_PANTRY_PURCHASE_DATE, "");
-            pantryFilter = state.getString(STATE_PANTRY_FILTER, "ALL");
-            pantrySearchQuery = state.getString(STATE_PANTRY_QUERY, "");
-            pantryReturnScreen = Screen.SHOPPING;
-        }
         String savedLogScreen = state.getString(STATE_LOG_SCREEN);
         if (Screen.COOKING_JOURNAL.name().equals(savedLogScreen)
                 || Screen.COOKING_LOGS.name().equals(savedLogScreen)
@@ -586,19 +521,6 @@ public class MainActivity extends AppCompatActivity {
             outState.putString(STATE_SHOPPING_FILTER, shoppingStatusFilter);
             outState.putString(STATE_SHOPPING_RETURN_SCREEN, shoppingReturnScreen.name());
         }
-        if (screen == Screen.PANTRY || screen == Screen.PANTRY_FORM) {
-            outState.putString(STATE_PANTRY_SCREEN, screen.name());
-            outState.putString(STATE_PANTRY_ID, editingPantryItemId);
-            outState.putString(STATE_PANTRY_NAME, pantryNameInput == null ? pantryDraftName : pantryNameInput.getText().toString());
-            outState.putString(STATE_PANTRY_AMOUNT, pantryAmountInput == null ? pantryDraftAmount : pantryAmountInput.getText().toString());
-            outState.putString(STATE_PANTRY_UNIT, pantryUnitInput == null ? pantryDraftUnit : pantryUnitInput.getText().toString());
-            outState.putString(STATE_PANTRY_CATEGORY, pantryDraftCategory);
-            outState.putString(STATE_PANTRY_EXPIRY, pantryDraftExpiry);
-            outState.putString(STATE_PANTRY_LOCATION, pantryLocationInput == null ? pantryDraftLocation : pantryLocationInput.getText().toString());
-            outState.putString(STATE_PANTRY_PURCHASE_DATE, pantryDraftPurchaseDate);
-            outState.putString(STATE_PANTRY_FILTER, pantryFilter);
-            outState.putString(STATE_PANTRY_QUERY, pantrySearchQuery);
-        }
         if (screen == Screen.COOKING_JOURNAL || screen == Screen.COOKING_LOGS || screen == Screen.COOKING_LOG_FORM) {
             outState.putString(STATE_LOG_SCREEN, screen.name());
             outState.putString(STATE_LOG_RECIPE_ID, cookingLogRecipeId);
@@ -641,6 +563,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void render() {
+        if (isPantryScreen()) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            Fragment restored = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+            if (restored instanceof PantryFragment) {
+                pantryFragment = (PantryFragment) restored;
+                return;
+            }
+            pantryFragment = PantryFragment.newInstance(createPantryFragmentArguments());
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment_container, pantryFragment, PantryFragment.class.getName())
+                    .commitNow();
+            return;
+        }
+        if (screen == Screen.SHOPPING) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            Fragment restored = getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
+            if (restored instanceof ShoppingFragment) {
+                shoppingFragment = (ShoppingFragment) restored;
+                return;
+            }
+            shoppingFragment = ShoppingFragment.newInstance(shoppingStatusFilter == null
+                    ? ShoppingViewModel.NEED_TO_BUY : shoppingStatusFilter);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment_container, shoppingFragment, ShoppingFragment.class.getName())
+                    .commitNow();
+            return;
+        }
+        Fragment existingPantry = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+        if (existingPantry != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingPantry).commitNow();
+            pantryFragment = null;
+        }
+        Fragment existingShopping = getSupportFragmentManager().findFragmentByTag(ShoppingFragment.class.getName());
+        if (existingShopping != null) {
+            getSupportFragmentManager().beginTransaction().remove(existingShopping).commitNow();
+            shoppingFragment = null;
+        }
+        fragmentContainer.setVisibility(View.GONE);
+        removeLegacyContent();
         planPickerSearchInput = null;
         planPickerSourceButton = null;
         planPickerScrollView = null;
@@ -678,14 +641,11 @@ public class MainActivity extends AppCompatActivity {
         else if (screen == Screen.NOTE) renderNote();
         else if (screen == Screen.MEAL_PLAN) renderMealPlan();
         else if (screen == Screen.MEAL_PLAN_PICKER) renderMealPlanPicker();
-        else if (screen == Screen.SHOPPING) renderShoppingList();
         else if (screen == Screen.SHOPPING_ITEM_FORM) renderShoppingItemForm();
-        else if (screen == Screen.PANTRY) renderPantry();
-        else if (screen == Screen.PANTRY_FORM) renderPantryForm();
         else if (screen == Screen.COOKING_JOURNAL) renderAllCookingLogs();
         else if (screen == Screen.COOKING_LOGS) renderCookingLogs();
         else renderCookingLogForm();
-        setContentView(frame);
+        if (mainContent != null) mainContent.addView(frame, new FrameLayout.LayoutParams(-1, -1));
         if (animateNextScreen) {
             animateNextScreen = false;
             frame.setAlpha(0f);
@@ -702,6 +662,14 @@ public class MainActivity extends AppCompatActivity {
             int scrollY = restoredPickerScrollY;
             planPickerScrollView.post(() -> planPickerScrollView.scrollTo(0, scrollY));
             restoredPickerScrollY = 0;
+        }
+    }
+
+    private void removeLegacyContent() {
+        if (mainContent == null) return;
+        for (int i = mainContent.getChildCount() - 1; i >= 0; i--) {
+            View child = mainContent.getChildAt(i);
+            if (child != fragmentContainer) mainContent.removeViewAt(i);
         }
     }
 
@@ -1935,255 +1903,6 @@ public class MainActivity extends AppCompatActivity {
         addBottomNavigation(1);
     }
 
-    private void renderShoppingList() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(20), dp(24), dp(16));
-        addShoppingTitleWithPantry(page);
-
-        List<ShoppingListItem> items = shoppingViewModel.getItems();
-        if (items.isEmpty()) {
-            ScrollView emptyScroll = scrollContent();
-            emptyScroll.setFillViewport(true);
-            LinearLayout empty = vertical();
-            empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(24), 0, dp(24), 0);
-            emptyScroll.addView(empty, new ScrollView.LayoutParams(-1, -1));
-            ImageView icon = iconView(R.drawable.ic_cart_outline, GREEN);
-            icon.setPadding(dp(24), dp(24), dp(24), dp(24));
-            icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
-            empty.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
-            ShoppingViewModel.ShoppingState listState = shoppingViewModel.shoppingState().getValue();
-            if (listState != null && listState.loading) {
-                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-                LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-                progressParams.topMargin = dp(16);
-                empty.addView(progress, progressParams);
-                TextView loading = text("Đang tải danh sách mua sắm…", 14, MUTED, false);
-                loading.setGravity(Gravity.CENTER);
-                LinearLayout.LayoutParams loadingParams = new LinearLayout.LayoutParams(-1, -2);
-                loadingParams.topMargin = dp(12);
-                empty.addView(loading, loadingParams);
-            } else {
-                TextView title = text("Danh sách đang trống", 22, TEXT, true);
-                title.setGravity(Gravity.CENTER);
-                LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-                titleParams.topMargin = dp(18);
-                titleParams.bottomMargin = dp(8);
-                empty.addView(title, titleParams);
-                TextView hint = text("Chưa có dữ liệu nguyên liệu công thức. Bạn có thể thêm thủ công.",
-                        14, MUTED, false);
-                hint.setGravity(Gravity.CENTER);
-                hint.setLineSpacing(dp(3), 1f);
-                empty.addView(hint, new LinearLayout.LayoutParams(-1, -2));
-            }
-            TextView add = primaryButton("Thêm nguyên liệu", () -> openShoppingItemForm(null));
-            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(49));
-            addParams.topMargin = dp(44);
-            empty.addView(add, addParams);
-            page.addView(emptyScroll, new LinearLayout.LayoutParams(-1, 0, 1));
-            appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-            addBottomNavigation(2);
-            return;
-        }
-
-        TextView summary = text("Danh sách nguyên liệu lưu trên thiết bị.", 14, MUTED, false);
-        summary.setLineSpacing(dp(3), 1f);
-        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
-        summaryParams.topMargin = dp(14);
-        page.addView(summary, summaryParams);
-
-        int availableCount = 0;
-        for (ShoppingListItem item : items) {
-            if (ShoppingViewModel.AVAILABLE.equals(item.status)) availableCount++;
-        }
-        android.widget.ProgressBar progress = new android.widget.ProgressBar(this, null,
-                android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(Math.max(1, items.size()));
-        progress.setProgress(availableCount);
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(GREEN));
-        progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(BORDER));
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
-        progressParams.topMargin = dp(24);
-        page.addView(progress, progressParams);
-        addText(page, availableCount + "/" + items.size() + " nguyên liệu đã có", 14, MUTED,
-                false, 0, 8, 0, 0);
-
-        LinearLayout statusRow = new LinearLayout(this);
-        statusRow.setGravity(Gravity.CENTER_VERTICAL);
-        statusRow.setOrientation(LinearLayout.HORIZONTAL);
-        addShoppingFilterChip(statusRow, "Cần mua", ShoppingViewModel.NEED_TO_BUY);
-        addShoppingFilterChip(statusRow, "Đã có", ShoppingViewModel.AVAILABLE);
-        HorizontalScrollView statusScroll = new HorizontalScrollView(this);
-        statusScroll.setHorizontalScrollBarEnabled(false);
-        statusScroll.addView(statusRow, new HorizontalScrollView.LayoutParams(-2, -2));
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, dp(44));
-        statusParams.topMargin = dp(24);
-        statusParams.bottomMargin = dp(20);
-        page.addView(statusScroll, statusParams);
-
-        ScrollView scroll = scrollContent();
-        LinearLayout content = vertical();
-        content.setPadding(0, 0, 0, dp(12));
-        scroll.addView(content);
-        Map<String, List<ShoppingListItem>> groupedItems = new LinkedHashMap<>();
-        for (String category : ShoppingCategoryCatalog.ORDER) groupedItems.put(category, new ArrayList<>());
-        for (ShoppingListItem item : items) {
-            if (shoppingStatusFilter != null && !shoppingStatusFilter.equals(item.status)) continue;
-            String category = ShoppingCategoryCatalog.contains(item.category)
-                    ? item.category : ShoppingCategoryCatalog.OTHER;
-            groupedItems.get(category).add(item);
-        }
-        int renderedCategoryCount = 0;
-        for (Map.Entry<String, List<ShoppingListItem>> group : groupedItems.entrySet()) {
-            if (group.getValue().isEmpty()) continue;
-            addText(content, group.getKey(), 20, TEXT, true, 0,
-                    renderedCategoryCount == 0 ? 0 : 18, 0, 0);
-            renderedCategoryCount++;
-            for (ShoppingListItem item : group.getValue()) {
-                addShoppingItemRow(content, item);
-            }
-        }
-        if (shoppingStatusFilter != null && filteredShoppingCount(items) == 0) {
-            TextView noItems = text("Không có nguyên liệu ở trạng thái này.", 14, MUTED, false);
-            noItems.setPadding(0, dp(18), 0, 0);
-            content.addView(noItems);
-        }
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(49));
-        actionsParams.topMargin = dp(10);
-        page.addView(actions, actionsParams);
-        TextView add = text("＋   Thêm nguyên liệu", 15, WHITE, true);
-        add.setGravity(Gravity.CENTER);
-        add.setBackground(roundRect(GREEN, GREEN, 14));
-        actions.addView(add, new LinearLayout.LayoutParams(0, -1, 1.6f));
-        add.setOnClickListener(v -> openShoppingItemForm(null));
-        TextView clear = text("Xóa toàn bộ", 15, ERROR, true);
-        clear.setGravity(Gravity.CENTER);
-        clear.setBackground(roundRect(WHITE, BORDER, 14));
-        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(0, -1, 1);
-        clearParams.leftMargin = dp(12);
-        actions.addView(clear, clearParams);
-        clear.setOnClickListener(v -> confirmClearShoppingList(items.size()));
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(2);
-    }
-
-    private void schedulePantryExpiryRefresh() {
-        if (pantryExpiryRefresh != null) pantryExpiryHandler.removeCallbacks(pantryExpiryRefresh);
-        if (screen != Screen.PANTRY) return;
-        Calendar nextDay = Calendar.getInstance();
-        nextDay.add(Calendar.DAY_OF_YEAR, 1);
-        nextDay.set(Calendar.HOUR_OF_DAY, 0);
-        nextDay.set(Calendar.MINUTE, 0);
-        nextDay.set(Calendar.SECOND, 0);
-        nextDay.set(Calendar.MILLISECOND, 0);
-        long delay = Math.max(1000L, nextDay.getTimeInMillis() - System.currentTimeMillis());
-        pantryExpiryRefresh = () -> {
-            pantryExpiryRefresh = null;
-            if (screen == Screen.PANTRY) render();
-        };
-        pantryExpiryHandler.postDelayed(pantryExpiryRefresh, delay);
-    }
-
-    private void addShoppingFilterChip(LinearLayout parent, String label, String status) {
-        boolean selected = status.equals(shoppingStatusFilter == null
-                ? ShoppingViewModel.NEED_TO_BUY : shoppingStatusFilter);
-        TextView chip = text(label, 14, selected ? GREEN : MUTED, true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(13), 0, dp(13), 0);
-        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE,
-                selected ? PALE_GREEN : BORDER, 22));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(42));
-        params.rightMargin = dp(8);
-        parent.addView(chip, params);
-        chip.setOnClickListener(v -> {
-            shoppingStatusFilter = status;
-            render();
-        });
-    }
-
-    private int filteredShoppingCount(List<ShoppingListItem> items) {
-        int count = 0;
-        for (ShoppingListItem item : items) {
-            if (shoppingStatusFilter != null && shoppingStatusFilter.equals(item.status)) count++;
-        }
-        return count;
-    }
-
-    private void addShoppingItemRow(LinearLayout parent, ShoppingListItem item) {
-        LinearLayout card = new LinearLayout(this);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(12), dp(12));
-        card.setBackground(roundRect(WHITE, BORDER, 16));
-        LinearLayout details = vertical();
-        details.addView(text(item.name, 16, TEXT, true));
-        String state = shoppingStatusLabel(item.status);
-        TextView amount = text(item.amount + " " + KitchenUnitCatalog.label(item.unit) + " · " + state,
-                14, MUTED, false);
-        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, -2);
-        amountParams.topMargin = dp(5);
-        details.addView(amount, amountParams);
-        card.addView(details, new LinearLayout.LayoutParams(0, -2, 1));
-        boolean available = ShoppingViewModel.AVAILABLE.equals(item.status);
-        TextView check = text(available ? "✓" : "", 22, available ? WHITE : GREEN, true);
-        check.setGravity(Gravity.CENTER);
-        check.setBackground(roundRect(available ? GREEN : WHITE, GREEN, 10));
-        check.setContentDescription(available ? "Đánh dấu cần mua: " + item.name
-                : "Đánh dấu đã có: " + item.name);
-        card.addView(check, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
-        cardParams.topMargin = dp(12);
-        parent.addView(card, cardParams);
-        card.setOnClickListener(v -> openShoppingItemForm(item.id));
-        check.setOnClickListener(v -> {
-            String newStatus = available
-                    ? ShoppingViewModel.NEED_TO_BUY : ShoppingViewModel.AVAILABLE;
-            String previousStatus = item.status;
-            shoppingViewModel.setStatus(item.id, newStatus);
-            render();
-            Snackbar snackbar = Snackbar.make(appRoot,
-                    item.name + " · " + shoppingStatusLabel(newStatus), Snackbar.LENGTH_LONG)
-                    .setAction("Hoàn tác", view -> {
-                        shoppingViewModel.setStatus(item.id, previousStatus);
-                        render();
-                    });
-            if (bottomNavigationBar != null) snackbar.setAnchorView(bottomNavigationBar);
-            snackbar.show();
-        });
-        card.setOnLongClickListener(v -> {
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Xóa nguyên liệu?")
-                    .setMessage("Xóa “" + item.name + "” khỏi danh sách mua sắm?")
-                    .setNegativeButton("Hủy", null)
-                    .setPositiveButton("Xóa", (dialog, which) -> {
-                        shoppingViewModel.deleteItem(item.id);
-                        render();
-                    }).show();
-            return true;
-        });
-    }
-
-    private String shoppingStatusLabel(String status) {
-        if (ShoppingViewModel.AVAILABLE.equals(status)) return "Đã có";
-        return "Cần mua";
-    }
-
-    private void confirmClearShoppingList(int itemCount) {
-        if (itemCount <= 0) return;
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Xóa toàn bộ danh sách?")
-                .setMessage("Toàn bộ " + itemCount + " nguyên liệu sẽ bị xóa khỏi danh sách mua sắm. Không thể hoàn tác thao tác này.")
-                .setNegativeButton("Giữ danh sách", null)
-                .setPositiveButton("Xóa toàn bộ", (dialog, which) -> {
-                    shoppingViewModel.clearItems();
-                    shoppingStatusFilter = ShoppingViewModel.NEED_TO_BUY;
-                    render();
-                })
-                .show();
-    }
-
     private void openShoppingItemForm(String itemId) {
         editingShoppingItemId = itemId;
         ShoppingListItem item = shoppingViewModel.findItem(itemId);
@@ -2996,423 +2715,67 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPantry(Screen returnScreen) {
         pantryReturnScreen = returnScreen == Screen.PANTRY ? Screen.SHOPPING : returnScreen;
-        pantryFilter = "ALL";
         screen = Screen.PANTRY;
         pantryViewModel.refreshItems();
         render();
     }
 
-    private void renderPantry() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(12));
-        addBackTitle(page, "Tủ nguyên liệu");
-        List<PantryIngredient> items = pantryViewModel.getItems();
-        int usableCount = 0;
-        int expiringCount = 0;
-        int expiredCount = 0;
-        for (PantryIngredient item : items) {
-            String state = pantryViewModel.expiryState(item.expiryDate);
-            if ("EXPIRED".equals(state)) expiredCount++;
-            else if ("EXPIRING".equals(state)) expiringCount++;
-            else usableCount++;
-        }
-        addText(page, usableCount + " sử dụng được · " + expiringCount + " sắp hết hạn · " + expiredCount + " hết hạn",
-                14, MUTED, false, 0, 8, 0, 12);
+    private boolean isPantryScreen() { return screen == Screen.PANTRY || screen == Screen.PANTRY_FORM; }
 
-        EditText search = editField(pantrySearchQuery, 15, 48);
-        search.setSingleLine(true);
-        search.setHint("Tìm nguyên liệu trong tủ");
-        search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
-        search.setBackgroundColor(Color.TRANSPARENT);
-        search.setPadding(dp(48), dp(8), dp(12), dp(8));
-        FrameLayout searchBox = new FrameLayout(this);
-        searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        ImageView searchIcon = iconView(R.drawable.ic_search_outline, GREEN);
-        searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
-        searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
-        searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
-        searchParams.bottomMargin = dp(12);
-        page.addView(searchBox, searchParams);
-
-        LinearLayout filters = new LinearLayout(this);
-        filters.setGravity(Gravity.CENTER_VERTICAL);
-        addPantryFilterChip(filters, "Tất cả", "ALL");
-        addPantryFilterChip(filters, "Sử dụng được", "USABLE");
-        addPantryFilterChip(filters, "Sắp hết hạn", "EXPIRING");
-        addPantryFilterChip(filters, "Hết hạn", "EXPIRED");
-        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
-        filterScroll.setHorizontalScrollBarEnabled(false);
-        filterScroll.addView(filters, new HorizontalScrollView.LayoutParams(-2, -2));
-        page.addView(filterScroll, new LinearLayout.LayoutParams(-1, dp(46)));
-
-        ScrollView scroll = scrollContent();
-        LinearLayout content = vertical();
-        content.setPadding(0, dp(8), 0, dp(12));
-        scroll.addView(content);
-        populatePantryRows(content, items);
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                pantrySearchQuery = s.toString();
-                populatePantryRows(content, items);
-            }
-            @Override public void afterTextChanged(Editable s) { }
-        });
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        TextView add = text("+   Thêm nguyên liệu", 14, WHITE, true);
-        add.setGravity(Gravity.CENTER);
-        add.setBackground(roundRect(GREEN, GREEN, 14));
-        actions.addView(add, new LinearLayout.LayoutParams(0, dp(48), 1));
-        add.setOnClickListener(v -> openPantryForm(null));
-        TextView clear = text("Xóa tất cả", 14, ERROR, true);
-        clear.setGravity(Gravity.CENTER);
-        clear.setPadding(dp(10), 0, dp(10), 0);
-        clear.setBackground(roundRect(WHITE, BORDER, 14));
-        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(-2, dp(48));
-        clearParams.leftMargin = dp(10);
-        actions.addView(clear, clearParams);
-        clear.setEnabled(!items.isEmpty());
-        clear.setAlpha(items.isEmpty() ? 0.5f : 1f);
-        clear.setOnClickListener(v -> confirmClearPantryItems(items.size()));
-        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
-        actionsParams.topMargin = dp(8);
-        page.addView(actions, actionsParams);
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(2);
-        schedulePantryExpiryRefresh();
+    private PantryFragment activePantryFragment() {
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag(PantryFragment.class.getName());
+        return fragment instanceof PantryFragment ? (PantryFragment) fragment : pantryFragment;
     }
 
-    private void populatePantryRows(LinearLayout content, List<PantryIngredient> allItems) {
-        content.removeAllViews();
-        List<PantryIngredient> matches = new ArrayList<>();
-        String query = normalizeSearchText(pantrySearchQuery);
-        for (PantryIngredient item : allItems) {
-            String expiryState = pantryViewModel.expiryState(item.expiryDate);
-            if ("USABLE".equals(pantryFilter) && !expiryState.isEmpty()) continue;
-            if ("EXPIRING".equals(pantryFilter) && !"EXPIRING".equals(expiryState)) continue;
-            if ("EXPIRED".equals(pantryFilter) && !"EXPIRED".equals(expiryState)) continue;
-            if (!query.isEmpty() && !normalizeSearchText(item.name + " " + item.category + " " + item.storageLocation)
-                    .contains(query)) continue;
-            matches.add(item);
-        }
-        if (matches.isEmpty()) {
-            PantryViewModel.PantryState state = pantryViewModel.pantryState().getValue();
-            if (allItems.isEmpty() && state != null && state.loading) {
-                LinearLayout loading = vertical();
-                loading.setGravity(Gravity.CENTER);
-                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-                loading.addView(progress, new LinearLayout.LayoutParams(dp(32), dp(32)));
-                TextView label = text("Đang tải tủ nguyên liệu…", 14, MUTED, false);
-                LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-2, -2);
-                labelParams.topMargin = dp(10);
-                loading.addView(label, labelParams);
-                content.addView(loading, new LinearLayout.LayoutParams(-1, dp(160)));
-                return;
-            }
-            String title = allItems.isEmpty() ? "Tủ nguyên liệu đang trống" : "Không tìm thấy nguyên liệu";
-            String subtitle = allItems.isEmpty()
-                    ? "Thêm những nguyên liệu bạn đang có để quản lý hạn sử dụng."
-                    : "Thử từ khóa khác hoặc chọn bộ lọc Tất cả.";
-            addEmptyCard(content, title, subtitle, allItems.isEmpty() ? () -> openPantryForm(null) : () -> {
-                pantryFilter = "ALL";
-                pantrySearchQuery = "";
-                render();
-            });
-            return;
-        }
-        Map<String, List<PantryIngredient>> groups = new LinkedHashMap<>();
-        for (String category : ShoppingCategoryCatalog.ORDER) groups.put(category, new ArrayList<>());
-        for (PantryIngredient item : matches) {
-            String category = ShoppingCategoryCatalog.contains(item.category)
-                    ? item.category : ShoppingCategoryCatalog.OTHER;
-            groups.get(category).add(item);
-        }
-        int groupIndex = 0;
-        for (Map.Entry<String, List<PantryIngredient>> group : groups.entrySet()) {
-            if (group.getValue().isEmpty()) continue;
-            addText(content, group.getKey(), 18, TEXT, true, 0, groupIndex == 0 ? 4 : 20, 0, 0);
-            groupIndex++;
-            for (PantryIngredient item : group.getValue()) addPantryItemCard(content, item);
-        }
-    }
-
-    private void addPantryFilterChip(LinearLayout parent, String label, String filter) {
-        boolean selected = filter.equals(pantryFilter);
-        TextView chip = text(label, 13, selected ? GREEN : MUTED, true);
-        chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(12), 0, dp(12), 0);
-        chip.setBackground(roundRect(selected ? PALE_GREEN : WHITE, selected ? PALE_GREEN : BORDER, 22));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(38));
-        params.rightMargin = dp(8);
-        parent.addView(chip, params);
-        chip.setOnClickListener(v -> {
-            pantryFilter = filter;
-            render();
-        });
-    }
-
-    private void addPantryItemCard(LinearLayout parent, PantryIngredient item) {
-        LinearLayout card = vertical();
-        card.setPadding(dp(14), dp(12), dp(12), dp(12));
-        card.setBackground(roundRect(WHITE, BORDER, 16));
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        TextView name = text(item.name, 16, TEXT, true);
-        top.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView edit = text("Sửa", 13, GREEN, true);
-        edit.setGravity(Gravity.CENTER);
-        edit.setPadding(dp(10), 0, dp(10), 0);
-        top.addView(edit, new LinearLayout.LayoutParams(-2, dp(40)));
-        card.addView(top);
-        String quantity = item.amountDecimal == null ? "Chưa biết lượng" :
-                item.amountDecimal + (item.unitId == null || item.unitId.isEmpty() ? "" : " " + KitchenUnitCatalog.label(item.unitId));
-        String availability = pantryViewModel.availabilityLabel(item.expiryDate);
-        String detailText = quantity + " · " + availability + " · " + item.category;
-        TextView detail = text(detailText,
-                13, "Hết hạn".equals(availability) ? ERROR
-                        : "Sắp hết hạn".equals(availability) ? Color.rgb(180, 112, 30) : MUTED, false);
-        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(-1, -2);
-        detailParams.topMargin = dp(4);
-        card.addView(detail, detailParams);
-        String expiryState = pantryViewModel.expiryState(item.expiryDate);
-        if (item.expiryDate != null || !item.storageLocation.isEmpty() || item.purchaseDate != null) {
-            LinearLayout meta = new LinearLayout(this);
-            meta.setGravity(Gravity.CENTER_VERTICAL);
-            if (item.expiryDate != null) {
-                int color = "EXPIRED".equals(expiryState) ? ERROR
-                        : "EXPIRING".equals(expiryState) ? Color.rgb(180, 112, 30) : MUTED;
-                String label = "EXPIRED".equals(expiryState) ? "Hạn đã qua · "
-                        : "EXPIRING".equals(expiryState) ? "Hạn sắp đến · " : "Dùng trước · ";
-                meta.addView(text(label + displayIsoDate(item.expiryDate), 13, color, true),
-                        new LinearLayout.LayoutParams(0, -2, 1));
-            }
-            if (!item.storageLocation.isEmpty()) {
-                meta.addView(text(item.storageLocation, 12, MUTED, false));
-            }
-            LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(-1, -2);
-            metaParams.topMargin = dp(5);
-            card.addView(meta, metaParams);
-        }
-        if (item.purchaseDate != null) {
-            TextView purchased = text("Mua ngày " + displayIsoDate(item.purchaseDate), 12, MUTED, false);
-            LinearLayout.LayoutParams purchasedParams = new LinearLayout.LayoutParams(-1, -2);
-            purchasedParams.topMargin = dp(4);
-            card.addView(purchased, purchasedParams);
-        }
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
-        cardParams.topMargin = dp(9);
-        parent.addView(card, cardParams);
-        card.setOnClickListener(v -> openPantryForm(item.id));
-        edit.setOnClickListener(v -> openPantryForm(item.id));
-        card.setOnLongClickListener(v -> {
-            confirmDeletePantryItem(item);
-            return true;
-        });
-    }
-
-    private void openPantryForm(String itemId) {
-        editingPantryItemId = itemId;
-        PantryIngredient item = pantryViewModel.getItem(itemId);
-        pantryDraftName = item == null ? "" : item.name;
-        pantryDraftAmount = item == null || item.amountDecimal == null ? "" : item.amountDecimal;
-        pantryDraftUnitId = item == null || item.unitId == null ? "" : item.unitId;
-        pantryDraftUnit = pantryDraftUnitId.isEmpty() ? "" : KitchenUnitCatalog.label(pantryDraftUnitId);
-        pantryDraftCategory = item == null ? ShoppingCategoryCatalog.OTHER : item.category;
-        pantryDraftExpiry = item == null || item.expiryDate == null ? "" : item.expiryDate;
-        pantryDraftLocation = item == null ? "" : item.storageLocation;
-        pantryDraftPurchaseDate = item == null || item.purchaseDate == null ? "" : item.purchaseDate;
-        screen = Screen.PANTRY_FORM;
+    @Override public void onShoppingBack() {
+        screen = shoppingReturnScreen == Screen.SHOPPING ? Screen.DISCOVER : shoppingReturnScreen;
         render();
     }
 
-    private void renderPantryForm() {
-        LinearLayout page = vertical();
-        page.setPadding(dp(24), dp(8), dp(24), dp(16));
-        addBackTitle(page, editingPantryItemId == null ? "Thêm nguyên liệu" : "Sửa nguyên liệu");
-        ScrollView scroll = scrollContent();
-        LinearLayout fields = vertical();
-        fields.setPadding(0, dp(18), 0, dp(20));
-        scroll.addView(fields);
-
-        addText(fields, "Tên nguyên liệu", 14, TEXT, true, 0, 0, 0, 0);
-        pantryNameInput = editField(pantryDraftName, 16, 52);
-        pantryNameInput.setSingleLine(true);
-        pantryNameInput.setHint("Ví dụ: Cà chua");
-        pantryNameInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-        addFieldView(fields, pantryNameInput, 8, 20);
-
-        addText(fields, "Số lượng (không bắt buộc)", 14, TEXT, true, 0, 0, 0, 0);
-        pantryAmountInput = editField(pantryDraftAmount, 16, 52);
-        pantryAmountInput.setSingleLine(true);
-        pantryAmountInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        pantryAmountInput.setHint("Để trống nếu chưa biết lượng");
-        addFieldView(fields, pantryAmountInput, 8, 20);
-
-        addText(fields, "Đơn vị", 14, TEXT, true, 0, 0, 0, 0);
-        pantryUnitInput = editField(pantryDraftUnit, 16, 52);
-        pantryUnitInput.setSingleLine(true);
-        pantryUnitInput.setHint("Ví dụ: quả, g, ml, muỗng cà phê");
-        addFieldView(fields, pantryUnitInput, 8, 20);
-
-        addText(fields, "Danh mục", 14, TEXT, true, 0, 0, 0, 0);
-        pantryCategoryInput = selectionField(pantryDraftCategory + "     ▾", 15, 52);
-        addFieldView(fields, pantryCategoryInput, 8, 20);
-        pantryCategoryInput.setOnClickListener(v -> showPantryCategoryPicker());
-
-        addText(fields, "Hạn sử dụng (không bắt buộc)", 14, TEXT, true, 0, 0, 0, 0);
-        LinearLayout expiryRow = new LinearLayout(this);
-        expiryRow.setGravity(Gravity.CENTER_VERTICAL);
-        pantryExpiryInput = text(pantryDraftExpiry.isEmpty() ? "Không đặt" : displayIsoDate(pantryDraftExpiry),
-                15, pantryDraftExpiry.isEmpty() ? MUTED : TEXT, false);
-        pantryExpiryInput.setPadding(dp(15), 0, dp(15), 0);
-        pantryExpiryInput.setBackground(roundRect(WHITE, BORDER, 14));
-        expiryRow.addView(pantryExpiryInput, new LinearLayout.LayoutParams(0, dp(52), 1));
-        TextView clearDate = text("Xóa", 13, GREEN, true);
-        clearDate.setGravity(Gravity.CENTER);
-        expiryRow.addView(clearDate, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        addFieldView(fields, expiryRow, 8, 20);
-        pantryExpiryInput.setOnClickListener(v -> showPantryExpiryPicker());
-        clearDate.setOnClickListener(v -> {
-            pantryDraftExpiry = "";
-            pantryExpiryInput.setText("Không đặt");
-            pantryExpiryInput.setTextColor(MUTED);
-        });
-
-        addText(fields, "Ngày mua (không bắt buộc)", 14, TEXT, true, 0, 0, 0, 0);
-        LinearLayout purchaseRow = new LinearLayout(this);
-        purchaseRow.setGravity(Gravity.CENTER_VERTICAL);
-        pantryPurchaseDateInput = text(pantryDraftPurchaseDate.isEmpty() ? "Không đặt" : displayIsoDate(pantryDraftPurchaseDate),
-                15, pantryDraftPurchaseDate.isEmpty() ? MUTED : TEXT, false);
-        pantryPurchaseDateInput.setPadding(dp(15), 0, dp(15), 0);
-        pantryPurchaseDateInput.setBackground(roundRect(WHITE, BORDER, 14));
-        purchaseRow.addView(pantryPurchaseDateInput, new LinearLayout.LayoutParams(0, dp(52), 1));
-        TextView clearPurchaseDate = text("Xóa", 13, GREEN, true);
-        clearPurchaseDate.setGravity(Gravity.CENTER);
-        purchaseRow.addView(clearPurchaseDate, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        addFieldView(fields, purchaseRow, 8, 20);
-        pantryPurchaseDateInput.setOnClickListener(v -> showPantryPurchaseDatePicker());
-        clearPurchaseDate.setOnClickListener(v -> {
-            pantryDraftPurchaseDate = "";
-            pantryPurchaseDateInput.setText("Không đặt");
-            pantryPurchaseDateInput.setTextColor(MUTED);
-        });
-
-        addText(fields, "Nơi cất (không bắt buộc)", 14, TEXT, true, 0, 0, 0, 0);
-        pantryLocationInput = editField(pantryDraftLocation, 16, 52);
-        pantryLocationInput.setSingleLine(true);
-        pantryLocationInput.setHint("Ví dụ: Ngăn mát");
-        addFieldView(fields, pantryLocationInput, 8, 14);
-
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addButton(page, "Lưu nguyên liệu", true, this::savePantryForm, 8);
-        if (editingPantryItemId != null) {
-            TextView remove = text("Xóa nguyên liệu", 14, ERROR, true);
-            remove.setGravity(Gravity.CENTER);
-            page.addView(remove, new LinearLayout.LayoutParams(-1, dp(44)));
-            remove.setOnClickListener(v -> confirmDeletePantryItem(pantryViewModel.getItem(editingPantryItemId)));
-        }
-        appRoot.addView(page, new LinearLayout.LayoutParams(-1, 0, 1));
+    @Override public void onShoppingNavigateTab(int tab) {
+        animateNextScreen = true;
+        clearCookingJournalDateRangeIfLeavingJournal();
+        if (tab == 0) screen = Screen.DISCOVER;
+        else if (tab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
+        else if (tab == 2) return;
+        else screen = Screen.LIBRARY;
+        render();
     }
 
-    private void showPantryCategoryPicker() {
-        String[] categories = ShoppingCategoryCatalog.ORDER.toArray(new String[0]);
-        int selected = ShoppingCategoryCatalog.ORDER.indexOf(pantryDraftCategory);
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Chọn danh mục")
-                .setSingleChoiceItems(categories, Math.max(0, selected), (dialog, which) -> {
-                    pantryDraftCategory = categories[which];
-                    pantryCategoryInput.setText(pantryDraftCategory + "     ▾");
-                    dialog.dismiss();
-                }).setNegativeButton("Hủy", null).show();
+    @Override public void onShoppingOpenPantry() {
+        pantryReturnScreen = Screen.SHOPPING;
+        screen = Screen.PANTRY;
+        pantryViewModel.refreshItems();
+        render();
     }
 
-    private void showPantryExpiryPicker() {
-        Calendar selected = Calendar.getInstance();
-        if (!pantryDraftExpiry.isEmpty()) {
-            try {
-                java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
-                Date date = format.parse(pantryDraftExpiry);
-                if (date != null) selected.setTime(date);
-            } catch (java.text.ParseException ignored) { }
-        }
-        new DatePickerDialog(this, (view, year, month, day) -> {
-            Calendar date = Calendar.getInstance();
-            date.clear();
-            date.set(year, month, day);
-            pantryDraftExpiry = formatIsoDate(date.getTimeInMillis());
-            pantryExpiryInput.setText(displayIsoDate(pantryDraftExpiry));
-            pantryExpiryInput.setTextColor(TEXT);
-        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show();
+    @Override public void onShoppingEditItem(String id) { openShoppingItemForm(id); }
+
+    @Override public void onShoppingFilterChanged(String status) { shoppingStatusFilter = status; }
+
+    private Bundle createPantryFragmentArguments() {
+        Bundle args = new Bundle();
+        args.putBoolean("pantry.initialScreen", screen == Screen.PANTRY_FORM);
+        return args;
     }
 
-    private void showPantryPurchaseDatePicker() {
-        Calendar selected = Calendar.getInstance();
-        if (!pantryDraftPurchaseDate.isEmpty()) {
-            try {
-                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
-                Date date = format.parse(pantryDraftPurchaseDate);
-                if (date != null) selected.setTime(date);
-            } catch (java.text.ParseException ignored) { }
-        }
-        new DatePickerDialog(this, (view, year, month, day) -> {
-            Calendar date = Calendar.getInstance();
-            date.clear();
-            date.set(year, month, day);
-            pantryDraftPurchaseDate = formatIsoDate(date.getTimeInMillis());
-            pantryPurchaseDateInput.setText(displayIsoDate(pantryDraftPurchaseDate));
-            pantryPurchaseDateInput.setTextColor(TEXT);
-        }, selected.get(Calendar.YEAR), selected.get(Calendar.MONTH), selected.get(Calendar.DAY_OF_MONTH)).show();
+    @Override public void onPantryClose() {
+        screen = pantryReturnScreen;
+        render();
     }
 
-    private void capturePantryDraftFields() {
-        if (pantryNameInput != null) pantryDraftName = pantryNameInput.getText().toString();
-        if (pantryAmountInput != null) pantryDraftAmount = pantryAmountInput.getText().toString();
-        if (pantryUnitInput != null) pantryDraftUnit = pantryUnitInput.getText().toString();
-        if (pantryLocationInput != null) pantryDraftLocation = pantryLocationInput.getText().toString();
-        pantryDraftUnitId = pantryDraftAmount.trim().isEmpty() ? "" : KitchenUnitCatalog.canonicalId(pantryDraftUnit);
+    @Override public void onPantryScreenChanged(boolean showingForm) {
+        screen = showingForm ? Screen.PANTRY_FORM : Screen.PANTRY;
     }
 
-    private void savePantryForm() {
-        capturePantryDraftFields();
-        if (!pantryDraftAmount.trim().isEmpty() && pantryDraftUnitId.isEmpty()) {
-            Toast.makeText(this, "Nhập đơn vị cho số lượng.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (!pantryViewModel.saveItem(editingPantryItemId, pantryDraftName, pantryDraftAmount,
-                pantryDraftUnitId, pantryDraftCategory, pantryDraftExpiry, pantryDraftLocation,
-                pantryDraftPurchaseDate)) {
-            Toast.makeText(this, "Vui lòng kiểm tra tên, số lượng và đơn vị.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-    }
-
-    private void confirmDeletePantryItem(PantryIngredient item) {
-        if (item == null) return;
-        new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Xóa nguyên liệu khỏi tủ?")
-                .setMessage("Xóa “" + item.name + "” khỏi tủ nguyên liệu?")
-                .setNegativeButton("Hủy", null)
-                .setPositiveButton("Xóa", (dialog, which) -> {
-                    pantryViewModel.deleteItem(item.id);
-                    screen = Screen.PANTRY;
-                    render();
-                }).show();
-    }
-
-    private void confirmClearPantryItems(int itemCount) {
-        if (itemCount <= 0) return;
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Xóa tất cả nguyên liệu trong tủ?")
-                .setMessage("Xóa toàn bộ " + itemCount + " nguyên liệu đã lưu trong tủ? Thao tác này không thể hoàn tác.")
-                .setNegativeButton("Hủy", null)
-                .setPositiveButton("Xóa tất cả", (dialog, which) -> {
-                    pantryViewModel.deleteAllItems();
-                    pantryFilter = "ALL";
-                    pantrySearchQuery = "";
-                    screen = Screen.PANTRY;
-                    render();
-                }).show();
+    @Override public void onPantryNavigateTab(int selectedTab) {
+        animateNextScreen = true;
+        clearCookingJournalDateRangeIfLeavingJournal();
+        if (selectedTab == 0) screen = Screen.DISCOVER;
+        else if (selectedTab == 1) { screen = Screen.MEAL_PLAN; mealPlanViewModel.refresh(); }
+        else if (selectedTab == 2) { openShoppingList(Screen.PANTRY); return; }
+        else screen = Screen.LIBRARY;
+        render();
     }
 
     private void addCookingJournalPreview(LinearLayout parent, Recipe recipe) {
@@ -4013,20 +3376,6 @@ public class MainActivity extends AppCompatActivity {
     private int parseInteger(String value, int fallback) {
         try { return Integer.parseInt(value == null ? "" : value.trim()); }
         catch (NumberFormatException invalid) { return fallback; }
-    }
-
-    private void addShoppingTitleWithPantry(LinearLayout page) {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text("Danh sách mua sắm", 23, TEXT, true);
-        row.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView pantry = text("Tủ nguyên liệu", 12, GREEN, true);
-        pantry.setGravity(Gravity.CENTER);
-        pantry.setPadding(dp(8), 0, dp(8), 0);
-        pantry.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
-        row.addView(pantry, new LinearLayout.LayoutParams(-2, dp(40)));
-        pantry.setOnClickListener(v -> openPantry(Screen.SHOPPING));
-        page.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void addRecipeGrid(LinearLayout parent, List<Recipe> recipes, boolean showFavorite, boolean removable) {
