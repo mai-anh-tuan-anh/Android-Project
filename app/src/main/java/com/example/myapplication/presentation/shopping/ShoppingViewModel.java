@@ -3,6 +3,8 @@ package com.example.myapplication.presentation.shopping;
 
 
 import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 import com.example.myapplication.domain.model.*;
 import com.example.myapplication.domain.repository.PersonalDataRepository;
 import com.example.myapplication.domain.catalog.KitchenUnitCatalog;
@@ -16,6 +18,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Collections;
+import java.util.concurrent.Executor;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -27,16 +31,38 @@ public final class ShoppingViewModel extends ViewModel {
     public static final String AVAILABLE = "AVAILABLE";
 
     private final PersonalDataRepository repository;
+    private final Executor ioExecutor;
+    private final MutableLiveData<ShoppingState> shoppingState = new MutableLiveData<>(
+            new ShoppingState(Collections.emptyList(), true, null));
+    private final MutableLiveData<SaveResult> saveResult = new MutableLiveData<>();
+    private final MutableLiveData<PlanUpdate> planUpdate = new MutableLiveData<>();
 
-    public ShoppingViewModel(PersonalDataRepository repository) {
+    public ShoppingViewModel(PersonalDataRepository repository, Executor ioExecutor) {
         this.repository = repository;
+        this.ioExecutor = ioExecutor;
     }
 
-    public List<ShoppingListItem> getItems() { return repository.getShoppingItems(); }
+    public LiveData<ShoppingState> shoppingState() { return shoppingState; }
+    public LiveData<SaveResult> saveResult() { return saveResult; }
+    public LiveData<PlanUpdate> planUpdate() { return planUpdate; }
 
-    public String initialStatusForPantry(String ingredientId, String name, String amount, String unitId) {
-        return initialStatusForPantry(ingredientId, name, amount, unitId,
-                repository.getPantryItems(), System.currentTimeMillis());
+    public List<ShoppingListItem> getItems() {
+        ShoppingState state = shoppingState.getValue();
+        return state == null ? Collections.emptyList() : state.items;
+    }
+
+    public void refreshItems() {
+        ShoppingState old = shoppingState.getValue();
+        shoppingState.setValue(new ShoppingState(old == null ? Collections.emptyList() : old.items, true, null));
+        ioExecutor.execute(() -> {
+            try {
+                shoppingState.postValue(new ShoppingState(repository.getShoppingItems(), false, null));
+            } catch (RuntimeException error) {
+                ShoppingState current = shoppingState.getValue();
+                shoppingState.postValue(new ShoppingState(current == null ? Collections.emptyList() : current.items,
+                        false, error.getMessage()));
+            }
+        });
     }
 
     public static String initialStatusForPantry(String ingredientId, String name, String amount, String unitId,
@@ -90,32 +116,91 @@ public final class ShoppingViewModel extends ViewModel {
 
     public boolean saveItem(String id, String name, String amount, String unit, String category, String status) {
         if (name == null || name.trim().isEmpty() || amount == null || amount.trim().isEmpty()
-                || unit == null || unit.trim().isEmpty() || !ShoppingCategoryCatalog.contains(category)) return false;
+                || unit == null || unit.trim().isEmpty() || !ShoppingCategoryCatalog.contains(category)) {
+            saveResult.setValue(new SaveResult(false, null, "Vui lòng nhập tên, số lượng hợp lệ và đơn vị."));
+            return false;
+        }
         try {
             BigDecimal numericAmount = new BigDecimal(amount.trim().replace(',', '.'));
-            if (numericAmount.signum() <= 0) return false;
+            if (numericAmount.signum() <= 0) {
+                saveResult.setValue(new SaveResult(false, null, "Số lượng phải lớn hơn 0."));
+                return false;
+            }
             BigDecimal rounded = numericAmount.setScale(2, RoundingMode.HALF_UP);
-            if (rounded.signum() <= 0) return false;
+            if (rounded.signum() <= 0) {
+                saveResult.setValue(new SaveResult(false, null, "Số lượng phải lớn hơn 0."));
+                return false;
+            }
             amount = rounded.stripTrailingZeros().toPlainString();
         } catch (NumberFormatException qualitativeAmount) {
             // Text quantities such as “vừa đủ” stay qualitative and are never arithmetically combined.
         }
-        if (!isValidStatus(status)) return false;
-        repository.saveShoppingItem(id, name, amount, unit, category, status);
+        ShoppingListItem current = id == null ? null : findItem(id);
+        String resolvedStatus = status;
+        if (current != null) resolvedStatus = current.status;
+        if (resolvedStatus != null && !isValidStatus(resolvedStatus)) return false;
+        saveResult.setValue(null);
+        String finalAmount = amount;
+        String finalStatus = resolvedStatus;
+        ioExecutor.execute(() -> {
+            try {
+                String statusToSave = finalStatus;
+                if (statusToSave == null) {
+                    statusToSave = initialStatusForPantry(null, name, finalAmount, unit,
+                            repository.getPantryItems(), System.currentTimeMillis());
+                }
+                repository.saveShoppingItem(id, name, finalAmount, unit, category, statusToSave);
+                shoppingState.postValue(new ShoppingState(repository.getShoppingItems(), false, null));
+                saveResult.postValue(new SaveResult(true, statusToSave, null));
+            } catch (RuntimeException error) {
+                saveResult.postValue(new SaveResult(false, null, error.getMessage()));
+            }
+        });
         return true;
     }
 
     public void setStatus(String id, String status) {
-        if (id != null && isValidStatus(status)) repository.setShoppingItemStatus(id, status);
+        if (id == null || !isValidStatus(status)) return;
+        List<ShoppingListItem> previousItems = new ArrayList<>(getItems());
+        updateItemsOptimistically(id, status, false);
+        ioExecutor.execute(() -> {
+            try {
+                repository.setShoppingItemStatus(id, status);
+                shoppingState.postValue(new ShoppingState(repository.getShoppingItems(), false, null));
+            } catch (RuntimeException error) {
+                shoppingState.postValue(new ShoppingState(previousItems, false, error.getMessage()));
+            }
+        });
     }
 
     public void deleteItem(String id) {
-        if (id != null) repository.deleteShoppingItem(id);
+        if (id == null) return;
+        List<ShoppingListItem> previousItems = new ArrayList<>(getItems());
+        updateItemsOptimistically(id, null, true);
+        ioExecutor.execute(() -> {
+            try {
+                repository.deleteShoppingItem(id);
+                shoppingState.postValue(new ShoppingState(repository.getShoppingItems(), false, null));
+            } catch (RuntimeException error) {
+                shoppingState.postValue(new ShoppingState(previousItems, false, error.getMessage()));
+            }
+        });
     }
 
-    public void clearItems() { repository.clearShoppingItems(); }
+    public void clearItems() {
+        List<ShoppingListItem> previousItems = new ArrayList<>(getItems());
+        shoppingState.setValue(new ShoppingState(Collections.emptyList(), false, null));
+        ioExecutor.execute(() -> {
+            try {
+                repository.clearShoppingItems();
+                shoppingState.postValue(new ShoppingState(repository.getShoppingItems(), false, null));
+            } catch (RuntimeException error) {
+                shoppingState.postValue(new ShoppingState(previousItems, false, error.getMessage()));
+            }
+        });
+    }
 
-    public PlanUpdate checkForPlanChanges() {
+    private PlanUpdate checkForPlanChanges() {
         List<PlannedRecipe> currentPlan = repository.getMealPlanRecipes();
         String currentSnapshot = serializePlan(currentPlan);
         String previousSnapshot = repository.getShoppingPlanSnapshot();
@@ -133,8 +218,60 @@ public final class ShoppingViewModel extends ViewModel {
         return new PlanUpdate(currentSnapshot, changes, buildPlanChangeMessage(changes));
     }
 
+    public void checkForPlanChangesAsync() {
+        planUpdate.setValue(null);
+        ioExecutor.execute(() -> {
+            try {
+                PlanUpdate update = checkForPlanChanges();
+                planUpdate.postValue(update);
+            } catch (RuntimeException error) {
+                planUpdate.postValue(new PlanUpdate("", Collections.emptyList(), error.getMessage()));
+            }
+        });
+    }
+
     public void acceptPlanUpdate(PlanUpdate update) {
-        if (update != null) repository.saveShoppingPlanSnapshot(update.currentSnapshot);
+        if (update != null) ioExecutor.execute(() -> repository.saveShoppingPlanSnapshot(update.currentSnapshot));
+    }
+
+    public void clearPlanUpdate() { planUpdate.setValue(null); }
+    public void clearSaveResult() { saveResult.setValue(null); }
+
+    private void updateItemsOptimistically(String id, String status, boolean remove) {
+        ShoppingState current = shoppingState.getValue();
+        if (current == null) return;
+        List<ShoppingListItem> updated = new ArrayList<>();
+        for (ShoppingListItem item : current.items) {
+            if (item.id.equals(id)) {
+                if (!remove) updated.add(new ShoppingListItem(item.id, item.name, item.amount, item.unit,
+                        status, item.category));
+            } else updated.add(item);
+        }
+        shoppingState.setValue(new ShoppingState(updated, false, null));
+    }
+
+    public static final class ShoppingState {
+        public final List<ShoppingListItem> items;
+        public final boolean loading;
+        public final String error;
+
+        ShoppingState(List<ShoppingListItem> items, boolean loading, String error) {
+            this.items = Collections.unmodifiableList(new ArrayList<>(items));
+            this.loading = loading;
+            this.error = error;
+        }
+    }
+
+    public static final class SaveResult {
+        public final boolean success;
+        public final String status;
+        public final String error;
+
+        SaveResult(boolean success, String status, String error) {
+            this.success = success;
+            this.status = status;
+            this.error = error;
+        }
     }
 
     private String serializePlan(List<PlannedRecipe> plan) {

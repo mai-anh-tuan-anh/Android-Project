@@ -2,7 +2,10 @@ package com.example.myapplication;
 
 import com.example.myapplication.presentation.main.MainActivity;
 import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+import com.example.myapplication.domain.model.ShoppingListItem;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
 
 
 
@@ -22,6 +25,12 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import androidx.lifecycle.Observer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -206,6 +215,71 @@ public class MainActivityStateTest {
         }
     }
 
+    @Test
+    public void shoppingDataLoadsAndStatusChangesThroughAsyncViewModelState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<ShoppingViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch initialLoad = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                ShoppingViewModel viewModel = (ShoppingViewModel) getFieldUnchecked(activity,
+                        "shoppingViewModel");
+                viewModelRef.set(viewModel);
+                setFieldUnchecked(activity, "screen", MainActivity.Screen.SHOPPING);
+                viewModel.shoppingState().observe(activity, state -> {
+                    if (state != null && !state.loading) initialLoad.countDown();
+                });
+                viewModel.refreshItems();
+            });
+            if (!initialLoad.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping list did not load asynchronously");
+            }
+
+            ShoppingViewModel viewModel = viewModelRef.get();
+            String itemName = "Kiểm tra bất đồng bộ " + System.nanoTime();
+            AtomicReference<String> savedItemId = new AtomicReference<>();
+            CountDownLatch saved = new CountDownLatch(1);
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicBoolean reloadStarted = new AtomicBoolean(false);
+            Observer<ShoppingViewModel.SaveResult> saveObserver = result -> {
+                if (result != null && result.success) saved.countDown();
+            };
+            scenario.onActivity(activity -> {
+                viewModel.clearSaveResult();
+                viewModel.saveResult().observe(activity, saveObserver);
+                assertEquals(true, viewModel.saveItem(null, itemName, "1", "cái",
+                        ShoppingCategoryCatalog.OTHER, ShoppingViewModel.NEED_TO_BUY));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping item save did not complete asynchronously");
+            }
+
+            scenario.onActivity(activity -> {
+                for (ShoppingListItem item : viewModel.getItems()) {
+                    if (itemName.equals(item.name)) savedItemId.set(item.id);
+                }
+                assertEquals(true, savedItemId.get() != null);
+                String itemId = savedItemId.get();
+                viewModel.setStatus(itemId, ShoppingViewModel.AVAILABLE);
+                ShoppingListItem updated = viewModel.findItem(itemId);
+                assertEquals(ShoppingViewModel.AVAILABLE, updated.status);
+                viewModel.shoppingState().observe(activity, state -> {
+                    if (state != null && state.loading) reloadStarted.set(true);
+                    if (state != null && !state.loading && reloadStarted.get()) {
+                        boolean remains = false;
+                        for (ShoppingListItem item : state.items) remains |= itemId.equals(item.id);
+                        if (!remains) deleted.countDown();
+                    }
+                });
+                viewModel.deleteItem(itemId);
+                viewModel.refreshItems();
+                viewModel.saveResult().removeObserver(saveObserver);
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping item delete did not complete asynchronously");
+            }
+        }
+    }
+
     private static boolean containsText(View view, String expected) {
         if (view instanceof TextView && expected.contentEquals(((TextView) view).getText())) return true;
         if (!(view instanceof ViewGroup)) return false;
@@ -255,5 +329,13 @@ public class MainActivityStateTest {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static void setFieldUnchecked(Object target, String name, Object value) {
+        try {
+            setField(target, name, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 }

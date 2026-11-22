@@ -286,6 +286,29 @@ public class MainActivity extends AppCompatActivity {
         cookingJournalViewModel = new ViewModelProvider(this, viewModelFactory).get(CookingJournalViewModel.class);
         searchViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
         discoverViewModel = new ViewModelProvider(this, viewModelFactory).get(DiscoverViewModel.class);
+        shoppingViewModel.shoppingState().observe(this, state -> {
+            if (screen == Screen.SHOPPING && state != null && !state.loading) render();
+        });
+        shoppingViewModel.saveResult().observe(this, result -> {
+            if (result == null || screen != Screen.SHOPPING_ITEM_FORM) return;
+            shoppingViewModel.clearSaveResult();
+            if (result.success) {
+                shoppingStatusFilter = result.status;
+                screen = Screen.SHOPPING;
+                render();
+            } else {
+                Toast.makeText(this, result.error == null ? "Không thể lưu nguyên liệu." : result.error,
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+        shoppingViewModel.planUpdate().observe(this, update -> {
+            if (update == null || screen != Screen.SHOPPING) return;
+            shoppingViewModel.clearPlanUpdate();
+            if (!update.changes.isEmpty()) showShoppingPlanUpdate(update);
+            else if (update.message != null && !update.message.isEmpty()) {
+                Toast.makeText(this, update.message, Toast.LENGTH_SHORT).show();
+            }
+        });
         cookingPhotoPicker = registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
             if (uri == null || screen != Screen.COOKING_LOG_FORM) return;
             PhotoSaveResult result = cookingJournalViewModel.savePhoto(uri.toString());
@@ -303,6 +326,7 @@ public class MainActivity extends AppCompatActivity {
         restoreAppState(savedInstanceState);
         restoreMealPlanState(savedInstanceState);
         restoreOfflineFeatureState(savedInstanceState);
+        if (screen == Screen.SHOPPING) shoppingViewModel.refreshItems();
         render();
     }
 
@@ -1821,17 +1845,30 @@ public class MainActivity extends AppCompatActivity {
             icon.setPadding(dp(24), dp(24), dp(24), dp(24));
             icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 26));
             empty.addView(icon, new LinearLayout.LayoutParams(dp(84), dp(84)));
-            TextView title = text("Danh sách đang trống", 22, TEXT, true);
-            title.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
-            titleParams.topMargin = dp(18);
-            titleParams.bottomMargin = dp(8);
-            empty.addView(title, titleParams);
-            TextView hint = text("Chưa có dữ liệu nguyên liệu công thức. Bạn có thể thêm thủ công.",
-                    14, MUTED, false);
-            hint.setGravity(Gravity.CENTER);
-            hint.setLineSpacing(dp(3), 1f);
-            empty.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+            ShoppingViewModel.ShoppingState listState = shoppingViewModel.shoppingState().getValue();
+            if (listState != null && listState.loading) {
+                android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+                LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+                progressParams.topMargin = dp(16);
+                empty.addView(progress, progressParams);
+                TextView loading = text("Đang tải danh sách mua sắm…", 14, MUTED, false);
+                loading.setGravity(Gravity.CENTER);
+                LinearLayout.LayoutParams loadingParams = new LinearLayout.LayoutParams(-1, -2);
+                loadingParams.topMargin = dp(12);
+                empty.addView(loading, loadingParams);
+            } else {
+                TextView title = text("Danh sách đang trống", 22, TEXT, true);
+                title.setGravity(Gravity.CENTER);
+                LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+                titleParams.topMargin = dp(18);
+                titleParams.bottomMargin = dp(8);
+                empty.addView(title, titleParams);
+                TextView hint = text("Chưa có dữ liệu nguyên liệu công thức. Bạn có thể thêm thủ công.",
+                        14, MUTED, false);
+                hint.setGravity(Gravity.CENTER);
+                hint.setLineSpacing(dp(3), 1f);
+                empty.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+            }
             TextView add = primaryButton("Thêm nguyên liệu", () -> openShoppingItemForm(null));
             LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(49));
             addParams.topMargin = dp(44);
@@ -2138,20 +2175,15 @@ public class MainActivity extends AppCompatActivity {
                 ? shoppingDraftUnitId : KitchenUnitCatalog.canonicalId(shoppingDraftUnit);
         String status;
         if (editingShoppingItemId == null) {
-            status = shoppingViewModel.initialStatusForPantry(null, shoppingDraftName,
-                    shoppingDraftAmount, canonicalUnit);
+            status = null; // The ViewModel checks known pantry stock asynchronously.
         } else {
             ShoppingListItem existing = shoppingViewModel.findItem(editingShoppingItemId);
             status = existing == null ? ShoppingViewModel.NEED_TO_BUY : existing.status;
         }
         if (!shoppingViewModel.saveItem(editingShoppingItemId, shoppingDraftName, shoppingDraftAmount,
                 canonicalUnit, shoppingDraftCategory, status)) {
-            Toast.makeText(this, "Vui lòng nhập tên, số lượng hợp lệ và đơn vị.", Toast.LENGTH_SHORT).show();
             return;
         }
-        shoppingStatusFilter = status;
-        screen = Screen.SHOPPING;
-        render();
     }
 
     private void confirmDeleteShoppingItem(String itemId) {
@@ -2251,13 +2283,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openShoppingList(Screen returnScreen) {
-        ShoppingViewModel.PlanUpdate update = returnScreen == Screen.MEAL_PLAN
-                ? shoppingViewModel.checkForPlanChanges() : null;
         shoppingReturnScreen = returnScreen == Screen.SHOPPING ? Screen.MEAL_PLAN : returnScreen;
         shoppingStatusFilter = ShoppingViewModel.NEED_TO_BUY;
         screen = Screen.SHOPPING;
+        shoppingViewModel.refreshItems();
+        if (returnScreen == Screen.MEAL_PLAN) shoppingViewModel.checkForPlanChangesAsync();
         render();
-        if (update != null) showShoppingPlanUpdate(update);
     }
 
     private void addPlannedRecipeCard(LinearLayout parent, PlannedRecipe item,
