@@ -500,7 +500,7 @@ public final class DiscoverFragment extends Fragment {
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
-        addText(page, "Món mới", 28, TEXT, true, 0, 0, 0, 0);
+        addBackTitle(page, "Món mới");
         addText(page, "Sắp xếp theo ngày công bố gần nhất.", 14, MUTED, false, 0, 4, 0, 20);
         List<Recipe> newRecipes =
                 discoverViewModel.newlyPublished(
