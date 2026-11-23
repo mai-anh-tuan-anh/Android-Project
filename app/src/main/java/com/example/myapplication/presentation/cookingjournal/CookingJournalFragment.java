@@ -110,6 +110,7 @@ public final class CookingJournalFragment extends Fragment {
   private EditText servingsInput;
   private EditText durationInput;
   private EditText adjustmentInput;
+  private ImageView photoPreviewView;
   private List<CookingLogEntry> allLogs = new ArrayList<>();
 
   public static CookingJournalFragment newInstance(String screen, String recipeId) {
@@ -269,6 +270,14 @@ public final class CookingJournalFragment extends Fragment {
   }
 
   private void onMutationResult(CookingJournalViewModel.MutationResult result) {
+    if (CookingJournalViewModel.MutationResult.PHOTO_PREVIEW.equals(result.operation)) {
+      if (FORM.equals(screen)
+          && photoPath.equals(result.filename)
+          && photoPreviewView != null) {
+        photoPreviewView.setImageBitmap(viewModel.getPhotoPreviewBitmap(result.filename));
+      }
+      return;
+    }
     if (CookingJournalViewModel.MutationResult.PHOTO.equals(result.operation)) {
       if (result.success && FORM.equals(screen)) {
         if (!originalPhotoPath.equals(photoPath)) viewModel.deletePhoto(photoPath);
@@ -519,7 +528,8 @@ public final class CookingJournalFragment extends Fragment {
     });
     if (!photoPath.isEmpty()) {
       ImageView preview = new ImageView(requireContext());
-      Bitmap bitmap = viewModel.getPhotoBitmap(photoPath);
+      photoPreviewView = preview;
+      Bitmap bitmap = viewModel.getPhotoPreviewBitmap(photoPath);
       if (bitmap != null) preview.setImageBitmap(bitmap);
       preview.setScaleType(ImageView.ScaleType.CENTER_CROP);
       preview.setBackground(roundRect(BORDER, BORDER, 14));
@@ -570,6 +580,7 @@ public final class CookingJournalFragment extends Fragment {
     formInitialized = true;
     notifyScreenChanged();
     render();
+    if (!photoPath.isEmpty()) viewModel.loadPhotoPreviewAsync(photoPath);
   }
 
   private void saveForm() {

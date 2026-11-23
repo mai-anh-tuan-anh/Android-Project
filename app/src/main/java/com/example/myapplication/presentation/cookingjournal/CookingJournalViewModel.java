@@ -32,6 +32,7 @@ public final class CookingJournalViewModel extends ViewModel {
     private final MutableLiveData<MutationResult> mutationResult = new MutableLiveData<>();
     private volatile List<CookingLogEntry> logs = new ArrayList<>();
     private volatile Map<String, Bitmap> photoBitmaps = new ConcurrentHashMap<>();
+    private final Map<String, Bitmap> photoPreviewBitmaps = new ConcurrentHashMap<>();
 
     public CookingJournalViewModel(PersonalDataRepository repository, Executor ioExecutor) {
         this.repository = repository;
@@ -138,6 +139,29 @@ public final class CookingJournalViewModel extends ViewModel {
 
     public Bitmap getPhotoBitmap(String filename) { return filename == null ? null : photoBitmaps.get(filename); }
 
+    public Bitmap getPhotoPreviewBitmap(String filename) {
+        if (filename == null) return null;
+        Bitmap preview = photoPreviewBitmaps.get(filename);
+        return preview == null ? photoBitmaps.get(filename) : preview;
+    }
+
+    public void loadPhotoPreviewAsync(String filename) {
+        if (filename == null || filename.isEmpty() || photoPreviewBitmaps.containsKey(filename)) return;
+        ioExecutor.execute(() -> {
+            try {
+                File photo = repository.getCookingLogPhoto(filename);
+                Bitmap bitmap = photo == null ? null : decodePreview(photo);
+                if (bitmap != null) {
+                    photoPreviewBitmaps.put(filename, bitmap);
+                    mutationResult.postValue(new MutationResult(
+                            MutationResult.PHOTO_PREVIEW, true, null, filename));
+                }
+            } catch (RuntimeException ignored) {
+                // The existing thumbnail remains available if the larger preview cannot be decoded.
+            }
+        });
+    }
+
     public boolean save(String id, Recipe recipe, long cookedAt, int servings, Integer duration,
                         Integer rating, String adjustment, String photoPath) {
         if (recipe == null || cookedAt <= 0 || servings < 1 || servings > 999
@@ -185,6 +209,8 @@ public final class CookingJournalViewModel extends ViewModel {
                     File photo = repository.getCookingLogPhoto(result.filename);
                     Bitmap bitmap = photo == null ? null : decodeThumbnail(photo);
                     if (bitmap != null) photoBitmaps.put(result.filename, bitmap);
+                    Bitmap preview = photo == null ? null : decodePreview(photo);
+                    if (preview != null) photoPreviewBitmaps.put(result.filename, preview);
                 }
                 mutationResult.postValue(new MutationResult(MutationResult.PHOTO, result.filename != null,
                         result.filename == null ? (result.tooLarge ? "Ảnh cần nhỏ hơn 10 MB." : "Không thể lưu ảnh đã chọn.") : null,
@@ -201,6 +227,7 @@ public final class CookingJournalViewModel extends ViewModel {
             try {
                 repository.deleteCookingLogPhoto(filename);
                 photoBitmaps.remove(filename);
+                photoPreviewBitmaps.remove(filename);
             } catch (RuntimeException error) {
                 mutationResult.postValue(new MutationResult(MutationResult.PHOTO, false, errorMessage(error), null));
             }
@@ -214,6 +241,14 @@ public final class CookingJournalViewModel extends ViewModel {
     }
 
     private static Bitmap decodeThumbnail(File file) {
+        return decodeSampled(file, 512);
+    }
+
+    private static Bitmap decodePreview(File file) {
+        return decodeSampled(file, 1280);
+    }
+
+    private static Bitmap decodeSampled(File file, int maxDimension) {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
@@ -221,7 +256,7 @@ public final class CookingJournalViewModel extends ViewModel {
         BitmapFactory.Options options = new BitmapFactory.Options();
         int sampleSize = 1;
         int longestSide = Math.max(bounds.outWidth, bounds.outHeight);
-        while (longestSide / sampleSize > 512) sampleSize *= 2;
+        while (longestSide / sampleSize > maxDimension) sampleSize *= 2;
         options.inSampleSize = sampleSize;
         return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
     }
@@ -238,7 +273,8 @@ public final class CookingJournalViewModel extends ViewModel {
     }
 
     public static final class MutationResult {
-        public static final String SAVE = "SAVE", DELETE = "DELETE", PHOTO = "PHOTO";
+        public static final String SAVE = "SAVE", DELETE = "DELETE", PHOTO = "PHOTO",
+                PHOTO_PREVIEW = "PHOTO_PREVIEW";
         public final String operation;
         public final boolean success;
         public final String message;
