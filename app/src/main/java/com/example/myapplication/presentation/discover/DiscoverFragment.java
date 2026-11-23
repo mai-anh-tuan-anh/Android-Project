@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.example.myapplication.core.ui.BottomNavigationBar;
+import com.example.myapplication.core.ui.DebouncedSearchTextWatcher;
 
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
@@ -568,6 +569,8 @@ public final class DiscoverFragment extends Fragment {
         searchInput.setSingleLine(true);
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchBox.addView(searchInput, new LinearLayout.LayoutParams(0, -2, 1));
+        searchInput.addTextChangedListener(
+                new DebouncedSearchTextWatcher(searchInput, searchViewModel::setSearchQuery));
 
         ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
         clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
@@ -875,6 +878,12 @@ public final class DiscoverFragment extends Fragment {
         searchInput.setSingleLine(true);
         searchInput.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
         searchBox.addView(searchInput, new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout matchesContainer = vertical();
+        searchInput.addTextChangedListener(
+                new DebouncedSearchTextWatcher(searchInput, query -> {
+                    searchViewModel.setSearchQuery(query);
+                    renderSearchMatches(matchesContainer);
+                }));
 
         ImageView clearIcon = iconView(R.drawable.ic_close_outline, MUTED);
         clearIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
@@ -941,15 +950,23 @@ public final class DiscoverFragment extends Fragment {
         filterRow.addView(filterBtn, new LinearLayout.LayoutParams(dp(40), dp(40)));
         page.addView(filterRow, frParams);
 
-        // Search matches
+        renderSearchMatches(matchesContainer);
+        page.addView(matchesContainer);
+
+        scroll.addView(page);
+        pageRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void renderSearchMatches(LinearLayout matchesContainer) {
+        matchesContainer.removeAllViews();
         List<Recipe> matches = searchViewModel.filterRecipes(PreviewRecipeCatalog.designRecipes());
         if (!matches.isEmpty()) {
             TextView countText = text(matches.size() + " món phù hợp", 13, MUTED, false);
             countText.setPadding(0, 0, 0, dp(12));
-            page.addView(countText);
+            matchesContainer.addView(countText);
 
             for (Recipe r : matches) {
-                addSearchDishItem(page, r);
+                addSearchDishItem(matchesContainer, r);
             }
         } else {
             // Empty state matching states/khong-ket-qua.png
@@ -993,11 +1010,8 @@ public final class DiscoverFragment extends Fragment {
             });
             empty.addView(editFilterBtn, new LinearLayout.LayoutParams(-1, -2));
 
-            page.addView(empty);
+            matchesContainer.addView(empty);
         }
-
-        scroll.addView(page);
-        pageRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     }
 
     private void renderWhatToCookIngredients() {

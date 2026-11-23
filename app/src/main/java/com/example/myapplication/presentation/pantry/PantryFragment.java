@@ -32,6 +32,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.myapplication.core.ui.DebouncedSearchTextWatcher;
 import com.example.myapplication.R;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.di.AppViewModelFactory;
@@ -281,13 +282,10 @@ public final class PantryFragment extends Fragment {
         rows.setPadding(0, dp(8), 0, dp(12));
         scroll.addView(rows);
         populateRows(rows, items);
-        search.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                query = s.toString(); populateRows(rows, viewModel.getItems());
-            }
-            @Override public void afterTextChanged(Editable s) { }
-        });
+        search.addTextChangedListener(new DebouncedSearchTextWatcher(search, value -> {
+            query = value;
+            populateRows(rows, viewModel.getItems());
+        }));
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout actions = new LinearLayout(requireContext());
         actions.setGravity(Gravity.CENTER_VERTICAL);

@@ -27,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.example.myapplication.core.ui.BottomNavigationBar;
+import com.example.myapplication.core.ui.DebouncedSearchTextWatcher;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
@@ -41,6 +42,7 @@ import java.util.Date;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /** Owns Module 5 library, favorites, collection list/detail, and collection form screens. */
 public final class PersonalDataFragment extends Fragment {
@@ -346,18 +348,9 @@ public final class PersonalDataFragment extends Fragment {
           createSearchBox(
               searchQuery,
               "Tìm món yêu thích",
-              new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                  searchQuery = s.toString();
-                  populateFavorites(content, favorites);
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {}
+              query -> {
+                searchQuery = query;
+                populateFavorites(content, favorites);
               });
       EditText input = box.findViewWithTag("personal-favorite-search");
       LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(49));
@@ -426,13 +419,9 @@ public final class PersonalDataFragment extends Fragment {
       content.addView(empty, new LinearLayout.LayoutParams(-1, -1));
     } else {
       FrameLayout search = createSearchBox(
-          collectionDetailQuery, "Tìm món trong bộ sưu tập", new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-              collectionDetailQuery = s.toString();
-              populateCollectionResults(recipes);
-            }
-            @Override public void afterTextChanged(Editable s) {}
+          collectionDetailQuery, "Tìm món trong bộ sưu tập", query -> {
+            collectionDetailQuery = query;
+            populateCollectionResults(recipes);
           });
       LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
       searchParams.bottomMargin = dp(14);
@@ -517,13 +506,9 @@ public final class PersonalDataFragment extends Fragment {
     collectionError = text("", 12, Color.rgb(169, 54, 54), false);
     content.addView(collectionError);
     addText(content, "Chọn món để thêm", 19, TEXT, true, 0, 34, 0, 18);
-    FrameLayout search = createSearchBox(collectionFormQuery, "Tìm món để thêm", new TextWatcher() {
-      @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-      @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-        collectionFormQuery = s.toString();
-        populateCollectionFormRows();
-      }
-      @Override public void afterTextChanged(Editable s) {}
+    FrameLayout search = createSearchBox(collectionFormQuery, "Tìm món để thêm", query -> {
+      collectionFormQuery = query;
+      populateCollectionFormRows();
     });
     LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
     searchParams.bottomMargin = dp(14);
@@ -988,7 +973,7 @@ public final class PersonalDataFragment extends Fragment {
     parent.addView(gap, new LinearLayout.LayoutParams(1, dp(16)));
   }
 
-  private FrameLayout createSearchBox(String value, String hint, TextWatcher watcher) {
+  private FrameLayout createSearchBox(String value, String hint, Consumer<String> onSearch) {
     EditText search = new EditText(requireContext());
     search.setTag("personal-favorite-search");
     search.setText(value);
@@ -1007,7 +992,7 @@ public final class PersonalDataFragment extends Fragment {
     icon.setPadding(dp(12), dp(12), dp(12), dp(12));
     box.addView(icon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
     box.addView(search, new FrameLayout.LayoutParams(-1, -1));
-    search.addTextChangedListener(watcher);
+    search.addTextChangedListener(new DebouncedSearchTextWatcher(search, onSearch));
     return box;
   }
 

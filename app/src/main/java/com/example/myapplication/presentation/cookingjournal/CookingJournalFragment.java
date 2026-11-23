@@ -30,6 +30,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.example.myapplication.core.ui.BottomNavigationBar;
+import com.example.myapplication.core.ui.DebouncedSearchTextWatcher;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
@@ -689,19 +690,13 @@ public final class CookingJournalFragment extends Fragment {
     input.setText(search);
     box.addView(input, new FrameLayout.LayoutParams(-1, -1));
     input.addTextChangedListener(
-        new TextWatcher() {
-          @Override
-          public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-
-          @Override
-          public void onTextChanged(CharSequence s, int st, int before, int count) {
-            search = s.toString();
-            if (journalRows != null) populateJournalRows(journalRows);
+        new DebouncedSearchTextWatcher(input, query -> {
+          search = query;
+          if (journalRows != null) {
+            journalRows.removeAllViews();
+            populateJournalRows(journalRows);
           }
-
-          @Override
-          public void afterTextChanged(Editable e) {}
-        });
+        }));
     return box;
   }
 
