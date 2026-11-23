@@ -900,11 +900,12 @@ public final class PersonalDataFragment extends Fragment {
   private void addEmptyCollectionCard(LinearLayout parent) {
     LinearLayout card = vertical();
     card.setPadding(dp(16), dp(18), dp(16), dp(18));
+    card.setMinimumHeight(dp(64));
     card.setBackground(roundRect(WHITE, BORDER, 16));
     addText(card, "Chưa có bộ sưu tập", 15, TEXT, true, 0, 0, 0, 3);
     addText(card, "Tạo bộ sưu tập đầu tiên của bạn.", 13, MUTED, false, 0, 0, 0, 0);
     card.setOnClickListener(v -> host.onPersonalCreateCollection());
-    parent.addView(card, new LinearLayout.LayoutParams(-1, dp(64)));
+    parent.addView(card, new LinearLayout.LayoutParams(-1, -2));
   }
 
   private LinearLayout horizontalCard() {
