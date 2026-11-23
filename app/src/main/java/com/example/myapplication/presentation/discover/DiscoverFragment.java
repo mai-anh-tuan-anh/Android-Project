@@ -848,7 +848,7 @@ public final class DiscoverFragment extends Fragment {
                     @Override
                     public void afterTextChanged(Editable s) {}
                 });
-        page.addView(incInput, new LinearLayout.LayoutParams(-1, -2));
+        page.addView(incInput, new LinearLayout.LayoutParams(-1, dp(52)));
 
         addText(page, "Nguyên liệu cần loại trừ", 14, TEXT, true, 0, 16, 0, 8);
         EditText excInput = editField(searchViewModel.getDraftExcludeIngredient(), 14, 52);
@@ -870,7 +870,7 @@ public final class DiscoverFragment extends Fragment {
                     @Override
                     public void afterTextChanged(Editable s) {}
                 });
-        page.addView(excInput, new LinearLayout.LayoutParams(-1, -2));
+        page.addView(excInput, new LinearLayout.LayoutParams(-1, dp(52)));
 
         LinearLayout actionRow = new LinearLayout(requireContext());
         actionRow.setOrientation(LinearLayout.HORIZONTAL);

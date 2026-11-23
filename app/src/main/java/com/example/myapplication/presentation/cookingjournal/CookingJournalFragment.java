@@ -470,13 +470,13 @@ public final class CookingJournalFragment extends Fragment {
     servingsInput.setSingleLine(true);
     servingsInput.setInputType(2);
     servingsInput.setHint("Số người");
-    fields.addView(servingsInput);
+    fields.addView(servingsInput, new LinearLayout.LayoutParams(-1, dp(52)));
     addText(fields, "Thời gian thực tế (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
     durationInput = editField(duration, 16, 52);
     durationInput.setSingleLine(true);
     durationInput.setInputType(2);
     durationInput.setHint("Số phút");
-    fields.addView(durationInput);
+    fields.addView(durationInput, new LinearLayout.LayoutParams(-1, dp(52)));
     addText(fields, "Bạn đánh giá món này (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
     LinearLayout stars = new LinearLayout(requireContext());
     stars.setGravity(Gravity.CENTER_VERTICAL);

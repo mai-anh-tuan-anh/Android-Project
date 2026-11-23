@@ -536,7 +536,7 @@ public final class PantryFragment extends Fragment {
     }
 
     private void addField(LinearLayout parent, View view, int top, int bottom) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2); params.topMargin = dp(top); params.bottomMargin = dp(bottom); parent.addView(view, params);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52)); params.topMargin = dp(top); params.bottomMargin = dp(bottom); parent.addView(view, params);
     }
 
     private void addText(LinearLayout parent, String value, int size, int color, boolean bold, int left, int top, int right, int bottom) {

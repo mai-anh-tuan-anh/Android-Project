@@ -325,7 +325,7 @@ public final class ShoppingFragment extends Fragment {
   }
 
   private void addFormField(LinearLayout parent, View field, int top, int bottom) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
     params.topMargin = dp(top);
     params.bottomMargin = dp(bottom);
     parent.addView(field, params);
