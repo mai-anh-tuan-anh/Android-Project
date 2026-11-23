@@ -376,7 +376,7 @@ public final class PersonalDataFragment extends Fragment {
                 populateFavorites(content, favorites);
               });
       EditText input = box.findViewWithTag("personal-favorite-search");
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(49));
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
       params.bottomMargin = dp(18);
       page.addView(box, params);
     }
@@ -446,7 +446,7 @@ public final class PersonalDataFragment extends Fragment {
             collectionDetailQuery = query;
             populateCollectionResults(recipes);
           });
-      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+      LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
       searchParams.bottomMargin = dp(14);
       content.addView(search, searchParams);
       collectionRecipeResults = vertical();
@@ -522,10 +522,11 @@ public final class PersonalDataFragment extends Fragment {
     collectionNameInput.setText(viewModel.getCollectionNameDraft());
     collectionNameInput.setTextSize(16);
     collectionNameInput.setTextColor(TEXT);
-    collectionNameInput.setPadding(dp(15), dp(8), dp(15), dp(8));
+    collectionNameInput.setPadding(dp(15), 0, dp(15), 0);
+    collectionNameInput.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     collectionNameInput.setBackground(roundRect(WHITE, BORDER, 14));
     collectionNameInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
-    content.addView(collectionNameInput, new LinearLayout.LayoutParams(-1, dp(49)));
+    content.addView(collectionNameInput, new LinearLayout.LayoutParams(-1, dp(52)));
     collectionError = text("", 12, Color.rgb(169, 54, 54), false);
     content.addView(collectionError);
     addText(content, "Chọn món để thêm", 19, TEXT, true, 0, 34, 0, 18);
@@ -533,7 +534,7 @@ public final class PersonalDataFragment extends Fragment {
       collectionFormQuery = query;
       populateCollectionFormRows();
     });
-    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
     searchParams.bottomMargin = dp(14);
     content.addView(search, searchParams);
     collectionFormRecipeRows = vertical();
@@ -1006,6 +1007,7 @@ public final class PersonalDataFragment extends Fragment {
     search.setHintTextColor(MUTED);
     search.setSingleLine(true);
     search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+    search.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     search.setHint(hint);
     search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
     search.setBackgroundColor(Color.TRANSPARENT);

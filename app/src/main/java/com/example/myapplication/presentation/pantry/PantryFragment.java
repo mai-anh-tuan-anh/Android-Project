@@ -250,7 +250,7 @@ public final class PantryFragment extends Fragment {
         }
         addText(page, usable + " sử dụng được · " + expiring + " sắp hết hạn · " + expired + " hết hạn",
                 14, MUTED, false, 0, 8, 0, 12);
-        EditText search = editField(query, 15, 48);
+        EditText search = editField(query, 15, 52);
         search.setSingleLine(true);
         search.setHint("Tìm nguyên liệu trong tủ");
         search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
@@ -263,7 +263,7 @@ public final class PantryFragment extends Fragment {
         icon.setPadding(dp(12), dp(12), dp(12), dp(12));
         searchBox.addView(icon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
         searchBox.addView(search, new FrameLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
         searchParams.bottomMargin = dp(12);
         page.addView(searchBox, searchParams);
         LinearLayout chips = new LinearLayout(requireContext());
@@ -545,11 +545,11 @@ public final class PantryFragment extends Fragment {
 
     private EditText editField(String value, int size, int height) {
         EditText edit = new EditText(requireContext()); edit.setText(value); edit.setTextSize(size); edit.setTextColor(TEXT); edit.setHintTextColor(MUTED); edit.setSingleLine(true);
-        edit.setPadding(dp(14), 0, dp(14), 0); edit.setBackground(roundRect(WHITE, BORDER, 14)); edit.setMinHeight(dp(height)); edit.setSelectAllOnFocus(false); return edit;
+        edit.setPadding(dp(14), 0, dp(14), 0); edit.setGravity(Gravity.CENTER_VERTICAL | Gravity.START); edit.setBackground(roundRect(WHITE, BORDER, 14)); edit.setHeight(dp(height)); edit.setSelectAllOnFocus(false); return edit;
     }
 
     private TextView selectionField(String value, int size, int height) {
-        TextView text = text(value, size, TEXT, false); text.setGravity(Gravity.CENTER_VERTICAL); text.setPadding(dp(14), 0, dp(14), 0); text.setBackground(roundRect(WHITE, BORDER, 14)); text.setMinHeight(dp(height)); return text;
+        TextView text = text(value, size, TEXT, false); text.setGravity(Gravity.CENTER_VERTICAL); text.setPadding(dp(14), 0, dp(14), 0); text.setBackground(roundRect(WHITE, BORDER, 14)); text.setHeight(dp(height)); return text;
     }
 
     private LinearLayout vertical() { LinearLayout layout = new LinearLayout(requireContext()); layout.setOrientation(LinearLayout.VERTICAL); return layout; }

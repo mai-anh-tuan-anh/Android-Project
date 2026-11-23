@@ -316,7 +316,7 @@ public final class CookingJournalFragment extends Fragment {
     addText(page, "Tìm lại những lần bạn đã nấu.", 14, MUTED, false, 0, 0, 0, 14);
     addStats(page, viewModel.getStats());
     FrameLayout searchBox = searchBox();
-    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
     searchParams.topMargin = dp(16);
     searchParams.bottomMargin = dp(10);
     page.addView(searchBox, searchParams);
@@ -460,18 +460,19 @@ public final class CookingJournalFragment extends Fragment {
     fields.addView(recipeCard);
     addText(fields, "Ngày nấu", 14, TEXT, true, 0, 20, 0, 7);
     TextView date = text(formatDate(cookedAt) + "     ▾", 15, TEXT, false);
+    date.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     date.setPadding(dp(14), 0, dp(14), 0);
     date.setBackground(roundRect(WHITE, BORDER, 14));
-    fields.addView(date, new LinearLayout.LayoutParams(-1, dp(50)));
+    fields.addView(date, new LinearLayout.LayoutParams(-1, dp(52)));
     date.setOnClickListener(v -> showDatePicker());
     addText(fields, "Khẩu phần", 14, TEXT, true, 0, 18, 0, 7);
-    servingsInput = editField(String.valueOf(servings), 16, 50);
+    servingsInput = editField(String.valueOf(servings), 16, 52);
     servingsInput.setSingleLine(true);
     servingsInput.setInputType(2);
     servingsInput.setHint("Số người");
     fields.addView(servingsInput);
     addText(fields, "Thời gian thực tế (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-    durationInput = editField(duration, 16, 50);
+    durationInput = editField(duration, 16, 52);
     durationInput.setSingleLine(true);
     durationInput.setInputType(2);
     durationInput.setHint("Số phút");
@@ -507,7 +508,7 @@ public final class CookingJournalFragment extends Fragment {
       });
     }
     addText(fields, "Điều chỉnh lần này (không bắt buộc)", 14, TEXT, true, 0, 18, 0, 7);
-    adjustmentInput = editField(adjustment, 15, 100);
+    adjustmentInput = editField(adjustment, 15, 104);
     adjustmentInput.setGravity(Gravity.TOP | Gravity.START);
     adjustmentInput.setInputType(
         android.text.InputType.TYPE_CLASS_TEXT
@@ -685,6 +686,7 @@ public final class CookingJournalFragment extends Fragment {
     input.setHintTextColor(MUTED);
     input.setHint("Tìm món hoặc ghi chú");
     input.setBackgroundColor(Color.TRANSPARENT);
+    input.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     input.setText(search);
     box.addView(input, new FrameLayout.LayoutParams(-1, -1));
     input.addTextChangedListener(
@@ -905,7 +907,7 @@ public final class CookingJournalFragment extends Fragment {
     field.setSingleLine(false);
     field.setBackground(roundRect(WHITE, BORDER, 14));
     field.setPadding(dp(15), dp(10), dp(15), dp(10));
-    if (minHeight > 0) field.setMinHeight(dp(minHeight));
+    if (minHeight > 0) field.setHeight(dp(minHeight));
     return field;
   }
 

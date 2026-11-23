@@ -274,7 +274,7 @@ public final class ShoppingFragment extends Fragment {
     addFormField(fields, unitInput, 10, 26);
 
     addText(fields, "Danh mục", 15, TEXT, true, 0, 0, 0, 0);
-    categoryInput = selectionField(draftCategory + "     ▾", 16, 56);
+    categoryInput = selectionField(draftCategory + "     ▾", 16);
     addFormField(fields, categoryInput, 10, 26);
     categoryInput.setOnClickListener(v -> showCategoryPicker());
 
@@ -318,8 +318,9 @@ public final class ShoppingFragment extends Fragment {
     field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
     field.setHint(hint);
     field.setBackground(roundRect(WHITE, BORDER, 14));
-    field.setPadding(dp(15), dp(10), dp(15), dp(10));
-    field.setMinHeight(dp(56));
+    field.setPadding(dp(15), 0, dp(15), 0);
+    field.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+    field.setHeight(dp(52));
     return field;
   }
 
@@ -330,11 +331,11 @@ public final class ShoppingFragment extends Fragment {
     parent.addView(field, params);
   }
 
-  private TextView selectionField(String value, int textSize, int minHeight) {
+  private TextView selectionField(String value, int textSize) {
     TextView field = text(value, textSize, TEXT, false);
     field.setGravity(Gravity.CENTER_VERTICAL);
     field.setPadding(dp(15), dp(8), dp(15), dp(8));
-    field.setMinHeight(dp(minHeight));
+    field.setHeight(dp(52));
     field.setBackground(roundRect(WHITE, BORDER, 14));
     field.setFocusable(true);
     field.setClickable(true);

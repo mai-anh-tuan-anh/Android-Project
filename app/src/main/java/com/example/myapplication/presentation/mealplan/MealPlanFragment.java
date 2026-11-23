@@ -333,6 +333,7 @@ public final class MealPlanFragment extends Fragment {
     pickerSearch.setHint("Tìm món hoặc nguyên liệu");
     pickerSearch.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
     pickerSearch.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+    pickerSearch.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
     pickerSearch.setPadding(dp(48), dp(10), dp(12), dp(10));
     FrameLayout searchBox = new FrameLayout(requireContext());
     searchBox.setBackground(roundRect(WHITE, BORDER, 16));
@@ -340,7 +341,7 @@ public final class MealPlanFragment extends Fragment {
     searchIcon.setPadding(dp(12), dp(12), dp(12), dp(12));
     searchBox.addView(searchIcon, new FrameLayout.LayoutParams(dp(48), -1, Gravity.START));
     searchBox.addView(pickerSearch, new FrameLayout.LayoutParams(-1, -1));
-    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(49));
+    LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(-1, dp(52));
     searchParams.topMargin = dp(14);
     searchParams.bottomMargin = dp(10);
     page.addView(searchBox, searchParams);

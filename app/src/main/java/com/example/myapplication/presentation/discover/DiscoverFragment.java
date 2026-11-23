@@ -608,12 +608,12 @@ public final class DiscoverFragment extends Fragment {
         LinearLayout searchBox = new LinearLayout(requireContext());
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
         searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        searchBox.setPadding(dp(14), dp(10), dp(12), dp(10));
+        searchBox.setPadding(dp(14), 0, dp(12), 0);
 
         ImageView searchIcon = iconView(R.drawable.ic_search_outline, MUTED);
         searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
-        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 44);
+        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 52);
         discoverSearchInput = searchInput;
         searchInput.setHint("Tìm công thức, nguyên liệu...");
         searchInput.setBackgroundColor(Color.TRANSPARENT);
@@ -635,7 +635,7 @@ public final class DiscoverFragment extends Fragment {
         });
         searchBox.addView(clearIcon, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
-        page.addView(searchBox, new LinearLayout.LayoutParams(-1, -2));
+        page.addView(searchBox, new LinearLayout.LayoutParams(-1, dp(52)));
 
         searchInput.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEARCH
@@ -829,7 +829,7 @@ public final class DiscoverFragment extends Fragment {
         page.addView(dietRow);
 
         addText(page, "Nguyên liệu muốn dùng", 14, TEXT, true, 0, 20, 0, 8);
-        EditText incInput = editField(searchViewModel.getDraftIncludeIngredient(), 14, 46);
+        EditText incInput = editField(searchViewModel.getDraftIncludeIngredient(), 14, 52);
         incInput.setHint("Ví dụ: Cà chua, thịt gà...");
         incInput.setBackground(roundRect(WHITE, BORDER, 14));
         incInput.setPadding(dp(14), dp(10), dp(14), dp(10));
@@ -851,7 +851,7 @@ public final class DiscoverFragment extends Fragment {
         page.addView(incInput, new LinearLayout.LayoutParams(-1, -2));
 
         addText(page, "Nguyên liệu cần loại trừ", 14, TEXT, true, 0, 16, 0, 8);
-        EditText excInput = editField(searchViewModel.getDraftExcludeIngredient(), 14, 46);
+        EditText excInput = editField(searchViewModel.getDraftExcludeIngredient(), 14, 52);
         excInput.setHint("Ví dụ: Đậu phộng, hải sản...");
         excInput.setBackground(roundRect(WHITE, BORDER, 14));
         excInput.setPadding(dp(14), dp(10), dp(14), dp(10));
@@ -918,12 +918,12 @@ public final class DiscoverFragment extends Fragment {
         LinearLayout searchBox = new LinearLayout(requireContext());
         searchBox.setGravity(Gravity.CENTER_VERTICAL);
         searchBox.setBackground(roundRect(WHITE, BORDER, 16));
-        searchBox.setPadding(dp(14), dp(10), dp(12), dp(10));
+        searchBox.setPadding(dp(14), 0, dp(12), 0);
 
         ImageView searchIcon = iconView(R.drawable.ic_search_outline, MUTED);
         searchBox.addView(searchIcon, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
-        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 44);
+        EditText searchInput = editField(searchViewModel.getSearchQuery(), 15, 52);
         searchInput.setHint("Tìm công thức, nguyên liệu...");
         searchInput.setBackgroundColor(Color.TRANSPARENT);
         searchInput.setPadding(dp(10), 0, dp(10), 0);
@@ -959,7 +959,7 @@ public final class DiscoverFragment extends Fragment {
             return false;
         });
 
-        LinearLayout.LayoutParams sbParams = new LinearLayout.LayoutParams(-1, -2);
+        LinearLayout.LayoutParams sbParams = new LinearLayout.LayoutParams(-1, dp(52));
         sbParams.bottomMargin = dp(14);
         page.addView(searchBox, sbParams);
 
@@ -1752,10 +1752,11 @@ public final class DiscoverFragment extends Fragment {
         field.setTextSize(textSize);
         field.setTextColor(TEXT);
         field.setHintTextColor(MUTED);
-        field.setSingleLine(false);
+        field.setSingleLine(true);
+        field.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         field.setBackground(roundRect(WHITE, BORDER, 14));
         field.setPadding(dp(15), dp(10), dp(15), dp(10));
-        if (minHeight > 0) field.setMinHeight(dp(minHeight));
+        if (minHeight > 0) field.setHeight(dp(minHeight));
         return field;
     }
 }
