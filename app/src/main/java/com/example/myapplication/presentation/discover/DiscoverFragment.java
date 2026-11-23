@@ -74,6 +74,7 @@ public final class DiscoverFragment extends Fragment {
     private DiscoverViewModel discoverViewModel;
     private PersonalDataViewModel personalDataViewModel;
     private Screen screen = Screen.DISCOVER;
+    private Screen lastRenderedScreen;
     private Screen detailReturnScreen = Screen.DISCOVER;
     private String selectedCategory = "";
     private String detailRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
@@ -258,6 +259,9 @@ public final class DiscoverFragment extends Fragment {
 
     private void render() {
         if (root == null || !isAdded()) return;
+        boolean preservePosition = lastRenderedScreen == screen;
+        ScrollView previousScroll = preservePosition ? findFirstScrollView(root) : null;
+        int previousScrollY = previousScroll == null ? 0 : previousScroll.getScrollY();
         root.removeAllViews();
         pageRoot = new LinearLayout(requireContext());
         pageRoot.setOrientation(LinearLayout.VERTICAL);
@@ -297,6 +301,23 @@ public final class DiscoverFragment extends Fragment {
             default:
                 renderDiscover();
         }
+        lastRenderedScreen = screen;
+        if (preservePosition && previousScrollY > 0) {
+            ScrollView currentScroll = findFirstScrollView(root);
+            if (currentScroll != null)
+                currentScroll.post(() -> currentScroll.scrollTo(0, previousScrollY));
+        }
+    }
+
+    private ScrollView findFirstScrollView(View view) {
+        if (view instanceof ScrollView) return (ScrollView) view;
+        if (!(view instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) view;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            ScrollView found = findFirstScrollView(group.getChildAt(i));
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private void renderDiscover() {

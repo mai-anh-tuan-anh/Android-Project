@@ -106,6 +106,7 @@ public final class PersonalDataFragment extends Fragment {
   private long collectionId = -1L;
   private String noteRecipeId;
   private LinearLayout root;
+  private String lastRenderedSection;
   private EditText collectionNameInput;
   private TextView collectionError;
   private TextView collectionSaveButton;
@@ -247,6 +248,9 @@ public final class PersonalDataFragment extends Fragment {
 
   private void render() {
     if (root == null || !isAdded()) return;
+    boolean preservePosition = java.util.Objects.equals(lastRenderedSection, section);
+    ScrollView previousScroll = preservePosition ? findFirstScrollView(root) : null;
+    int previousScrollY = previousScroll == null ? 0 : previousScroll.getScrollY();
     root.removeAllViews();
     if (FAVORITES.equals(section)) renderFavorites();
     else if (COLLECTIONS.equals(section)) renderCollections();
@@ -254,6 +258,22 @@ public final class PersonalDataFragment extends Fragment {
     else if (COLLECTION_FORM.equals(section)) renderCollectionForm();
     else if (NOTE.equals(section)) renderNote();
     else renderLibrary();
+    lastRenderedSection = section;
+    if (preservePosition && previousScrollY > 0) {
+      ScrollView currentScroll = findFirstScrollView(root);
+      if (currentScroll != null) currentScroll.post(() -> currentScroll.scrollTo(0, previousScrollY));
+    }
+  }
+
+  private ScrollView findFirstScrollView(View view) {
+    if (view instanceof ScrollView) return (ScrollView) view;
+    if (!(view instanceof ViewGroup)) return null;
+    ViewGroup group = (ViewGroup) view;
+    for (int i = 0; i < group.getChildCount(); i++) {
+      ScrollView found = findFirstScrollView(group.getChildAt(i));
+      if (found != null) return found;
+    }
+    return null;
   }
 
   private boolean noteInputFocused() {
