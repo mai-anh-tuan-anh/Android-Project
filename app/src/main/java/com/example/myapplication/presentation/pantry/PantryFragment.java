@@ -440,7 +440,7 @@ public final class PantryFragment extends Fragment {
 
     private TextView dateField(String date) {
         TextView value = text(date.isEmpty() ? "Không đặt" : displayDate(date), 15, date.isEmpty() ? MUTED : TEXT, false);
-        value.setPadding(dp(15), 0, dp(15), 0); value.setBackground(roundRect(WHITE, BORDER, 14)); return value;
+        value.setGravity(Gravity.CENTER_VERTICAL | Gravity.START); value.setPadding(dp(15), 0, dp(15), 0); value.setBackground(roundRect(WHITE, BORDER, 14)); return value;
     }
 
     private void showCategoryPicker() {
