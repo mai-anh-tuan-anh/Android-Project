@@ -209,6 +209,8 @@ public final class DiscoverFragment extends Fragment {
             showScreen(Screen.SEARCH);
         } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
             showScreen(Screen.WHAT_TO_COOK_INGREDIENTS);
+        } else if (screen == Screen.CATEGORY_RECIPES) {
+            showScreen(Screen.CATEGORY_LIST);
         } else if (screen == Screen.RECIPE_DETAIL) {
             Screen destination =
                     detailReturnScreen == Screen.RECIPE_DETAIL

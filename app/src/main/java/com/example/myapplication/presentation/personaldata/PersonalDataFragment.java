@@ -83,8 +83,6 @@ public final class PersonalDataFragment extends Fragment {
 
     void onPersonalOpenRecipe(Recipe recipe);
 
-    void onPersonalOpenNote(Recipe recipe);
-
     Recipe onPersonalResolveRecipe(String recipeId);
 
     void onPersonalOpenRecipeLogs(String recipeId);
@@ -952,7 +950,7 @@ public final class PersonalDataFragment extends Fragment {
       else viewModel.addFavorite(recipe);
     });
     item.addView(text("›", 23, GREEN, false));
-    item.setOnClickListener(v -> host.onPersonalOpenNote(recipe));
+    item.setOnClickListener(v -> host.onPersonalOpenRecipe(recipe));
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(64));
     p.bottomMargin = dp(9);
     parent.addView(item, p);

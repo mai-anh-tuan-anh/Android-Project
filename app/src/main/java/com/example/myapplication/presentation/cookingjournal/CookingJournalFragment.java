@@ -80,8 +80,6 @@ public final class CookingJournalFragment extends Fragment {
 
     void onJournalBack(String currentScreen);
 
-    void onJournalOpenRecipeNote(String recipeId);
-
     void onJournalNavigateTab(int tab);
 
     void onJournalScreenChanged(String screen, String recipeId);
@@ -156,8 +154,6 @@ public final class CookingJournalFragment extends Fragment {
       screen = formReturnScreen;
       if (JOURNAL.equals(screen) || LOGS.equals(screen)) render();
       notifyScreenChanged();
-    } else if (LOGS.equals(screen)) {
-      host.onJournalOpenRecipeNote(recipeId);
     } else {
       clearDateRangeForExit();
       host.onJournalBack(screen);

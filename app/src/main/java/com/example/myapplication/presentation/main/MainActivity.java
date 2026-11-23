@@ -49,6 +49,12 @@ public class MainActivity extends AppCompatActivity
     private static final String STATE_DISCOVER_SEARCH_QUERY = "discover.searchQuery";
     private static final String STATE_DETAIL_RECIPE_ID = "discover.detailRecipeId";
     private static final String STATE_DETAIL_RETURN_SCREEN = "discover.detailReturnScreen";
+    private static final String STATE_NOTE_RETURN_SCREEN = "personal.noteReturnScreen";
+    private static final String STATE_COLLECTION_RETURN_SCREEN = "personal.collectionReturnScreen";
+    private static final String STATE_COLLECTION_FORM_RETURN_SCREEN = "personal.collectionFormReturnScreen";
+    private static final String STATE_COLLECTION_BACK_STACK = "personal.collectionBackStack";
+    private static final String STATE_SELECTED_COLLECTION_ID = "personal.collectionId";
+    private static final String STATE_NOTE_RECIPE_ID = "personal.noteRecipeId";
     private static final String STATE_SCREEN = "module6.screen";
     private static final String STATE_PICKED_RECIPE_IDS = "module6.pickedRecipeIds";
     private static final String STATE_PICKER_SERVINGS = "module6.pickerServings";
@@ -75,6 +81,8 @@ public class MainActivity extends AppCompatActivity
     private boolean renderPending;
     private Screen noteReturnScreen = Screen.LIBRARY;
     private Screen collectionReturnScreen = Screen.LIBRARY;
+    private Screen collectionFormReturnScreen = Screen.LIBRARY;
+    private final ArrayList<Long> collectionBackStack = new ArrayList<>();
     private Screen detailReturnScreen = Screen.DISCOVER;
     private String detailRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
     private String selectedCategory = "";
@@ -137,6 +145,9 @@ public class MainActivity extends AppCompatActivity
                                         fragment.handleBackPressed();
                                         return;
                                     }
+                                } else if (isPersonalDataScreen()) {
+                                    handlePersonalDataBack();
+                                    return;
                                 } else if (isDiscoverScreen()) {
                                     DiscoverFragment fragment = activeDiscoverFragment();
                                     if (fragment != null) {
@@ -160,14 +171,13 @@ public class MainActivity extends AppCompatActivity
                                     screen = Screen.SEARCH;
                                 } else if (screen == Screen.WHAT_TO_COOK_RESULTS) {
                                     screen = Screen.WHAT_TO_COOK_INGREDIENTS;
-                                } else if (screen == Screen.CATEGORY_RECIPES
-                                        || screen == Screen.NEW_RECIPES
+                                } else if (screen == Screen.CATEGORY_RECIPES) {
+                                    screen = Screen.CATEGORY_LIST;
+                                } else if (screen == Screen.NEW_RECIPES
                                         || screen == Screen.CATEGORY_LIST
                                         || screen == Screen.SEARCH
                                         || screen == Screen.WHAT_TO_COOK_INGREDIENTS) {
                                     screen = Screen.DISCOVER;
-                                } else if (screen == Screen.CATEGORY_RECIPES) {
-                                    screen = Screen.CATEGORY_LIST;
                                 } else if (screen == Screen.RECIPE_DETAIL) {
                                     screen =
                                             detailReturnScreen == Screen.RECIPE_DETAIL
@@ -178,10 +188,7 @@ public class MainActivity extends AppCompatActivity
                                 } else if (screen == Screen.PANTRY) {
                                     screen = pantryReturnScreen;
                                 } else if (screen == Screen.COLLECTION_FORM) {
-                                    screen =
-                                            selectedCollectionId > 0
-                                                    ? Screen.COLLECTION
-                                                    : collectionReturnScreen;
+                                    screen = collectionFormReturnScreen;
                                 } else if (screen == Screen.COLLECTION) {
                                     screen = collectionReturnScreen;
                                 } else if (screen == Screen.NOTE) {
@@ -238,6 +245,17 @@ public class MainActivity extends AppCompatActivity
             cookingLogFormReturnScreen = Screen.COOKING_LOGS;
         }
         discoverSearchQuery = state.getString(STATE_DISCOVER_SEARCH_QUERY, "");
+        noteReturnScreen = readScreen(state, STATE_NOTE_RETURN_SCREEN, Screen.LIBRARY);
+        collectionReturnScreen = readScreen(state, STATE_COLLECTION_RETURN_SCREEN, Screen.LIBRARY);
+        collectionFormReturnScreen =
+                readScreen(state, STATE_COLLECTION_FORM_RETURN_SCREEN, Screen.LIBRARY);
+        selectedCollectionId = state.getLong(STATE_SELECTED_COLLECTION_ID, -1L);
+        noteRecipeId = state.getString(STATE_NOTE_RECIPE_ID, noteRecipeId);
+        long[] savedCollectionBackStack = state.getLongArray(STATE_COLLECTION_BACK_STACK);
+        collectionBackStack.clear();
+        if (savedCollectionBackStack != null) {
+            for (long collectionId : savedCollectionBackStack) collectionBackStack.add(collectionId);
+        }
         detailRecipeId =
                 state.getString(
                         STATE_DETAIL_RECIPE_ID, PreviewRecipeCatalog.designRecipes().get(0).id);
@@ -307,6 +325,14 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    private Screen readScreen(Bundle state, String key, Screen fallback) {
+        try {
+            return Screen.valueOf(state.getString(key, fallback.name()));
+        } catch (IllegalArgumentException invalid) {
+            return fallback;
+        }
+    }
+
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (screen == Screen.MEAL_PLAN || screen == Screen.MEAL_PLAN_PICKER) {
@@ -342,6 +368,14 @@ public class MainActivity extends AppCompatActivity
                 searchViewModel == null ? discoverSearchQuery : searchViewModel.getSearchQuery());
         outState.putString(STATE_DETAIL_RECIPE_ID, detailRecipeId);
         outState.putString(STATE_DETAIL_RETURN_SCREEN, detailReturnScreen.name());
+        outState.putString(STATE_NOTE_RETURN_SCREEN, noteReturnScreen.name());
+        outState.putString(STATE_COLLECTION_RETURN_SCREEN, collectionReturnScreen.name());
+        outState.putString(STATE_COLLECTION_FORM_RETURN_SCREEN, collectionFormReturnScreen.name());
+        long[] collectionIds = new long[collectionBackStack.size()];
+        for (int i = 0; i < collectionBackStack.size(); i++) collectionIds[i] = collectionBackStack.get(i);
+        outState.putLongArray(STATE_COLLECTION_BACK_STACK, collectionIds);
+        outState.putLong(STATE_SELECTED_COLLECTION_ID, selectedCollectionId);
+        outState.putString(STATE_NOTE_RECIPE_ID, noteRecipeId);
         super.onSaveInstanceState(outState);
     }
 
@@ -580,6 +614,39 @@ public class MainActivity extends AppCompatActivity
                 || screen == Screen.RECIPE_DETAIL;
     }
 
+    private boolean isPersonalDataScreen() {
+        return screen == Screen.LIBRARY
+                || screen == Screen.FAVORITES
+                || screen == Screen.COLLECTION_LIST
+                || screen == Screen.COLLECTION
+                || screen == Screen.COLLECTION_FORM
+                || screen == Screen.NOTE;
+    }
+
+    private void handlePersonalDataBack() {
+        if (screen == Screen.FAVORITES || screen == Screen.COLLECTION_LIST) {
+            screen = Screen.LIBRARY;
+        } else if (screen == Screen.COLLECTION_FORM) {
+            if (collectionFormReturnScreen == Screen.COLLECTION
+                    && selectedCollectionId <= 0
+                    && !collectionBackStack.isEmpty()) {
+                selectedCollectionId = collectionBackStack.remove(collectionBackStack.size() - 1);
+            }
+            screen = collectionFormReturnScreen;
+        } else if (screen == Screen.COLLECTION) {
+            if (collectionReturnScreen == Screen.COLLECTION && !collectionBackStack.isEmpty()) {
+                selectedCollectionId = collectionBackStack.remove(collectionBackStack.size() - 1);
+            } else {
+                screen = collectionReturnScreen;
+            }
+        } else if (screen == Screen.NOTE) {
+            screen = noteReturnScreen;
+        } else {
+            screen = Screen.DISCOVER;
+        }
+        render();
+    }
+
     private DiscoverFragment activeDiscoverFragment() {
         Fragment fragment =
                 getSupportFragmentManager().findFragmentByTag(DiscoverFragment.class.getName());
@@ -747,6 +814,8 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPersonalOpenCollections() {
+        collectionReturnScreen = screen;
+        collectionBackStack.clear();
         screen = Screen.COLLECTION_LIST;
         render();
     }
@@ -764,9 +833,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onPersonalDeleteCollection(long collectionId) {
         personalDataViewModel.deleteCollection(collectionId);
-        selectedCollectionId = -1L;
-        screen = collectionReturnScreen;
-        render();
+        returnFromCollection();
     }
 
     @Override
@@ -778,8 +845,15 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPersonalOpenCollection(long collectionId) {
+        if (screen == Screen.COLLECTION && selectedCollectionId > 0 && selectedCollectionId != collectionId) {
+            collectionBackStack.add(selectedCollectionId);
+            collectionReturnScreen = Screen.COLLECTION;
+        } else {
+            collectionBackStack.clear();
+            collectionReturnScreen = screen == Screen.COLLECTION_LIST
+                    ? Screen.COLLECTION_LIST : Screen.LIBRARY;
+        }
         selectedCollectionId = collectionId;
-        collectionReturnScreen = Screen.LIBRARY;
         screen = Screen.COLLECTION;
         render();
     }
@@ -787,11 +861,6 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onPersonalOpenRecipe(Recipe recipe) {
         openRecipeDetail(recipe);
-    }
-
-    @Override
-    public void onPersonalOpenNote(Recipe recipe) {
-        openRecipeNote(recipe);
     }
 
     @Override
@@ -829,7 +898,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPersonalBack() {
-        getOnBackPressedDispatcher().onBackPressed();
+        handlePersonalDataBack();
     }
 
     @Override
@@ -839,16 +908,12 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onJournalBack(String currentScreen) {
-        if (Screen.COOKING_JOURNAL.name().equals(currentScreen)) screen = cookingLogReturnScreen;
-        else screen = Screen.NOTE;
-        render();
-    }
-
-    @Override
-    public void onJournalOpenRecipeNote(String recipeId) {
-        noteRecipeId = recipeId;
-        noteReturnScreen = Screen.LIBRARY;
-        screen = Screen.NOTE;
+        if (Screen.COOKING_LOG_FORM.name().equals(currentScreen))
+            screen = cookingLogFormReturnScreen;
+        else if (Screen.COOKING_JOURNAL.name().equals(currentScreen)
+                || Screen.COOKING_LOGS.name().equals(currentScreen))
+            screen = cookingLogReturnScreen;
+        else screen = Screen.DISCOVER;
         render();
     }
 
@@ -974,7 +1039,15 @@ public class MainActivity extends AppCompatActivity
 
 
     private void openCollectionForm(Long collectionId) {
-        if (collectionId == null && screen != Screen.COLLECTION) collectionReturnScreen = screen;
+        collectionFormReturnScreen = collectionId == null ? screen : Screen.COLLECTION;
+        if (collectionId == null) {
+            if (screen == Screen.COLLECTION && selectedCollectionId > 0) {
+                collectionBackStack.add(selectedCollectionId);
+                collectionReturnScreen = Screen.COLLECTION;
+            } else {
+                collectionReturnScreen = screen;
+            }
+        }
         selectedCollectionId = collectionId == null ? -1L : collectionId;
         String name = "";
         List<Recipe> recipes = new ArrayList<>();
