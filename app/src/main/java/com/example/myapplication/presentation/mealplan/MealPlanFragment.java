@@ -184,6 +184,7 @@ public final class MealPlanFragment extends Fragment {
 
   private void render() {
     if (root == null || !isAdded()) return;
+    captureScrollPositions();
     root.removeAllViews();
     if (pickerMode) {
       renderPicker();
@@ -731,6 +732,16 @@ public final class MealPlanFragment extends Fragment {
     root.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
   }
 
+  private void captureScrollPositions() {
+    if (root == null || root.getChildCount() == 0) return;
+    View page = root.getChildAt(0);
+    if (!(page instanceof LinearLayout)) return;
+    View list = ((LinearLayout) page).findViewWithTag("mealplan-scroll");
+    if (list instanceof ScrollView) restoredScroll = ((ScrollView) list).getScrollY();
+    View picker = ((LinearLayout) page).findViewWithTag("mealplan-picker-scroll");
+    if (picker instanceof ScrollView) restoredPickerScroll = ((ScrollView) picker).getScrollY();
+  }
+
   private TextView step(String value, String description, Runnable action) {
     TextView b = text(value, 20, GREEN, true);
     b.setGravity(Gravity.CENTER);
@@ -764,6 +775,7 @@ public final class MealPlanFragment extends Fragment {
         break;
     }
     ImageView view = icon(image, TEXT);
+    view.clearColorFilter();
     view.setScaleType(ImageView.ScaleType.CENTER_CROP);
     view.setBackground(roundRect(BORDER, BORDER, 12));
     view.setClipToOutline(true);
