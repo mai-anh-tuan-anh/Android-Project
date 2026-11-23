@@ -403,28 +403,21 @@ public final class DiscoverSearchViewModel extends ViewModel {
 
             // 5. Included ingredient filter
             if (!normInclude.isEmpty()) {
-                boolean hasIncluded = false;
-                for (String ing : recipe.ingredients) {
-                    if (normalize(ing).contains(normInclude)) {
-                        hasIncluded = true;
-                        break;
-                    }
-                }
-                if (!hasIncluded) {
+                boolean hasIncluded = containsExactIngredient(recipe, normInclude);
+                // An incomplete list cannot prove that a recipe does not contain the
+                // requested ingredient. Keep it as a possible match; the UI marks it
+                // so the result is not presented as confirmed.
+                if (!hasIncluded && recipe.ingredientListComplete) {
                     continue;
                 }
             }
 
             // 6. Excluded ingredient filter
             if (!normExclude.isEmpty()) {
-                boolean hasExcluded = false;
-                for (String ing : recipe.ingredients) {
-                    if (normalize(ing).contains(normExclude)) {
-                        hasExcluded = true;
-                        break;
-                    }
-                }
-                if (hasExcluded) {
+                boolean hasExcluded = containsExactIngredient(recipe, normExclude);
+                // Exclusion is safety-sensitive: an incomplete ingredient list cannot
+                // confirm that the excluded ingredient is absent.
+                if (hasExcluded || !recipe.ingredientListComplete) {
                     continue;
                 }
             }
@@ -432,6 +425,14 @@ public final class DiscoverSearchViewModel extends ViewModel {
             results.add(recipe);
         }
         return results;
+    }
+
+    private boolean containsExactIngredient(Recipe recipe, String normalizedIngredient) {
+        if (recipe == null || recipe.ingredients == null || normalizedIngredient == null) return false;
+        for (String ingredient : recipe.ingredients) {
+            if (normalize(ingredient).equals(normalizedIngredient)) return true;
+        }
+        return false;
     }
 
     private static boolean matchesDuration(int minutes, Integer range) {

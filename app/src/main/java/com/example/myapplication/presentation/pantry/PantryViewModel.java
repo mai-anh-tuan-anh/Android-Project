@@ -108,6 +108,14 @@ public final class PantryViewModel extends ViewModel {
             pantryState.postValue(new PantryState(repository.getPantryItems(), false, null));
             if (result != null) mutationResult.postValue(result);
         } catch (RuntimeException error) {
+            PantryState current = pantryState.getValue();
+            String message = error.getMessage() == null
+                    ? "Không thể tải dữ liệu tủ nguyên liệu."
+                    : error.getMessage();
+            pantryState.postValue(new PantryState(
+                    current == null ? Collections.emptyList() : current.items,
+                    false,
+                    message));
             postMutationError(result == null ? MutationResult.LOAD : result.operation, error);
         }
     }

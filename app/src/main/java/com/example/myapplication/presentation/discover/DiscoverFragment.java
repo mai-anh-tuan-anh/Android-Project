@@ -36,7 +36,9 @@ import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.main.MainActivity.Screen;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.domain.model.PantryIngredient;
 
 import java.text.Normalizer;
 import java.util.List;
@@ -72,6 +74,7 @@ public final class DiscoverFragment extends Fragment {
     private LinearLayout pageRoot;
     private DiscoverSearchViewModel searchViewModel;
     private DiscoverViewModel discoverViewModel;
+    private PantryViewModel pantryViewModel;
     private PersonalDataViewModel personalDataViewModel;
     private Screen screen = Screen.DISCOVER;
     private Screen lastRenderedScreen;
@@ -133,6 +136,8 @@ public final class DiscoverFragment extends Fragment {
                 new ViewModelProvider(requireActivity(), factory).get(DiscoverViewModel.class);
         personalDataViewModel =
                 new ViewModelProvider(requireActivity(), factory).get(PersonalDataViewModel.class);
+        pantryViewModel =
+                new ViewModelProvider(requireActivity(), factory).get(PantryViewModel.class);
         root = new FrameLayout(requireContext());
         root.setBackgroundColor(CREAM);
         ViewCompat.setOnApplyWindowInsetsListener(
@@ -166,6 +171,19 @@ public final class DiscoverFragment extends Fragment {
                             if (value != null && !value.loading && screen == Screen.RECIPE_DETAIL)
                                 render();
                         });
+        pantryViewModel
+                .pantryState()
+                .observe(
+                        getViewLifecycleOwner(),
+                        value -> {
+                            if (value != null
+                                    && !value.loading
+                                    && screen == Screen.WHAT_TO_COOK_INGREDIENTS) render();
+                        });
+        PantryViewModel.PantryState pantryState = pantryViewModel.pantryState().getValue();
+        if (pantryState == null || (pantryState.loading && pantryState.items.isEmpty())) {
+            pantryViewModel.refreshItems();
+        }
         render();
         return root;
     }
@@ -563,6 +581,11 @@ public final class DiscoverFragment extends Fragment {
         labels.setPadding(dp(12), 0, dp(8), 0);
         labels.addView(text(recipe.title, 14, TEXT, true));
         labels.addView(text(recipe.duration + " · " + recipe.difficulty, 12, MUTED, false));
+        if (!recipe.ingredientListComplete
+                && (!searchViewModel.getIncludeIngredient().trim().isEmpty()
+                        || !searchViewModel.getExcludeIngredient().trim().isEmpty())) {
+            labels.addView(text("Cần xác nhận nguyên liệu", 11, MUTED, false));
+        }
         item.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
 
         TextView arrow = text("›", 22, MUTED, false);
@@ -1099,6 +1122,89 @@ public final class DiscoverFragment extends Fragment {
         }
         page.addView(ingSection, new LinearLayout.LayoutParams(-1, -2));
 
+        addText(page, "Tủ nguyên liệu", 16, TEXT, true, 0, 20, 0, 4);
+        addText(
+                page,
+                "Chọn thêm nguyên liệu đang dùng được trong tủ. Nguyên liệu sắp hết hạn vẫn được tính; nguyên liệu đã hết hạn sẽ không xuất hiện.",
+                13,
+                MUTED,
+                false,
+                0,
+                0,
+                0,
+                10);
+        PantryViewModel.PantryState currentPantryState = pantryViewModel.pantryState().getValue();
+        List<PantryIngredient> pantryItems = pantryViewModel.getItems();
+        if (pantryItems.isEmpty()) {
+            if (currentPantryState != null && currentPantryState.loading) {
+                addEmptyCard(page, "Đang tải Tủ nguyên liệu", "Danh sách sẽ xuất hiện ngay khi tải xong.", null);
+            } else if (currentPantryState != null && currentPantryState.error != null) {
+                addEmptyCard(
+                        page,
+                        "Không tải được Tủ nguyên liệu",
+                        "Chạm để thử tải lại. Bạn vẫn có thể chọn nguyên liệu ở trên.",
+                        () -> pantryViewModel.refreshItems());
+            } else {
+                addEmptyCard(
+                        page,
+                        "Tủ nguyên liệu đang trống",
+                        "Bạn có thể tiếp tục chọn nguyên liệu ở trên hoặc thêm nguyên liệu vào tủ từ tab Mua sắm.",
+                        () -> host.onDiscoverNavigateTab(2));
+            }
+        } else {
+            LinearLayout pantrySection = vertical();
+            pantrySection.setBackground(roundRect(WHITE, BORDER, 16));
+            pantrySection.setPadding(dp(12), dp(4), dp(12), dp(4));
+            int visibleCount = 0;
+            for (PantryIngredient ingredient : pantryItems) {
+                if (ingredient == null
+                        || ingredient.name == null
+                        || ingredient.name.trim().isEmpty()
+                        || "EXPIRED".equals(pantryViewModel.expiryState(ingredient.expiryDate))) {
+                    continue;
+                }
+                visibleCount++;
+                boolean selected = searchViewModel.isCookingIngredientSelected(ingredient.name);
+                LinearLayout row = new LinearLayout(requireContext());
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(8), dp(10), dp(8), dp(10));
+                TextView name = text(ingredient.name.trim(), 14, TEXT, true);
+                row.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+                String amount = pantryAmountLabel(ingredient);
+                if (!amount.isEmpty()) {
+                    TextView detail = text(amount, 12, MUTED, false);
+                    detail.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+                    row.addView(detail, new LinearLayout.LayoutParams(-2, -2));
+                }
+                TextView toggle = text(selected ? "✓" : "+", 18, selected ? WHITE : GREEN, true);
+                toggle.setGravity(Gravity.CENTER);
+                toggle.setBackground(roundRect(selected ? GREEN : PALE_GREEN, selected ? GREEN : BORDER, 10));
+                LinearLayout.LayoutParams toggleParams = new LinearLayout.LayoutParams(dp(36), dp(36));
+                toggleParams.leftMargin = dp(8);
+                row.addView(toggle, toggleParams);
+                row.setOnClickListener(v -> {
+                    searchViewModel.toggleCookingIngredient(ingredient.name);
+                    render();
+                });
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+                pantrySection.addView(row, rowParams);
+                if (visibleCount < pantryItems.size()) {
+                    View divider = new View(requireContext());
+                    divider.setBackgroundColor(BORDER);
+                    pantrySection.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+                }
+            }
+            if (visibleCount == 0) {
+                addEmptyCard(
+                        page,
+                        "Chưa có nguyên liệu dùng được",
+                        "Các nguyên liệu trong tủ đã hết hạn. Bạn vẫn có thể chọn nguyên liệu ở trên.",
+                        null);
+            } else {
+                page.addView(pantrySection, new LinearLayout.LayoutParams(-1, -2));
+            }
+        }
+
         Set<String> selectedIngredients = searchViewModel.getSelectedCookingIngredients();
         addText(
                 page,
@@ -1148,6 +1254,15 @@ public final class DiscoverFragment extends Fragment {
             searchViewModel.toggleCookingIngredient(ingredient);
             render();
         });
+    }
+
+    private String pantryAmountLabel(PantryIngredient ingredient) {
+        if (ingredient.amountDecimal == null || ingredient.amountDecimal.trim().isEmpty()) return "";
+        String amount = ingredient.amountDecimal.trim();
+        if (ingredient.unitId != null && !ingredient.unitId.trim().isEmpty()) {
+            amount += " " + ingredient.unitId.trim();
+        }
+        return amount;
     }
 
     private String joinNames(List<String> names) {
@@ -1523,7 +1638,7 @@ public final class DiscoverFragment extends Fragment {
         empty.setBackground(roundRect(WHITE, BORDER, 15));
         empty.setFocusable(true);
         empty.setContentDescription(title + ". " + subtitle);
-        empty.setOnClickListener(v -> action.run());
+        if (action != null) empty.setOnClickListener(v -> action.run());
         empty.addView(text(title, 15, TEXT, true));
         empty.addView(text(subtitle, 13, MUTED, false));
         parent.addView(empty, new LinearLayout.LayoutParams(-1, -2));
