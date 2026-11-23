@@ -122,10 +122,11 @@ public final class CookingJournalFragment extends Fragment {
   }
 
   public void showScreen(String screen, String recipeId) {
+    boolean screenChanged = !screen.equals(this.screen);
     boolean recipeChanged = recipeId != null && !recipeId.equals(this.recipeId);
+    if (screenChanged || recipeChanged) search = "";
     if (recipeChanged) {
       this.recipeId = recipeId;
-      search = "";
       fromDate = 0;
       toDate = 0;
       ratingFilter = 0;
@@ -551,6 +552,7 @@ public final class CookingJournalFragment extends Fragment {
 
   private void openForm(String logId, String id) {
     captureDraft();
+    search = "";
     formReturnScreen = screen;
     recipeId = id;
     editingLogId = logId;
@@ -821,7 +823,13 @@ public final class CookingJournalFragment extends Fragment {
 
   private void addBottomNavigation(LinearLayout parent, int selected) {
     BottomNavigationBar navigation =
-        new BottomNavigationBar(requireContext(), selected, host::onJournalNavigateTab);
+        new BottomNavigationBar(
+            requireContext(),
+            selected,
+            tab -> {
+              search = "";
+              host.onJournalNavigateTab(tab);
+            });
     parent.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
   }
 

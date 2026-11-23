@@ -193,6 +193,11 @@ public final class DiscoverFragment extends Fragment {
 
     public void showRecipeDetail(Recipe recipe, Screen returnScreen) {
         if (recipe == null) return;
+        if (screen == Screen.SEARCH
+                || screen == Screen.SEARCH_FILTER
+                || screen == Screen.SEARCH_RESULTS) {
+            searchViewModel.setSearchQuery("");
+        }
         detailRecipeId = recipe.id;
         detailReturnScreen = returnScreen == Screen.RECIPE_DETAIL ? Screen.DISCOVER : returnScreen;
         personalDataViewModel.recordViewedRecipe(recipe);
@@ -224,6 +229,7 @@ public final class DiscoverFragment extends Fragment {
             }
             return;
         } else {
+            if (screen == Screen.SEARCH) searchViewModel.setSearchQuery("");
             showScreen(Screen.DISCOVER);
         }
         render();
@@ -1451,7 +1457,17 @@ public final class DiscoverFragment extends Fragment {
 
     private void addBottomNavigation(int selectedTab) {
         BottomNavigationBar navigation =
-                new BottomNavigationBar(requireContext(), selectedTab, host::onDiscoverNavigateTab);
+                new BottomNavigationBar(
+                        requireContext(),
+                        selectedTab,
+                        tab -> {
+                            if (screen == Screen.SEARCH
+                                    || screen == Screen.SEARCH_FILTER
+                                    || screen == Screen.SEARCH_RESULTS) {
+                                searchViewModel.setSearchQuery("");
+                            }
+                            host.onDiscoverNavigateTab(tab);
+                        });
         pageRoot.addView(navigation, new LinearLayout.LayoutParams(-1, -2));
     }
 

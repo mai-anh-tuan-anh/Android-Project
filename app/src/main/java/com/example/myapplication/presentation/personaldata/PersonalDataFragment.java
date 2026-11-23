@@ -133,6 +133,11 @@ public final class PersonalDataFragment extends Fragment {
   }
 
   public void showScreen(String section, long collectionId, String noteRecipeId) {
+    if (!java.util.Objects.equals(this.section, section)) {
+      searchQuery = "";
+      collectionDetailQuery = "";
+      collectionFormQuery = "";
+    }
     if (this.collectionId != collectionId) collectionDetailQuery = "";
     this.section = section;
     this.collectionId = collectionId;

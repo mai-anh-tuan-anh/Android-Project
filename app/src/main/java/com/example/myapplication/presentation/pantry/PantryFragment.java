@@ -393,6 +393,7 @@ public final class PantryFragment extends Fragment {
     }
 
     private void openForm(String id) {
+        query = "";
         editingId = id;
         PantryIngredient item = viewModel.getItem(id);
         draftName = item == null ? "" : item.name;
@@ -514,7 +515,11 @@ public final class PantryFragment extends Fragment {
             ImageView icon = new ImageView(requireContext()); icon.setImageResource(icons[i]); icon.setColorFilter(i == 2 ? GREEN : MUTED); if (i == 2) icon.setBackground(roundRect(PALE_GREEN, PALE_GREEN, 18));
             tab.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(30)));
             TextView label = text(labels[i], 10, i == 2 ? GREEN : MUTED, i == 2); label.setGravity(Gravity.CENTER); tab.addView(label);
-            nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1)); tab.setOnClickListener(v -> host.onPantryNavigateTab(tabIndex));
+            nav.addView(tab, new LinearLayout.LayoutParams(0, dp(58), 1));
+            tab.setOnClickListener(v -> {
+                query = "";
+                host.onPantryNavigateTab(tabIndex);
+            });
         }
         root.addView(nav, new LinearLayout.LayoutParams(-1, dp(64)));
     }
