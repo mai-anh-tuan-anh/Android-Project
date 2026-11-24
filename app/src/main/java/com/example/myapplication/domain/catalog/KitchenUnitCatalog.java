@@ -84,6 +84,11 @@ public final class KitchenUnitCatalog {
         }
     }
 
+    /** Checks a catalog key directly without interpreting it as a user-entered alias. */
+    public static boolean isKnownUnitId(String unitId) {
+        return UNITS.containsKey(unitId);
+    }
+
     public static String canonicalId(String input) {
         if (input == null || input.trim().isEmpty()) return "";
         String clean = input.trim().replaceAll("\\s+", " ");

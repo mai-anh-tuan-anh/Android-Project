@@ -15,8 +15,10 @@ import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
 import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.di.AppContainer;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.CookingLogEntry;
+import com.example.myapplication.domain.repository.PersonalDataRepository;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
 import com.example.myapplication.presentation.shopping.ShoppingFragment;
 import com.example.myapplication.domain.model.ShoppingListItem;
@@ -31,6 +33,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.test.core.app.ApplicationProvider;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
@@ -56,6 +59,7 @@ import androidx.lifecycle.Observer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
@@ -204,7 +208,7 @@ public class MainActivityStateTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
                 Recipe recipe = PreviewRecipeCatalog.designRecipes().get(0);
-                activity.onPersonalOpenNote(recipe);
+                openNoteFromRecipeDetail(activity, recipe);
                 activity.onPersonalCreateCookingLog(recipe.id);
                 CookingJournalFragment journal = (CookingJournalFragment) activity.getSupportFragmentManager()
                         .findFragmentByTag(CookingJournalFragment.class.getName());
@@ -284,10 +288,93 @@ public class MainActivityStateTest {
                 activity.onPersonalCreateCollection();
                 assertEquals(MainActivity.Screen.COLLECTION_FORM, getFieldUnchecked(activity, "screen"));
                 assertTrue(containsText(fragment.getView(), "Chọn món để thêm"));
-                activity.onPersonalOpenNote(com.example.myapplication.domain.catalog.PreviewRecipeCatalog
-                        .designRecipes().get(0));
+                openNoteFromRecipeDetail(activity, PreviewRecipeCatalog.designRecipes().get(0));
                 assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
-                assertTrue(containsText(fragment.getView(), "Ghi chú sau khi nấu"));
+                PersonalDataFragment note = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (note == null || note.getView() == null)
+                    throw new AssertionError("Personal note Fragment is not attached");
+                assertTrue(containsText(note.getView(), "Ghi chú sau khi nấu"));
+            });
+        }
+    }
+
+    @Test
+    public void deletingCollectionsReturnsToParentLibraryOrCollectionList() throws Exception {
+        BepNhaApplication application = ApplicationProvider.getApplicationContext();
+        AppContainer container = application.getAppContainer();
+        PersonalDataRepository repository = container.personalDataRepository;
+        String prefix = "Điều hướng " + System.nanoTime() + " ";
+        List<Long> created = new ArrayList<>();
+        try {
+            for (String suffix : Arrays.asList("cha", "con", "danh sách")) {
+                Long id = repository.saveCollectionAndGetId(prefix + suffix, Collections.emptyList(), null);
+                assertNotNull(id);
+                created.add(id);
+            }
+            long parentId = created.get(0);
+            long childId = created.get(1);
+            long listId = created.get(2);
+
+            try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+                container.ioExecutor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+                scenario.onActivity(activity -> {
+                    activity.onPersonalNavigateTab(3);
+                    activity.onPersonalOpenCollection(parentId);
+                    assertEquals(MainActivity.Screen.COLLECTION, getFieldUnchecked(activity, "screen"));
+                    assertEquals(parentId, getFieldUnchecked(activity, "selectedCollectionId"));
+
+                    activity.onPersonalOpenCollection(childId);
+                    assertEquals(MainActivity.Screen.COLLECTION, getFieldUnchecked(activity, "screen"));
+                    assertEquals(childId, getFieldUnchecked(activity, "selectedCollectionId"));
+                    activity.getOnBackPressedDispatcher().onBackPressed();
+                    assertEquals(MainActivity.Screen.COLLECTION, getFieldUnchecked(activity, "screen"));
+                    assertEquals(parentId, getFieldUnchecked(activity, "selectedCollectionId"));
+
+                    activity.onPersonalOpenCollection(childId);
+                    activity.onPersonalDeleteCollection(childId);
+                    assertEquals(MainActivity.Screen.COLLECTION, getFieldUnchecked(activity, "screen"));
+                    assertEquals(parentId, getFieldUnchecked(activity, "selectedCollectionId"));
+                    assertTrue(containsText(activity.findViewById(R.id.main_fragment_container), prefix + "cha"));
+
+                    activity.onPersonalNavigateTab(3);
+                    activity.onPersonalOpenCollection(parentId);
+                    activity.onPersonalDeleteCollection(parentId);
+                    assertEquals(MainActivity.Screen.LIBRARY, getFieldUnchecked(activity, "screen"));
+                    assertEquals(-1L, getFieldUnchecked(activity, "selectedCollectionId"));
+
+                    activity.onPersonalOpenCollections();
+                    activity.onPersonalOpenCollection(listId);
+                    activity.onPersonalDeleteCollection(listId);
+                    assertEquals(MainActivity.Screen.COLLECTION_LIST, getFieldUnchecked(activity, "screen"));
+                    assertEquals(-1L, getFieldUnchecked(activity, "selectedCollectionId"));
+                });
+            }
+        } finally {
+            container.ioExecutor.submit(() -> {
+                for (long id : created) repository.deleteCollection(id);
+            }).get(5, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    public void backFromRecipeNoteAndDetailRestoresMealPlan() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                Recipe recipe = PreviewRecipeCatalog.designRecipes().get(0);
+                activity.onPersonalNavigateTab(1);
+                activity.onMealPlanOpenRecipe(recipe);
+                assertEquals(MainActivity.Screen.RECIPE_DETAIL, getFieldUnchecked(activity, "screen"));
+
+                TextView noteButton = findTextView(activity.findViewById(R.id.main_fragment_container), "📝 Ghi chú");
+                assertNotNull(noteButton);
+                assertTrue(noteButton.performClick());
+                assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
+                activity.getOnBackPressedDispatcher().onBackPressed();
+                assertEquals(MainActivity.Screen.RECIPE_DETAIL, getFieldUnchecked(activity, "screen"));
+                assertEquals(recipe.id, getFieldUnchecked(activity, "detailRecipeId"));
+                activity.getOnBackPressedDispatcher().onBackPressed();
+                assertEquals(MainActivity.Screen.MEAL_PLAN, getFieldUnchecked(activity, "screen"));
             });
         }
     }
@@ -663,6 +750,19 @@ public class MainActivityStateTest {
             });
             if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log delete did not complete");
         }
+    }
+
+    private static void openNoteFromRecipeDetail(MainActivity activity, Recipe recipe) {
+        activity.onPersonalNavigateTab(3);
+        activity.onPersonalOpenRecipe(recipe);
+        assertEquals(MainActivity.Screen.RECIPE_DETAIL, getFieldUnchecked(activity, "screen"));
+        DiscoverFragment detail = (DiscoverFragment) activity.getSupportFragmentManager()
+                .findFragmentByTag(DiscoverFragment.class.getName());
+        if (detail == null || detail.getView() == null)
+            throw new AssertionError("Recipe detail Fragment is not attached");
+        TextView noteButton = findTextView(detail.getView(), "📝 Ghi chú");
+        if (noteButton == null) throw new AssertionError("Recipe detail note button is missing");
+        assertTrue("Recipe detail note button did not handle the click", noteButton.performClick());
     }
 
     private static boolean containsText(View view, String expected) {
