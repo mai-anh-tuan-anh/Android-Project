@@ -832,8 +832,9 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onPersonalDeleteCollection(long collectionId) {
-        personalDataViewModel.deleteCollection(collectionId);
+        // The deletion publishes state immediately, so leave the deleted collection's screen first.
         returnFromCollection();
+        personalDataViewModel.deleteCollection(collectionId);
     }
 
     private void returnFromCollection() {
@@ -1045,16 +1046,6 @@ public class MainActivity extends AppCompatActivity
         }
         personalDataViewModel.beginCollectionForm(name, recipes);
         screen = Screen.COLLECTION_FORM;
-        render();
-    }
-
-    private void returnFromCollection() {
-        if (collectionReturnScreen == Screen.COLLECTION && !collectionBackStack.isEmpty()) {
-            selectedCollectionId = collectionBackStack.remove(collectionBackStack.size() - 1);
-        } else {
-            selectedCollectionId = -1L;
-            screen = collectionReturnScreen;
-        }
         render();
     }
 
