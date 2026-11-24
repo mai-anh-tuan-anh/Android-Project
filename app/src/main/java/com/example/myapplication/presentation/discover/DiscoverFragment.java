@@ -469,17 +469,17 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
         String[][] categories = {
-            {"Món canh", "category_soup"},
-            {"Bún/Phở", "category_vietnamese"},
-            {"Món rau", "category_vegetarian"},
-            {"Món xào", "category_quick"},
-            {"Món kho", "category_main"},
-            {"Món rang", "category_main"},
-            {"Món chiên", "category_main"},
-            {"Món hấp/luộc", "category_main"},
-            {"Món nướng", "category_main"},
+            {"Món canh", "recipe_canh_chua"},
+            {"Bún/Phở", "recipe_pho_bo"},
+            {"Món rau", "recipe_rau_muong_xao_toi"},
+            {"Món xào", "recipe_ga_xao_sa_ot"},
+            {"Món kho", "recipe_thit_kho_trung"},
+            {"Món rang", "recipe_tep_rang_khe"},
+            {"Món chiên", "recipe_ca_chien_sa_ot"},
+            {"Món hấp/luộc", "recipe_ga_hap_hanh"},
+            {"Món nướng", "recipe_ga_nuong_muoi_ot"},
             {"Món chay", "category_vegetarian"},
-            {"Món khác", "category_main"}
+            {"Món khác", "recipe_mi_y"}
         };
         for (int i = 0; i < categories.length; i += 2) {
             LinearLayout row = new LinearLayout(requireContext());
