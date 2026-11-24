@@ -8,18 +8,17 @@ Bếp nhà gom các việc thường dùng khi nấu ăn: tìm công thức, tí
 
 | Người phụ trách | Module |
 | --- | --- |
-| Người 1 | 1 — Khám phá; 2 — Tìm kiếm và bộ lọc; 8 — Gợi ý theo nguyên liệu |
-| Người 2 | 3 — Chi tiết công thức và khẩu phần; 4 — Nấu từng bước, hẹn giờ; 9 — Cập nhật kho và offline |
-| Người 3 | 5 — Kho cá nhân; 6 — Nấu hôm nay; 7 — Mua sắm và Tủ nguyên liệu |
+| Trần Hải Đăng | 1 — Khám phá; 2 — Tìm kiếm và bộ lọc; 8 — Gợi ý theo nguyên liệu |
+| Nguyễn Trọng Bảo | 3 — Chi tiết công thức và khẩu phần; 4 — Nấu từng bước, hẹn giờ; 9 — Cập nhật kho và offline |
+| Mai Anh Tuấn Anh | 5 — Kho cá nhân; 6 — Nấu hôm nay; 7 — Mua sắm và Tủ nguyên liệu |
 
-Họ tên thật và tỷ lệ đóng góp chưa được cung cấp; nhóm cần bổ sung theo thực tế trước khi nộp báo cáo.
 
 ## Công nghệ
 
 - Android, Java 11, Android Studio và Gradle Wrapper.
 - `minSdk 24`, `compileSdk/targetSdk 37`.
-- Kiến trúc MVVM đã được thống nhất; việc refactor và hoàn thiện các lớp dùng chung vẫn đang tiếp tục.
-- SQLite/`SQLiteOpenHelper` lưu dữ liệu cá nhân. Firebase Realtime Database và Firebase Storage là nguồn dự kiến cho catalog công thức và ảnh; tích hợp Firebase chưa hoàn tất.
+- Kiến trúc MVVM
+- SQLite/`SQLiteOpenHelper` lưu dữ liệu cá nhân. Firebase Realtime Database và Firebase Storage là nguồn dự kiến cho catalog công thức và ảnh.
 
 ## Các luồng chính
 
