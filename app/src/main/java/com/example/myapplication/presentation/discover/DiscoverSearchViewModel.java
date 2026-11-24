@@ -1,35 +1,37 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.discover;
 
-import android.app.Application;
-import android.content.Context;
-import android.content.SharedPreferences;
+import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
 
-import androidx.annotation.NonNull;
-import androidx.lifecycle.AndroidViewModel;
+import com.example.myapplication.domain.catalog.IngredientSuggestionMatcher;
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.domain.repository.SearchHistoryRepository;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.Iterator;
+import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Presentation state and business filtering actions for Module 2 (Search and Filter).
  */
-public final class DiscoverSearchViewModel extends AndroidViewModel {
-    private static final String PREFS_NAME = "discover_search_prefs";
-    private static final String KEY_RECENT_SEARCHES = "recent_searches";
+public final class DiscoverSearchViewModel extends ViewModel {
     private static final int MAX_RECENT_SEARCHES = 8;
 
     private static final List<String> DEFAULT_SUGGESTIONS = Arrays.asList("cà chua", "món nhanh", "cá");
     private static final long RECENT_SEARCH_TTL_MS = 60L * 60L * 1000L;
 
-    private final SharedPreferences prefs;
+    private final SearchHistoryRepository searchHistoryRepository;
+    private final Executor ioExecutor;
+    private final MutableLiveData<RecentSearchState> recentSearchState = new MutableLiveData<>(
+            new RecentSearchState(Collections.emptyList(), true));
     private final List<String> recentSearches = new ArrayList<>();
     private final java.util.Map<String, Long> recentSearchTimes = new java.util.LinkedHashMap<>();
 
@@ -50,16 +52,22 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
     private String draftExcludeIngredient = "";
     private final Set<String> selectedCookingIngredients = new LinkedHashSet<>();
 
-    public DiscoverSearchViewModel(@NonNull Application application) {
-        super(application);
-        prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        loadRecentSearches();
+    public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository, Executor ioExecutor) {
+        this.searchHistoryRepository = searchHistoryRepository;
+        this.ioExecutor = ioExecutor;
+        ioExecutor.execute(this::loadRecentSearches);
     }
 
     private void loadRecentSearches() {
-        recentSearches.clear();
-        recentSearchTimes.clear();
-        String raw = prefs.getString(KEY_RECENT_SEARCHES, null);
+        String raw;
+        try {
+            raw = searchHistoryRepository.readSerializedSearchHistory();
+        } catch (RuntimeException error) {
+            recentSearchState.postValue(new RecentSearchState(recentSearches, false));
+            return;
+        }
+        List<String> loadedQueries = new ArrayList<>();
+        java.util.Map<String, Long> loadedTimes = new java.util.LinkedHashMap<>();
         long now = System.currentTimeMillis();
         boolean changed = false;
         if (raw != null && !raw.trim().isEmpty()) {
@@ -70,28 +78,38 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
                     long timestamp = Long.parseLong(entry.substring(0, separator));
                     String query = entry.substring(separator + 1).trim();
                     if (!query.isEmpty() && now >= timestamp
-                            && now - timestamp < RECENT_SEARCH_TTL_MS && !recentSearches.contains(query)) {
-                        recentSearches.add(query);
-                        recentSearchTimes.put(query, timestamp);
+                            && now - timestamp < RECENT_SEARCH_TTL_MS && !loadedQueries.contains(query)) {
+                        loadedQueries.add(query);
+                        loadedTimes.put(query, timestamp);
                     } else changed = true;
                 } catch (NumberFormatException ignored) { changed = true; }
             }
+        }
+        synchronized (this) {
+            recentSearches.clear();
+            recentSearches.addAll(loadedQueries);
+            recentSearchTimes.clear();
+            recentSearchTimes.putAll(loadedTimes);
+            publishRecentSearches(false);
         }
         if (changed) saveRecentSearches();
     }
 
     private void saveRecentSearches() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < recentSearches.size(); i++) {
-            if (i > 0) sb.append("\n");
-            String query = recentSearches.get(i);
-            sb.append(recentSearchTimes.getOrDefault(query, System.currentTimeMillis()))
-                    .append('\t').append(query);
+        synchronized (this) {
+            for (int i = 0; i < recentSearches.size(); i++) {
+                if (i > 0) sb.append("\n");
+                String query = recentSearches.get(i);
+                sb.append(recentSearchTimes.getOrDefault(query, System.currentTimeMillis()))
+                        .append('\t').append(query);
+            }
         }
-        prefs.edit().putString(KEY_RECENT_SEARCHES, sb.toString()).apply();
+        String serialized = sb.toString();
+        ioExecutor.execute(() -> searchHistoryRepository.writeSerializedSearchHistory(serialized));
     }
 
-    private void expireRecentSearches() {
+    private synchronized void expireRecentSearches() {
         long now = System.currentTimeMillis();
         boolean changed = false;
         Iterator<String> iterator = recentSearches.iterator();
@@ -107,16 +125,18 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
         if (changed) saveRecentSearches();
     }
 
-    public List<String> getRecentSearches() {
+    public synchronized List<String> getRecentSearches() {
         expireRecentSearches();
-        return Collections.unmodifiableList(recentSearches);
+        return Collections.unmodifiableList(new ArrayList<>(recentSearches));
     }
+
+    public LiveData<RecentSearchState> recentSearchState() { return recentSearchState; }
 
     public List<String> getSuggestions() {
         return Collections.unmodifiableList(DEFAULT_SUGGESTIONS);
     }
 
-    public void addRecentSearch(String query) {
+    public synchronized void addRecentSearch(String query) {
         if (query == null) return;
         String trimmed = query.trim();
         if (trimmed.isEmpty()) return;
@@ -127,20 +147,38 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
             String removed = recentSearches.remove(recentSearches.size() - 1);
             recentSearchTimes.remove(removed);
         }
+        publishRecentSearches(false);
         saveRecentSearches();
     }
 
-    public void removeRecentSearch(String query) {
+    public synchronized void removeRecentSearch(String query) {
         if (query != null && recentSearches.remove(query.trim())) {
             recentSearchTimes.remove(query.trim());
+            publishRecentSearches(false);
             saveRecentSearches();
         }
     }
 
-    public void clearRecentSearches() {
+    public synchronized void clearRecentSearches() {
         recentSearches.clear();
         recentSearchTimes.clear();
+        publishRecentSearches(false);
         saveRecentSearches();
+    }
+
+    private void publishRecentSearches(boolean loading) {
+        RecentSearchState state = new RecentSearchState(recentSearches, loading);
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) recentSearchState.setValue(state);
+        else recentSearchState.postValue(state);
+    }
+
+    public static final class RecentSearchState {
+        public final List<String> searches;
+        public final boolean loading;
+        RecentSearchState(List<String> searches, boolean loading) {
+            this.searches = Collections.unmodifiableList(new ArrayList<>(searches));
+            this.loading = loading;
+        }
     }
 
     public boolean isCookingIngredientSelected(String ingredient) {
@@ -164,37 +202,37 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
 
     public void clearCookingIngredients() { selectedCookingIngredients.clear(); }
 
-    public List<MainActivity.RecipePreview> suggestRecipes(List<MainActivity.RecipePreview> recipes) {
+    public List<Recipe> suggestRecipes(List<Recipe> recipes) {
         return IngredientSuggestionMatcher.suggest(recipes, selectedCookingIngredients,
                 recipe -> recipe.ingredients, recipe -> recipe.ingredientListComplete,
                 recipe -> recipe.difficulty, recipe -> recipe.durationMinutes,
                 recipe -> recipe.title, recipe -> recipe.id);
     }
 
-    public int availableIngredientCount(MainActivity.RecipePreview recipe) {
+    public int availableIngredientCount(Recipe recipe) {
         return IngredientSuggestionMatcher.countAvailable(recipe.ingredients,
                 IngredientSuggestionMatcher.normalizeSet(selectedCookingIngredients));
     }
 
-    public List<String> missingIngredients(MainActivity.RecipePreview recipe) {
+    public List<String> missingIngredients(Recipe recipe) {
         return IngredientSuggestionMatcher.missing(recipe.ingredients, selectedCookingIngredients);
     }
 
-    public int totalIngredientCount(MainActivity.RecipePreview recipe) {
+    public int totalIngredientCount(Recipe recipe) {
         return IngredientSuggestionMatcher.total(recipe.ingredients);
     }
 
-    public boolean hasCompleteRecipeIngredients(List<MainActivity.RecipePreview> recipes) {
+    public boolean hasCompleteRecipeIngredients(List<Recipe> recipes) {
         if (recipes == null) return false;
-        for (MainActivity.RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             if (recipe.ingredientListComplete) return true;
         }
         return false;
     }
 
-    public boolean hasIncompleteRecipeIngredients(List<MainActivity.RecipePreview> recipes) {
+    public boolean hasIncompleteRecipeIngredients(List<Recipe> recipes) {
         if (recipes == null) return false;
-        for (MainActivity.RecipePreview recipe : recipes) {
+        for (Recipe recipe : recipes) {
             if (!recipe.ingredientListComplete) return true;
         }
         return false;
@@ -315,14 +353,14 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
     public String getExcludeIngredient() { return excludeIngredient; }
 
     // --- Search & Filtering Logic ---
-    public List<MainActivity.RecipePreview> filterRecipes(List<MainActivity.RecipePreview> allRecipes) {
+    public List<Recipe> filterRecipes(List<Recipe> allRecipes) {
         if (allRecipes == null) return Collections.emptyList();
-        List<MainActivity.RecipePreview> results = new ArrayList<>();
+        List<Recipe> results = new ArrayList<>();
         String normQuery = normalize(searchQuery);
         String normInclude = normalize(includeIngredient);
         String normExclude = normalize(excludeIngredient);
 
-        for (MainActivity.RecipePreview recipe : allRecipes) {
+        for (Recipe recipe : allRecipes) {
             // 1. Query match (title, category, or ingredients)
             if (!normQuery.isEmpty()) {
                 boolean matchTitle = normalize(recipe.title).contains(normQuery);
@@ -365,28 +403,21 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
 
             // 5. Included ingredient filter
             if (!normInclude.isEmpty()) {
-                boolean hasIncluded = false;
-                for (String ing : recipe.ingredients) {
-                    if (normalize(ing).contains(normInclude)) {
-                        hasIncluded = true;
-                        break;
-                    }
-                }
-                if (!hasIncluded) {
+                boolean hasIncluded = containsExactIngredient(recipe, normInclude);
+                // An incomplete list cannot prove that a recipe does not contain the
+                // requested ingredient. Keep it as a possible match; the UI marks it
+                // so the result is not presented as confirmed.
+                if (!hasIncluded && recipe.ingredientListComplete) {
                     continue;
                 }
             }
 
             // 6. Excluded ingredient filter
             if (!normExclude.isEmpty()) {
-                boolean hasExcluded = false;
-                for (String ing : recipe.ingredients) {
-                    if (normalize(ing).contains(normExclude)) {
-                        hasExcluded = true;
-                        break;
-                    }
-                }
-                if (hasExcluded) {
+                boolean hasExcluded = containsExactIngredient(recipe, normExclude);
+                // Exclusion is safety-sensitive: an incomplete ingredient list cannot
+                // confirm that the excluded ingredient is absent.
+                if (hasExcluded || !recipe.ingredientListComplete) {
                     continue;
                 }
             }
@@ -394,6 +425,14 @@ public final class DiscoverSearchViewModel extends AndroidViewModel {
             results.add(recipe);
         }
         return results;
+    }
+
+    private boolean containsExactIngredient(Recipe recipe, String normalizedIngredient) {
+        if (recipe == null || recipe.ingredients == null || normalizedIngredient == null) return false;
+        for (String ingredient : recipe.ingredients) {
+            if (normalize(ingredient).equals(normalizedIngredient)) return true;
+        }
+        return false;
     }
 
     private static boolean matchesDuration(int minutes, Integer range) {

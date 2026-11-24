@@ -1,5 +1,9 @@
 package com.example.myapplication;
 
+
+import com.example.myapplication.data.local.storage.SharedPreferencesSearchHistoryRepository;
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
 import android.app.Application;
 import android.content.Context;
 
@@ -22,31 +26,32 @@ import static org.junit.Assert.assertTrue;
 public class DiscoverSearchViewModelTest {
 
     private DiscoverSearchViewModel viewModel;
-    private List<MainActivity.RecipePreview> sampleRecipes;
+    private List<Recipe> sampleRecipes;
 
     @Before
     public void setUp() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Application app = (Application) context.getApplicationContext();
-        viewModel = new DiscoverSearchViewModel(app);
+        viewModel = new DiscoverSearchViewModel(
+                new SharedPreferencesSearchHistoryRepository(app), Runnable::run);
         viewModel.clearRecentSearches();
         viewModel.resetActiveFilter();
         viewModel.setSearchQuery("");
 
         sampleRecipes = Arrays.asList(
-                new MainActivity.RecipePreview("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ",
+                new Recipe("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ",
                         30, "Không giới hạn", Arrays.asList("Món Việt", "Món nhanh", "Dễ làm"),
                     Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ"), 0L, true),
-                new MainActivity.RecipePreview("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
+                new Recipe("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
                         25, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món nhanh"),
                     Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô"), 0L, true),
-                new MainActivity.RecipePreview("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
+                new Recipe("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
                         35, "Không giới hạn", Arrays.asList("Món Âu", "Món nhanh"),
                     Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi"), 0L, true),
-                new MainActivity.RecipePreview("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
+                new Recipe("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
                         20, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món nhanh", "Dễ làm"),
                     Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi"), 0L, true),
-                new MainActivity.RecipePreview("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
+                new Recipe("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
                         15, "Món chay", Arrays.asList("Món chay", "Món Âu", "Món nhanh", "Dễ làm", "Bữa sáng"),
                     Arrays.asList("Xà lách", "Cà chua", "Dưa chuột", "Sốt mè rang", "Bắp ngọt"), 0L, true)
         );
@@ -63,7 +68,7 @@ public class DiscoverSearchViewModelTest {
     @Test
     public void searchByQueryMatchesTitleAndIngredientsWithoutDiacritics() {
         viewModel.setSearchQuery("bo");
-        List<MainActivity.RecipePreview> results = viewModel.filterRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.filterRecipes(sampleRecipes);
         assertEquals(2, results.size());
 
         viewModel.setSearchQuery("ca chua");
@@ -78,7 +83,7 @@ public class DiscoverSearchViewModelTest {
         viewModel.setDraftDifficulty("Dễ");
         viewModel.applyDraftFilter();
 
-        List<MainActivity.RecipePreview> results = viewModel.filterRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.filterRecipes(sampleRecipes);
         assertEquals(4, results.size());
     }
 
@@ -88,7 +93,7 @@ public class DiscoverSearchViewModelTest {
         viewModel.setDraftDiet("Món chay");
         viewModel.applyDraftFilter();
 
-        List<MainActivity.RecipePreview> results = viewModel.filterRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.filterRecipes(sampleRecipes);
         assertEquals(1, results.size());
         assertEquals("sample-salad-rau-cu", results.get(0).id);
     }
@@ -100,7 +105,7 @@ public class DiscoverSearchViewModelTest {
         viewModel.setDraftExcludeIngredient("Dưa chua");
         viewModel.applyDraftFilter();
 
-        List<MainActivity.RecipePreview> results = viewModel.filterRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.filterRecipes(sampleRecipes);
         assertEquals(1, results.size());
         assertEquals("sample-mi-y-sot-bo-bam", results.get(0).id);
     }
@@ -167,7 +172,7 @@ public class DiscoverSearchViewModelTest {
     public void ingredientSuggestionsRequireAnOverlapAndRankByMissingCount() {
         viewModel.toggleCookingIngredient("Cà chua");
         viewModel.toggleCookingIngredient("Dứa");
-        List<MainActivity.RecipePreview> results = viewModel.suggestRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.suggestRecipes(sampleRecipes);
         assertFalse(results.isEmpty());
         assertEquals("sample-canh-chua-ca", results.get(0).id);
         assertEquals(2, viewModel.availableIngredientCount(results.get(0)));
@@ -178,7 +183,7 @@ public class DiscoverSearchViewModelTest {
         for (String ingredient : sampleRecipes.get(4).ingredients) {
             viewModel.toggleCookingIngredient(ingredient);
         }
-        List<MainActivity.RecipePreview> results = viewModel.suggestRecipes(sampleRecipes);
+        List<Recipe> results = viewModel.suggestRecipes(sampleRecipes);
         assertFalse(results.isEmpty());
         assertEquals("sample-salad-rau-cu", results.get(0).id);
         assertTrue(viewModel.missingIngredients(results.get(0)).isEmpty());
@@ -194,7 +199,7 @@ public class DiscoverSearchViewModelTest {
                         + "\told query")
                 .commit();
         DiscoverSearchViewModel restored = new DiscoverSearchViewModel(
-                (Application) context.getApplicationContext());
+                new SharedPreferencesSearchHistoryRepository(context.getApplicationContext()), Runnable::run);
         assertTrue(restored.getRecentSearches().isEmpty());
     }
 }

@@ -1,5 +1,11 @@
-package com.example.myapplication;
+package com.example.myapplication.presentation.discover;
 
+import com.example.myapplication.BepNhaApplication;
+
+
+import com.example.myapplication.domain.repository.PersonalDataRepository;
+import com.example.myapplication.domain.model.Recipe;
+import androidx.lifecycle.ViewModel;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,7 +17,7 @@ import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 
 /** Stateless catalog rules used by the Discover screens. */
-public final class DiscoverViewModel {
+public final class DiscoverViewModel extends ViewModel {
     public <T> List<T> recipesInCategory(List<T> recipes, String category,
                                         Function<T, List<String>> categories) {
         if (recipes == null) return Collections.emptyList();

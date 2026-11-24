@@ -1,5 +1,36 @@
 package com.example.myapplication;
 
+import com.example.myapplication.presentation.main.MainActivity;
+import com.example.myapplication.core.ui.BottomNavigationBar;
+import com.example.myapplication.presentation.discover.DiscoverFragment;
+import com.example.myapplication.presentation.mealplan.MealPlanViewModel;
+import com.example.myapplication.presentation.mealplan.MealPlanFragment;
+import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.domain.model.PlannedRecipe;
+import com.example.myapplication.domain.model.PantryIngredient;
+import com.example.myapplication.presentation.pantry.PantryViewModel;
+import com.example.myapplication.presentation.pantry.PantryFragment;
+import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.personaldata.PersonalDataFragment;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
+import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
+import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.di.AppViewModelFactory;
+import com.example.myapplication.domain.model.CookingLogEntry;
+import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+import com.example.myapplication.presentation.shopping.ShoppingFragment;
+import com.example.myapplication.domain.model.ShoppingListItem;
+import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+import com.example.myapplication.domain.catalog.ShoppingCategoryCatalog;
+
+
+
+import com.example.myapplication.domain.model.*;
+import com.example.myapplication.domain.model.Recipe;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import android.view.View;
@@ -13,13 +44,41 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import androidx.lifecycle.Observer;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(AndroidJUnit4.class)
 public class MainActivityStateTest {
+
+    @Test
+    public void sharedBottomNavigationPreservesFourTabsAndForwardsSelection() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                float density = activity.getResources().getDisplayMetrics().density;
+                AtomicInteger selected = new AtomicInteger(-1);
+                BottomNavigationBar navigation = new BottomNavigationBar(
+                        activity, 2, selected::set);
+                assertEquals(4, navigation.getNavigationStrip().getChildCount());
+                navigation.measure(
+                        View.MeasureSpec.makeMeasureSpec(Math.round(360 * density), View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                assertEquals(65, Math.round(navigation.getMeasuredHeight() / density));
+                navigation.getNavigationStrip().getChildAt(2).performClick();
+                assertEquals(2, selected.get());
+            });
+        }
+    }
     @Test
     public void mealPlanPickerDraftSurvivesActivityRecreation() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
@@ -37,6 +96,10 @@ public class MainActivityStateTest {
                     Method render = MainActivity.class.getDeclaredMethod("render");
                     render.setAccessible(true);
                     render.invoke(activity);
+                    assertEquals("com", viewModel.getSearchQuery());
+                    MealPlanFragment fragment = (MealPlanFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(MealPlanFragment.class.getName());
+                    assertTrue(fragment != null && fragment.getView() != null);
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
@@ -55,8 +118,11 @@ public class MainActivityStateTest {
                     assertEquals("com", getField(viewModel, "searchQuery"));
                     assertEquals(MealPlanViewModel.PickerSource.COLLECTION, viewModel.getPickerSource());
                     assertEquals(24L, viewModel.getPickerCollectionId());
-                    assertEquals("com", ((android.widget.EditText) getField(activity,
-                            "planPickerSearchInput")).getText().toString());
+                    MealPlanFragment fragment = (MealPlanFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(MealPlanFragment.class.getName());
+                    assertTrue(fragment != null && fragment.getView() != null);
+                    assertEquals("com", ((android.widget.EditText) getField(fragment,
+                            "pickerSearch")).getText().toString());
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
@@ -76,8 +142,8 @@ public class MainActivityStateTest {
                     openPicker.invoke(activity);
                     assertEquals(1, viewModel.getPickerServings());
 
-                    PersonalDataDbHelper.PlannedRecipe existing = new PersonalDataDbHelper.PlannedRecipe(
-                            MainActivity.DESIGN_RECIPES.get(2), 3);
+                    PlannedRecipe existing = new PlannedRecipe(
+                            PreviewRecipeCatalog.designRecipes().get(2), 3);
                     assertEquals(2, MealPlanViewModel.servingsForSelection(2, null));
                     assertEquals(3, MealPlanViewModel.servingsForSelection(2, existing));
                     assertEquals(5, MealPlanViewModel.servingsForSelection(5, null));
@@ -107,47 +173,58 @@ public class MainActivityStateTest {
 
     @Test
     public void clearingOneJournalDateKeepsTheOtherDate() {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            scenario.onActivity(activity -> {
-                try {
-                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
-                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
-                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
-                    Method render = MainActivity.class.getDeclaredMethod("render");
-                    render.setAccessible(true);
-                    render.invoke(activity);
-                    View clearStartDate = findViewWithDescription(activity.getWindow().getDecorView(),
-                            "Xóa ngày bắt đầu");
-                    if (clearStartDate == null) throw new AssertionError("Start-date clear button is missing");
-                    clearStartDate.performClick();
-                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
-                    assertEquals(1_795_478_400_000L, getField(activity, "cookingJournalToDate"));
-                } catch (ReflectiveOperationException e) {
-                    throw new AssertionError(e);
-                }
-            });
-        }
+        CookingJournalFragment fragment = CookingJournalFragment.newInstance("COOKING_JOURNAL", null);
+        setFieldUnchecked(fragment, "fromDate", 1_795_392_000_000L);
+        setFieldUnchecked(fragment, "toDate", 1_795_478_400_000L);
+        try {
+            Method clearDate = CookingJournalFragment.class.getDeclaredMethod("clearDateFilter", boolean.class);
+            clearDate.setAccessible(true);
+            clearDate.invoke(fragment, true);
+            assertEquals(0L, getField(fragment, "fromDate"));
+            assertEquals(1_795_478_400_000L, getField(fragment, "toDate"));
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
 
     @Test
     public void leavingCookingJournalClearsBothDateBoundaries() {
+        CookingJournalFragment fragment = CookingJournalFragment.newInstance("COOKING_JOURNAL", null);
+        setFieldUnchecked(fragment, "fromDate", 1_795_392_000_000L);
+        setFieldUnchecked(fragment, "toDate", 1_795_478_400_000L);
+        try {
+            Method clearRange = CookingJournalFragment.class.getDeclaredMethod("clearDateRangeForExit");
+            clearRange.setAccessible(true);
+            clearRange.invoke(fragment);
+            assertEquals(0L, getField(fragment, "fromDate"));
+            assertEquals(0L, getField(fragment, "toDate"));
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+
+    @Test
+    public void cookingJournalFormReturnsToPersonalNoteWhenDismissed() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
-                try {
-                    setField(activity, "screen", MainActivity.Screen.COOKING_JOURNAL);
-                    setField(activity, "cookingLogReturnScreen", MainActivity.Screen.LIBRARY);
-                    setField(activity, "cookingJournalFromDate", 1_795_392_000_000L);
-                    setField(activity, "cookingJournalToDate", 1_795_478_400_000L);
-                    Method render = MainActivity.class.getDeclaredMethod("render");
-                    render.setAccessible(true);
-                    render.invoke(activity);
-                    activity.getOnBackPressedDispatcher().onBackPressed();
-                    assertEquals(MainActivity.Screen.LIBRARY, getField(activity, "screen"));
-                    assertEquals(0L, getField(activity, "cookingJournalFromDate"));
-                    assertEquals(0L, getField(activity, "cookingJournalToDate"));
-                } catch (ReflectiveOperationException e) {
-                    throw new AssertionError(e);
-                }
+                Recipe recipe = PreviewRecipeCatalog.designRecipes().get(0);
+                activity.onPersonalOpenNote(recipe);
+                activity.onPersonalCreateCookingLog(recipe.id);
+                CookingJournalFragment journal = (CookingJournalFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(CookingJournalFragment.class.getName());
+                if (journal == null || journal.getView() == null)
+                    throw new AssertionError("Cooking journal form Fragment is not attached");
+                ViewCompat.dispatchApplyWindowInsets(
+                        journal.getView(),
+                        new WindowInsetsCompat.Builder()
+                                .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(0, 24, 0, 24))
+                                .build());
+                assertEquals("Cooking journal must keep content below the status bar",
+                        24, journal.getView().getPaddingTop());
+                assertTrue(containsText(journal.getView(), "Lưu lần nấu"));
+                journal.handleBackPressed();
+                assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
+                PersonalDataFragment personal = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (personal == null || personal.getView() == null)
+                    throw new AssertionError("Personal note Fragment was not restored");
+                assertTrue(containsText(personal.getView(), "Ghi chú sau khi nấu"));
             });
         }
     }
@@ -161,17 +238,111 @@ public class MainActivityStateTest {
                     Method openShoppingForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
                     openShoppingForm.setAccessible(true);
                     openShoppingForm.invoke(activity, new Object[]{null});
-                    View shoppingCategory = (View) getField(activity, "shoppingCategoryInput");
+                    ShoppingFragment shopping = (ShoppingFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(ShoppingFragment.class.getName());
+                    if (shopping == null || shopping.getView() == null)
+                        throw new AssertionError("Shopping form Fragment is not attached");
+                    View shoppingCategory = (View) getField(shopping, "categoryInput");
                     assertMinimumDpHeight(shoppingCategory, density, 56);
 
-                    Method openPantryForm = MainActivity.class.getDeclaredMethod("openPantryForm", String.class);
+                    Method openPantry = MainActivity.class.getDeclaredMethod("openPantry", MainActivity.Screen.class);
+                    openPantry.setAccessible(true);
+                    openPantry.invoke(activity, MainActivity.Screen.SHOPPING);
+                    PantryFragment pantry = (PantryFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(PantryFragment.class.getName());
+                    Method openPantryForm = PantryFragment.class.getDeclaredMethod("openForm", String.class);
                     openPantryForm.setAccessible(true);
-                    openPantryForm.invoke(activity, new Object[]{null});
-                    View pantryCategory = (View) getField(activity, "pantryCategoryInput");
+                    openPantryForm.invoke(pantry, new Object[]{null});
+                    View pantryCategory = (View) getField(pantry, "categoryInput");
                     assertMinimumDpHeight(pantryCategory, density, 52);
                 } catch (ReflectiveOperationException e) {
                     throw new AssertionError(e);
                 }
+            });
+        }
+    }
+
+    @Test
+    public void personalLibraryAndFavoritesAreHostedByTheFeatureFragment() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                activity.onPersonalNavigateTab(3);
+                PersonalDataFragment fragment = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (fragment == null || fragment.getView() == null) {
+                    throw new AssertionError("Personal data feature fragment is not attached");
+                }
+                assertTrue(containsText(fragment.getView(), "Kho của tôi"));
+                TextView favoritesLink = findTextView(fragment.getView(), "Xem tất cả ›");
+                if (favoritesLink == null) throw new AssertionError("Favorites link is missing");
+                favoritesLink.performClick();
+                assertEquals(MainActivity.Screen.FAVORITES, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Những công thức bạn đã lưu."));
+                activity.onPersonalOpenCollections();
+                assertEquals(MainActivity.Screen.COLLECTION_LIST, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Các bộ sưu tập bạn đã tạo."));
+                activity.onPersonalCreateCollection();
+                assertEquals(MainActivity.Screen.COLLECTION_FORM, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Chọn món để thêm"));
+                activity.onPersonalOpenNote(com.example.myapplication.domain.catalog.PreviewRecipeCatalog
+                        .designRecipes().get(0));
+                assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Ghi chú sau khi nấu"));
+            });
+        }
+    }
+
+    @Test
+    public void shoppingItemFormDraftSurvivesActivityRecreation() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                try {
+                    Method openForm = MainActivity.class.getDeclaredMethod("openShoppingItemForm", String.class);
+                    openForm.setAccessible(true);
+                    openForm.invoke(activity, new Object[]{null});
+                    ShoppingFragment fragment = (ShoppingFragment) activity.getSupportFragmentManager()
+                            .findFragmentByTag(ShoppingFragment.class.getName());
+                    ((android.widget.EditText) getField(fragment, "nameInput")).setText("Cà chua");
+                    ((android.widget.EditText) getField(fragment, "amountInput")).setText("2");
+                    ((android.widget.EditText) getField(fragment, "unitInput")).setText("quả");
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+            scenario.recreate();
+            scenario.onActivity(activity -> {
+                ShoppingFragment fragment = (ShoppingFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(ShoppingFragment.class.getName());
+                assertTrue(fragment != null && fragment.isFormShowing());
+                assertEquals(MainActivity.Screen.SHOPPING_ITEM_FORM, getFieldUnchecked(activity, "screen"));
+                try {
+                    assertEquals("Cà chua", ((android.widget.EditText) getField(fragment, "nameInput")).getText().toString());
+                    assertEquals("2", ((android.widget.EditText) getField(fragment, "amountInput")).getText().toString());
+                    assertEquals("quả", ((android.widget.EditText) getField(fragment, "unitInput")).getText().toString());
+                } catch (ReflectiveOperationException e) {
+                    throw new AssertionError(e);
+                }
+            });
+        }
+    }
+
+    @Test
+    public void discoverScreensAreOwnedByFeatureFragmentAndBackStaysInFeature() {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            scenario.onActivity(activity -> {
+                DiscoverFragment fragment = (DiscoverFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(DiscoverFragment.class.getName());
+                if (fragment == null || fragment.getView() == null)
+                    throw new AssertionError("Discover screens are not hosted by DiscoverFragment");
+                assertTrue(containsText(fragment.getView(), "Bếp nhà"));
+                TextView searchEntry = findTextView(fragment.getView(), "Tìm công thức, nguyên liệu...");
+                if (searchEntry == null) throw new AssertionError("Discover search entry is missing");
+                ((View) searchEntry.getParent()).performClick();
+                assertEquals(MainActivity.Screen.SEARCH, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Tìm kiếm gần đây"));
+                fragment.handleBackPressed();
+                assertEquals(MainActivity.Screen.DISCOVER, getFieldUnchecked(activity, "screen"));
+                assertTrue(containsText(fragment.getView(), "Bếp nhà"));
             });
         }
     }
@@ -198,6 +369,302 @@ public class MainActivityStateTest {
         }
     }
 
+    @Test
+    public void shoppingDataLoadsAndStatusChangesThroughAsyncViewModelState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<ShoppingViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch initialLoad = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                ShoppingViewModel viewModel = (ShoppingViewModel) getFieldUnchecked(activity,
+                        "shoppingViewModel");
+                viewModelRef.set(viewModel);
+                setFieldUnchecked(activity, "screen", MainActivity.Screen.SHOPPING);
+                viewModel.shoppingState().observe(activity, state -> {
+                    if (state != null && !state.loading) initialLoad.countDown();
+                });
+                viewModel.refreshItems();
+            });
+            if (!initialLoad.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping list did not load asynchronously");
+            }
+
+            ShoppingViewModel viewModel = viewModelRef.get();
+            String itemName = "Kiểm tra bất đồng bộ " + System.nanoTime();
+            AtomicReference<String> savedItemId = new AtomicReference<>();
+            CountDownLatch saved = new CountDownLatch(1);
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicBoolean reloadStarted = new AtomicBoolean(false);
+            Observer<ShoppingViewModel.SaveResult> saveObserver = result -> {
+                if (result != null && result.success) saved.countDown();
+            };
+            scenario.onActivity(activity -> {
+                viewModel.clearSaveResult();
+                viewModel.saveResult().observe(activity, saveObserver);
+                assertEquals(true, viewModel.saveItem(null, itemName, "1", "cái",
+                        ShoppingCategoryCatalog.OTHER, ShoppingViewModel.NEED_TO_BUY));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping item save did not complete asynchronously");
+            }
+
+            scenario.onActivity(activity -> {
+                for (ShoppingListItem item : viewModel.getItems()) {
+                    if (itemName.equals(item.name)) savedItemId.set(item.id);
+                }
+                assertEquals(true, savedItemId.get() != null);
+                String itemId = savedItemId.get();
+                viewModel.setStatus(itemId, ShoppingViewModel.AVAILABLE);
+                ShoppingListItem updated = viewModel.findItem(itemId);
+                assertEquals(ShoppingViewModel.AVAILABLE, updated.status);
+                viewModel.shoppingState().observe(activity, state -> {
+                    if (state != null && state.loading) reloadStarted.set(true);
+                    if (state != null && !state.loading && reloadStarted.get()) {
+                        boolean remains = false;
+                        for (ShoppingListItem item : state.items) remains |= itemId.equals(item.id);
+                        if (!remains) deleted.countDown();
+                    }
+                });
+                viewModel.deleteItem(itemId);
+                viewModel.refreshItems();
+                viewModel.saveResult().removeObserver(saveObserver);
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Shopping item delete did not complete asynchronously");
+            }
+        }
+    }
+
+    @Test
+    public void mealPlanLoadsAndPersistsPickerSelectionWithoutBlockingUi() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<MealPlanViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                MealPlanViewModel viewModel = (MealPlanViewModel) getFieldUnchecked(activity,
+                        "mealPlanViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refresh();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan did not load");
+
+            MealPlanViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-plan-" + System.nanoTime(), "Món kiểm tra async", "", "10 phút", "Dễ");
+            CountDownLatch persisted = new CountDownLatch(1);
+            AtomicBoolean refreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.beginPicker();
+                viewModel.setPickerServings(2);
+                viewModel.toggleRecipe(recipe.id);
+                assertEquals(true, viewModel.saveSelection(Arrays.asList(recipe)));
+                List<PlannedRecipe> optimistic = viewModel.getMealPlanRecipes();
+                PlannedRecipe selected = null;
+                for (PlannedRecipe item : optimistic) if (recipe.id.equals(item.recipe.id)) selected = item;
+                assertEquals(2, selected == null ? 0 : selected.servings);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && state.loading) refreshStarted.set(true);
+                    if (state != null && !state.loading && refreshStarted.get()) {
+                        for (PlannedRecipe item : state.recipes) {
+                            if (recipe.id.equals(item.recipe.id) && item.servings == 2) persisted.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh();
+            });
+            if (!persisted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan was not persisted");
+            CountDownLatch removed = new CountDownLatch(1);
+            AtomicBoolean removeRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.removeMealPlanRecipe(recipe.id);
+                viewModel.planState().observe(activity, state -> {
+                    if (state != null && state.loading) removeRefreshStarted.set(true);
+                    if (state != null && !state.loading && removeRefreshStarted.get()) {
+                        boolean found = false;
+                        for (PlannedRecipe item : state.recipes) found |= recipe.id.equals(item.recipe.id);
+                        if (!found) removed.countDown();
+                    }
+                });
+                viewModel.refresh();
+            });
+            if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Meal plan removal was not persisted");
+        }
+    }
+
+    @Test
+    public void pantryItemsLoadSaveAndDeleteThroughAsyncState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<PantryViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                PantryViewModel viewModel = (PantryViewModel) getFieldUnchecked(activity, "pantryViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refreshItems();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry items did not load");
+
+            PantryViewModel viewModel = viewModelRef.get();
+            String name = "Nguyên liệu kiểm tra async " + System.nanoTime();
+            CountDownLatch saved = new CountDownLatch(1);
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicReference<String> idRef = new AtomicReference<>();
+            AtomicBoolean deletionRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state == null || state.loading) return;
+                    for (PantryIngredient item : state.items) {
+                        if (name.equals(item.name)) saved.countDown();
+                    }
+                });
+                assertEquals(true, viewModel.saveItem(null, name, "2", "PCS",
+                        ShoppingCategoryCatalog.OTHER, "", "", ""));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry item save did not complete");
+            scenario.onActivity(activity -> {
+                for (PantryIngredient item : viewModel.getItems()) if (name.equals(item.name)) idRef.set(item.id);
+                assertEquals(true, idRef.get() != null);
+                viewModel.pantryState().observe(activity, state -> {
+                    if (state != null && state.loading) deletionRefreshStarted.set(true);
+                    if (state != null && !state.loading && deletionRefreshStarted.get()) {
+                        boolean found = false;
+                        for (PantryIngredient item : state.items) found |= idRef.get().equals(item.id);
+                        if (!found) deleted.countDown();
+                    }
+                });
+                viewModel.deleteItem(idRef.get());
+                viewModel.refreshItems();
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Pantry item delete did not complete");
+        }
+    }
+
+    @Test
+    public void personalFavoritesAndHistoryUseCachedLiveDataAndAsyncPersistence() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<PersonalDataViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                PersonalDataViewModel viewModel = (PersonalDataViewModel) getFieldUnchecked(activity,
+                        "personalDataViewModel");
+                viewModelRef.set(viewModel);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Personal data did not load");
+
+            PersonalDataViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-personal-" + System.nanoTime(), "Món cá nhân kiểm tra", "", "15 phút", "Dễ");
+            CountDownLatch favoriteReloaded = new CountDownLatch(1);
+            AtomicBoolean favoriteRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.addFavorite(recipe);
+                assertEquals(true, viewModel.isFavorite(recipe.id));
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) favoriteRefreshStarted.set(true);
+                    if (state != null && !state.loading && favoriteRefreshStarted.get()) {
+                        for (Recipe favorite : state.favorites) {
+                            if (recipe.id.equals(favorite.id)) favoriteReloaded.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!favoriteReloaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Favorite was not persisted");
+
+            CountDownLatch historyReloaded = new CountDownLatch(1);
+            AtomicBoolean historyRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.recordViewedRecipe(recipe);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) historyRefreshStarted.set(true);
+                    if (state != null && !state.loading && historyRefreshStarted.get()) {
+                        for (Recipe viewed : state.history) {
+                            if (recipe.id.equals(viewed.id)) historyReloaded.countDown();
+                        }
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!historyReloaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("View history was not persisted");
+
+            CountDownLatch removed = new CountDownLatch(1);
+            AtomicBoolean removeRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.removeFavorite(recipe.id);
+                viewModel.personalDataState().observe(activity, state -> {
+                    if (state != null && state.loading) removeRefreshStarted.set(true);
+                    if (state != null && !state.loading && removeRefreshStarted.get()) {
+                        boolean found = false;
+                        for (Recipe favorite : state.favorites) found |= recipe.id.equals(favorite.id);
+                        if (!found) removed.countDown();
+                    }
+                });
+                viewModel.refresh(Collections.singletonList(recipe));
+            });
+            if (!removed.await(5, TimeUnit.SECONDS)) throw new AssertionError("Favorite removal was not persisted");
+        }
+    }
+
+    @Test
+    public void cookingJournalLoadsSavesAndDeletesThroughAsyncState() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            AtomicReference<CookingJournalViewModel> viewModelRef = new AtomicReference<>();
+            CountDownLatch loaded = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                CookingJournalViewModel viewModel = new ViewModelProvider(activity,
+                        new AppViewModelFactory((BepNhaApplication) activity.getApplication()))
+                        .get(CookingJournalViewModel.class);
+                viewModelRef.set(viewModel);
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && !state.loading) loaded.countDown();
+                });
+                viewModel.refresh();
+            });
+            if (!loaded.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking journal did not load");
+
+            CookingJournalViewModel viewModel = viewModelRef.get();
+            Recipe recipe = new Recipe("async-journal-" + System.nanoTime(), "Món nhật ký kiểm tra", "", "20 phút", "Dễ");
+            CountDownLatch saved = new CountDownLatch(1);
+            AtomicReference<String> logIdRef = new AtomicReference<>();
+            scenario.onActivity(activity -> {
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && !state.loading) {
+                        for (CookingLogEntry log : state.logs) {
+                            if (recipe.id.equals(log.recipeId)) {
+                                logIdRef.set(log.id);
+                                saved.countDown();
+                            }
+                        }
+                    }
+                });
+                assertEquals(true, viewModel.save(null, recipe, System.currentTimeMillis(), 1,
+                        20, 5, "Thêm rau thơm", ""));
+            });
+            if (!saved.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log save did not complete");
+
+            CountDownLatch deleted = new CountDownLatch(1);
+            AtomicBoolean deleteRefreshStarted = new AtomicBoolean(false);
+            scenario.onActivity(activity -> {
+                viewModel.journalState().observe(activity, state -> {
+                    if (state != null && state.loading) deleteRefreshStarted.set(true);
+                    if (state != null && !state.loading && deleteRefreshStarted.get()) {
+                        boolean found = false;
+                        for (CookingLogEntry log : state.logs) found |= logIdRef.get().equals(log.id);
+                        if (!found) deleted.countDown();
+                    }
+                });
+                viewModel.delete(logIdRef.get());
+                viewModel.refresh();
+            });
+            if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log delete did not complete");
+        }
+    }
+
     private static boolean containsText(View view, String expected) {
         if (view instanceof TextView && expected.contentEquals(((TextView) view).getText())) return true;
         if (!(view instanceof ViewGroup)) return false;
@@ -206,6 +673,19 @@ public class MainActivityStateTest {
             if (containsText(group.getChildAt(index), expected)) return true;
         }
         return false;
+    }
+
+    private static TextView findTextView(View view, String expected) {
+        if (view instanceof TextView && expected.contentEquals(((TextView) view).getText())) {
+            return (TextView) view;
+        }
+        if (!(view instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) view;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            TextView found = findTextView(group.getChildAt(index), expected);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static void assertMinimumDpHeight(View view, float density, int expectedDp) {
@@ -247,5 +727,13 @@ public class MainActivityStateTest {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static void setFieldUnchecked(Object target, String name, Object value) {
+        try {
+            setField(target, name, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 }

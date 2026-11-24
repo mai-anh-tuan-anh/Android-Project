@@ -33,6 +33,7 @@ The user selected **Người 3**. Treat this as the active assignment for this p
 ## Project references
 
 - Project handoff: `BAN_GIAO_DU_AN_ANDROID.md`.
+- Binding architecture standard for all contributors, including Người 2: `ARCHITECTURE_MVVM.md`.
 - Proposed shared data contract for Người 3 modules: `THONG_NHAT_DU_LIEU_MODULE_5_7.md` (proposal baseline; team confirmation points are listed inside).
 - UI/UX specification: `ui-ux-bep-nha/THIET_KE.md`.
 - UI images: `ui-ux-bep-nha/screens/`, `ui-ux-bep-nha/states/`, `ui-ux-bep-nha/showcase.png`, and the design/flow images in `ui-ux-bep-nha/`.

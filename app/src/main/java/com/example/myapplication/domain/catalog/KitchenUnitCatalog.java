@@ -1,4 +1,4 @@
-package com.example.myapplication;
+package com.example.myapplication.domain.catalog;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Canonical cooking units and safe same-dimension conversions for module 7. */
-final class KitchenUnitCatalog {
+public final class KitchenUnitCatalog {
     private static final Map<String, Unit> UNITS = new HashMap<>();
     private static final Map<String, String> ALIASES = new HashMap<>();
     private static final Set<String> AMBIGUOUS_ALIASES = new HashSet<>();
@@ -84,7 +84,7 @@ final class KitchenUnitCatalog {
         }
     }
 
-    static String canonicalId(String input) {
+    public static String canonicalId(String input) {
         if (input == null || input.trim().isEmpty()) return "";
         String clean = input.trim().replaceAll("\\s+", " ");
         String key = normalize(clean);
@@ -93,12 +93,12 @@ final class KitchenUnitCatalog {
         return known == null ? "CUSTOM:" + clean : known;
     }
 
-    static String label(String id) {
+    public static String label(String id) {
         Unit unit = UNITS.get(id);
         return unit == null ? id != null && id.startsWith("CUSTOM:") ? id.substring(7) : id : unit.symbol;
     }
 
-    static String dimension(String id) {
+    public static String dimension(String id) {
         if ("MG".equals(id) || "G".equals(id) || "KG".equals(id) || "OZ".equals(id) || "LB".equals(id)) {
             return "MASS";
         }
@@ -108,7 +108,7 @@ final class KitchenUnitCatalog {
     }
 
     /** Converts supported mass or volume units to g or ml, without cross-dimension assumptions. */
-    static BigDecimal toBaseAmount(BigDecimal amount, String id) {
+    public static BigDecimal toBaseAmount(BigDecimal amount, String id) {
         BigDecimal factor;
         switch (id == null ? "" : id) {
             case "MG": factor = new BigDecimal("0.001"); break;
