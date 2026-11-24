@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import com.example.myapplication.data.local.database.RecipeCatalogDbHelper.ApplyResult;
 import com.example.myapplication.data.mapper.CatalogSnapshotMapper;
 import com.example.myapplication.data.mapper.CatalogSnapshotMapper.Snapshot;
+import com.example.myapplication.data.repository.CatalogRefreshService;
 import com.example.myapplication.data.repository.LocalRecipeCatalogRepository;
 import com.example.myapplication.domain.model.CookingStep;
 import com.example.myapplication.domain.model.Recipe;
@@ -31,6 +32,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -236,6 +238,50 @@ public class RecipeCatalogDbHelperTest {
                 assertEquals(10, version.getInt(0));
             }
         }
+    }
+
+    @Test
+    public void refreshUsesLocalRevisionRulesForRtdbSnapshots() throws Exception {
+        // RTDB omits optional empty nodes. A catalog with metadata alone is valid.
+        assertEquals(ApplyResult.APPLIED, refresh(EMPTY));
+        assertEquals(Long.valueOf(0), repository.readCatalog().revision);
+        assertTrue(repository.readCatalog().recipes.isEmpty());
+
+        assertEquals(ApplyResult.APPLIED, refresh(fixture));
+        assertEquals(ApplyResult.STALE, refresh(EMPTY));
+        String reordered = fixture.replace("\"schemaVersion\": 1, \"revision\": 12",
+                "\"revision\":12,\"schemaVersion\":1");
+        assertEquals(ApplyResult.UNCHANGED, refresh(reordered));
+        assertEquals(Long.valueOf(12), repository.readCatalog().revision);
+        assertEquals("100.2500", recipe("recipe-soup").details.ingredientLines.get(0).amountDecimal);
+    }
+
+    @Test
+    public void failedRefreshKeepsCatalogAndPersonalData() throws Exception {
+        try (PersonalDataDbHelper personal = new PersonalDataDbHelper(context, PERSONAL_DB)) {
+            Recipe saved = new Recipe("recipe-soup", "Món đã lưu", "", "30 phút", "Dễ");
+            personal.saveNote(saved, "Ghi chú của tôi");
+        }
+        byte[] before = databaseBytes(PERSONAL_DB);
+        assertEquals(ApplyResult.APPLIED, refresh(fixture));
+
+        CatalogRefreshService offline = new CatalogRefreshService(() -> {
+            throw new IOException("offline");
+        }, repository::applySnapshot, Runnable::run);
+        assertTrue(assertThrows(ExecutionException.class, () -> offline.refresh().get())
+                .getCause() instanceof IOException);
+        for (String rejected : Arrays.asList("null", "{broken", fixture.replace("100.2500", "200.2500"))) {
+            assertTrue(assertThrows(ExecutionException.class, () -> refresh(rejected))
+                    .getCause() instanceof IllegalArgumentException);
+        }
+
+        assertEquals(Long.valueOf(12), repository.readCatalog().revision);
+        assertEquals("100.2500", recipe("recipe-soup").details.ingredientLines.get(0).amountDecimal);
+        assertArrayEquals(before, databaseBytes(PERSONAL_DB));
+    }
+
+    private ApplyResult refresh(String snapshot) throws Exception {
+        return new CatalogRefreshService(() -> snapshot, repository::applySnapshot, Runnable::run).refresh().get();
     }
 
     private void openCatalog() {
