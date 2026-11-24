@@ -135,16 +135,16 @@ public final class PreviewRecipeCatalog {
                         30, "Không giới hạn", Arrays.asList("Món canh"),
                         Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ")),
                 new Recipe("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
-                        25, "Không giới hạn", Arrays.asList("Món mặn", "Món chiên"),
+                        25, "Không giới hạn", Arrays.asList("Món chiên"),
                         Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô")),
                 new Recipe("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
                         35, "Không giới hạn", Arrays.asList("Món khác"),
                         Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi")),
                 new Recipe("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
-                        20, "Không giới hạn", Arrays.asList("Món mặn", "Món rang"),
+                        20, "Không giới hạn", Arrays.asList("Món rang"),
                         Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi")),
                 new Recipe("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
-                        15, "Món chay", Arrays.asList("Món chay"),
+                        15, "Món chay", Arrays.asList("Món rau", "Món chay"),
                         Arrays.asList("Xà lách", "Cà chua", "Dưa chuột", "Sốt mè rang", "Bắp ngọt"))));
 
         for (String[] dish : VIETNAMESE_PREVIEWS) recipes.add(createPreviewRecipe(dish[0], dish[1]));
@@ -192,20 +192,38 @@ public final class PreviewRecipeCatalog {
             categories.add("Bún/Phở");
         }
         boolean vegetarian = "vegetarian".equals(kind) || dish.contains("chay");
-        if (!soup && !noodle && !dish.contains("mì ý") && !dish.contains("salad") && !vegetarian) {
-            categories.add("Món mặn");
-        }
-        if (dish.contains("xào")) categories.add("Món xào");
-        if ((dish.contains("kho") && !dish.contains("kho quẹt")) || dish.contains("rim")) {
+        boolean vegetable = isVegetableDish(dish, soup);
+        if (vegetable) categories.add("Món rau");
+        if (!vegetable && dish.contains("xào")) categories.add("Món xào");
+        if (!vegetable && ((dish.contains("kho") && !dish.contains("kho quẹt")) || dish.contains("rim"))) {
             categories.add("Món kho");
         }
-        if (dish.contains("rang")) categories.add("Món rang");
-        if (dish.contains("chiên")) categories.add("Món chiên");
-        if (dish.contains("hấp") || dish.contains("luộc")) categories.add("Món hấp/luộc");
-        if (dish.contains("nướng")) categories.add("Món nướng");
+        if (!vegetable && dish.contains("rang")) categories.add("Món rang");
+        if (!vegetable && dish.contains("chiên")) categories.add("Món chiên");
+        if (!vegetable && (dish.contains("hấp") || dish.contains("luộc"))) categories.add("Món hấp/luộc");
+        if (!vegetable && dish.contains("nướng")) categories.add("Món nướng");
         if (vegetarian) categories.add("Món chay");
         if (categories.isEmpty()) categories.add("Món khác");
         return categories;
+    }
+
+    private static boolean isVegetableDish(String dish, boolean soup) {
+        if (soup) return false;
+        return dish.startsWith("rau ")
+                || dish.startsWith("cải ")
+                || dish.startsWith("bông cải")
+                || dish.startsWith("su su")
+                || dish.startsWith("giá ")
+                || dish.startsWith("mướp ")
+                || dish.startsWith("đậu que")
+                || dish.startsWith("bắp cải")
+                || dish.startsWith("cà tím")
+                || dish.startsWith("rau củ")
+                || dish.startsWith("đậu hũ kho")
+                || dish.startsWith("đậu hũ xào rau củ")
+                || dish.startsWith("đậu hũ non")
+                || dish.startsWith("nấm xào")
+                || dish.startsWith("salad ");
     }
 
     private static String slug(String value) {

@@ -410,7 +410,7 @@ public final class DiscoverFragment extends Fragment {
         LinearLayout catRow = new LinearLayout(requireContext());
         catRow.setOrientation(LinearLayout.HORIZONTAL);
         String[] categories = {
-            "Món mặn", "Món canh", "Bún/Phở", "Món xào", "Món kho", "Món rang",
+            "Món canh", "Bún/Phở", "Món rau", "Món xào", "Món kho", "Món rang",
             "Món chiên", "Món hấp/luộc", "Món nướng", "Món chay", "Món khác"
         };
         for (String cat : categories) {
@@ -469,9 +469,9 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
         String[][] categories = {
-            {"Món mặn", "category_main"},
             {"Món canh", "category_soup"},
             {"Bún/Phở", "category_vietnamese"},
+            {"Món rau", "category_vegetarian"},
             {"Món xào", "category_quick"},
             {"Món kho", "category_main"},
             {"Món rang", "category_main"},
