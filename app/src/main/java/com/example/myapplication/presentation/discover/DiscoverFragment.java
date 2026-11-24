@@ -38,6 +38,8 @@ import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.main.MainActivity.Screen;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
+import com.example.myapplication.presentation.recipedetail.RecipeDetailView;
+import com.example.myapplication.presentation.recipedetail.RecipeDetailViewModel;
 import com.example.myapplication.domain.model.PantryIngredient;
 
 import java.text.Normalizer;
@@ -55,6 +57,8 @@ public final class DiscoverFragment extends Fragment {
 
         void onDiscoverOpenMealPlanPicker(Recipe recipe);
 
+        void onDiscoverStartCooking(String canonicalRecipeId, int servings);
+
         void onDiscoverNavigateTab(int tab);
 
         void onDiscoverBack();
@@ -69,6 +73,8 @@ public final class DiscoverFragment extends Fragment {
     private static final int MUTED = Color.rgb(88, 102, 92);
     private static final int BORDER = Color.rgb(220, 228, 220);
     private static final int WHITE = Color.WHITE;
+    private static final String PREVIEW_DEMO_ID = "sample-canh-chua-ca";
+    private static final String CATALOG_DEMO_ID = "recipe-0001";
     private Host host;
     private FrameLayout root;
     private LinearLayout pageRoot;
@@ -76,11 +82,15 @@ public final class DiscoverFragment extends Fragment {
     private DiscoverViewModel discoverViewModel;
     private PantryViewModel pantryViewModel;
     private PersonalDataViewModel personalDataViewModel;
+    private RecipeDetailViewModel recipeDetailViewModel;
+    private RecipeDetailView catalogDetailView;
+    private String renderedCatalogId;
+    private boolean openingNewDetail;
     private Screen screen = Screen.DISCOVER;
     private Screen lastRenderedScreen;
     private Screen detailReturnScreen = Screen.DISCOVER;
     private String selectedCategory = "";
-    private String detailRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
+    private String detailRecipeId = "";
     private EditText discoverSearchInput;
 
     @Override
@@ -219,7 +229,8 @@ public final class DiscoverFragment extends Fragment {
         }
         detailRecipeId = recipe.id;
         detailReturnScreen = returnScreen == Screen.RECIPE_DETAIL ? Screen.DISCOVER : returnScreen;
-        personalDataViewModel.recordViewedRecipe(recipe);
+        openingNewDetail = usesCatalogDetail();
+        if (recipe.details == null) personalDataViewModel.recordViewedRecipe(recipe);
         showScreen(Screen.RECIPE_DETAIL);
         render();
     }
@@ -236,6 +247,8 @@ public final class DiscoverFragment extends Fragment {
         } else if (screen == Screen.CATEGORY_RECIPES) {
             showScreen(Screen.CATEGORY_LIST);
         } else if (screen == Screen.RECIPE_DETAIL) {
+            if (catalogDetailView != null && catalogDetailView.handleBack()) return;
+            if (recipeDetailViewModel != null) recipeDetailViewModel.close();
             Screen destination =
                     detailReturnScreen == Screen.RECIPE_DETAIL
                             ? Screen.DISCOVER
@@ -267,16 +280,96 @@ public final class DiscoverFragment extends Fragment {
                 || value == Screen.RECIPE_DETAIL;
     }
 
-    private Recipe recipeById(String id) {
+    private Recipe previewRecipeById(String id) {
         for (Recipe recipe : PreviewRecipeCatalog.designRecipes())
             if (recipe.id.equals(id)) return recipe;
-        return PreviewRecipeCatalog.designRecipes().isEmpty()
-                ? null
-                : PreviewRecipeCatalog.designRecipes().get(0);
+        return null;
+    }
+
+    private boolean usesCatalogDetail() {
+        // Temporary bridge for discovery routes. Personal entry points keep their preview ID.
+        return previewRecipeById(detailRecipeId) == null
+                || (PREVIEW_DEMO_ID.equals(detailRecipeId) && isDiscoverRoute(detailReturnScreen));
+    }
+
+    private void renderCatalogDetail() {
+        if (recipeDetailViewModel == null) {
+            AppViewModelFactory factory = new AppViewModelFactory((BepNhaApplication) requireActivity().getApplication());
+            recipeDetailViewModel = new ViewModelProvider(requireActivity(), factory).get(RecipeDetailViewModel.class);
+            recipeDetailViewModel.state().observe(getViewLifecycleOwner(), stateValue -> {
+                if (catalogDetailView != null && stateValue != null
+                        && stateValue.recipeId.equals(renderedCatalogId)) {
+                    Recipe source = previewRecipeById(detailRecipeId);
+                    catalogDetailView.display(stateValue, source != null && personalDataViewModel.isFavorite(source.id));
+                }
+            });
+            recipeDetailViewModel.draft().observe(getViewLifecycleOwner(), draftValue -> {
+                if (catalogDetailView != null) catalogDetailView.displayDraft(draftValue);
+            });
+        }
+        String catalogId = PREVIEW_DEMO_ID.equals(detailRecipeId) ? CATALOG_DEMO_ID : detailRecipeId;
+        Recipe preview = previewRecipeById(detailRecipeId);
+        if (catalogDetailView == null || !catalogId.equals(renderedCatalogId)) {
+            releaseCatalogView();
+            root.removeAllViews();
+            renderedCatalogId = catalogId;
+            catalogDetailView = new RecipeDetailView(requireContext(), recipeDetailViewModel,
+                    new RecipeDetailView.Actions() {
+                        @Override public void back() { handleBackPressed(); }
+                        @Override public void discover() {
+                            recipeDetailViewModel.close();
+                            showScreen(Screen.DISCOVER);
+                            render();
+                        }
+                        @Override public void openNote() { host.onDiscoverOpenNote(preview); }
+                        @Override public void toggleFavorite() {
+                            if (personalDataViewModel.isFavorite(preview.id)) personalDataViewModel.removeFavorite(preview.id);
+                            else personalDataViewModel.addFavorite(preview);
+                            render();
+                        }
+                        @Override public void openMealPlan() { host.onDiscoverOpenMealPlanPicker(preview); }
+                        @Override public void startCooking(String canonicalRecipeId, int servings) {
+                            host.onDiscoverStartCooking(canonicalRecipeId, servings);
+                        }
+                    }, preview);
+            root.addView(catalogDetailView, new FrameLayout.LayoutParams(-1, -1));
+        }
+        if (openingNewDetail) {
+            openingNewDetail = false;
+            recipeDetailViewModel.close();
+        }
+        recipeDetailViewModel.open(catalogId);
+        catalogDetailView.display(recipeDetailViewModel.state().getValue(),
+                preview != null && personalDataViewModel.isFavorite(preview.id));
+        if (catalogDetailView.isAttachedToWindow()) {
+            catalogDetailView.displayDraft(recipeDetailViewModel.draft().getValue());
+        }
+        lastRenderedScreen = Screen.RECIPE_DETAIL;
+    }
+
+    private void releaseCatalogView() {
+        if (catalogDetailView != null) catalogDetailView.dismissSheet();
+        catalogDetailView = null;
+        renderedCatalogId = null;
+    }
+
+    @Override
+    public void onDestroyView() {
+        releaseCatalogView();
+        recipeDetailViewModel = null;
+        root = null;
+        pageRoot = null;
+        discoverSearchInput = null;
+        super.onDestroyView();
     }
 
     private void render() {
         if (root == null || !isAdded()) return;
+        if (screen == Screen.RECIPE_DETAIL && usesCatalogDetail()) {
+            renderCatalogDetail();
+            return;
+        }
+        releaseCatalogView();
         boolean preservePosition = lastRenderedScreen == screen;
         ScrollView previousScroll = preservePosition ? findFirstScrollView(root) : null;
         int previousScrollY = previousScroll == null ? 0 : previousScroll.getScrollY();
@@ -1396,7 +1489,7 @@ public final class DiscoverFragment extends Fragment {
     }
 
     private void renderRecipeDetail() {
-        Recipe recipe = recipeById(detailRecipeId);
+        Recipe recipe = previewRecipeById(detailRecipeId);
         ScrollView scroll = scrollContent();
         LinearLayout page = vertical();
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
