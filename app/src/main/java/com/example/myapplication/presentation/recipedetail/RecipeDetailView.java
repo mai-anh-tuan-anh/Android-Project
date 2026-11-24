@@ -24,6 +24,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.example.myapplication.R;
+import com.example.myapplication.data.image.RecipeImageLoader;
 import com.example.myapplication.domain.model.CookingStep;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.recipedetail.RecipeDetailViewModel.Draft;
@@ -52,6 +53,7 @@ public final class RecipeDetailView extends FrameLayout {
     private static final int WHITE = Color.WHITE;
 
     private final RecipeDetailViewModel model;
+    private final RecipeImageLoader images;
     private final Actions actions;
     private final Recipe legacySource;
     private State state;
@@ -69,10 +71,11 @@ public final class RecipeDetailView extends FrameLayout {
     private EditText number;
     private boolean bindingNumber;
 
-    public RecipeDetailView(Context context, RecipeDetailViewModel model, Actions actions,
+    public RecipeDetailView(Context context, RecipeDetailViewModel model, RecipeImageLoader images, Actions actions,
                             Recipe legacySource) {
         super(context);
         this.model = model;
+        this.images = images;
         this.actions = actions;
         this.legacySource = legacySource;
         setBackgroundColor(CREAM);
@@ -87,6 +90,8 @@ public final class RecipeDetailView extends FrameLayout {
         int previousScroll = state != null && state.status == Status.AVAILABLE && scroll != null
                 ? scroll.getScrollY() : 0;
         state = value;
+        if (state == null || state.recipe == null || state.recipe.details == null
+                || state.recipe.details.steps.isEmpty()) stepsShown = false;
         drawPage();
         if (previousScroll > 0) {
             ScrollView current = scroll;
@@ -110,10 +115,10 @@ public final class RecipeDetailView extends FrameLayout {
     }
 
     private void drawPage() {
-        removeAllViews();
+        if (getChildCount() > 0) removeViewAt(0);
         star = null;
         LinearLayout page = column();
-        addView(page, new LayoutParams(-1, -1));
+        addView(page, 0, new LayoutParams(-1, -1));
         scroll = scrollView();
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         LinearLayout contents = column();
@@ -129,7 +134,6 @@ public final class RecipeDetailView extends FrameLayout {
         }
         if (servingOverlay != null) {
             page.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-            addView(servingOverlay, new LayoutParams(-1, -1));
         }
     }
 
@@ -514,19 +518,8 @@ public final class RecipeDetailView extends FrameLayout {
         ImageView image = new ImageView(getContext());
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setBackgroundColor(PALE);
-        if (recipe.details != null
-                && "recipe-0001".equals(recipe.id)
-                && "recipes/recipe-0001/cover-v1.jpg".equals(recipe.details.imagePath)) {
-            // The bundled preview is byte-identical to the approved v1 Hosting image.
-            image.setImageResource(R.drawable.recipe_canh_chua);
-            image.setContentDescription("Ảnh " + recipe.title);
-        } else if (hasText(recipe.imageName)) {
-            int resource = getResources().getIdentifier(recipe.imageName, "drawable", getContext().getPackageName());
-            if (resource != 0) {
-                image.setImageResource(resource);
-                image.setContentDescription("Ảnh " + recipe.title);
-            }
-        }
+        image.setContentDescription("Ảnh " + recipe.title);
+        images.bind(image, recipe.details == null ? null : recipe.details.imagePath);
         return image;
     }
 

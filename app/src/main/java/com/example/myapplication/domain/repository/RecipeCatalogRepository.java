@@ -13,6 +13,8 @@ import java.util.Map;
 public interface RecipeCatalogRepository {
     Catalog readCatalog();
 
+    default Long readRevision() { return readCatalog().revision; }
+
     Lookup findById(String recipeId);
 
     final class Catalog {

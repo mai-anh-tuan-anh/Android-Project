@@ -159,15 +159,20 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public Long readRevision() { return readRevision(getReadableDatabase()); }
+
+    private static Long readRevision(SQLiteDatabase db) {
+        try (Cursor meta = db.rawQuery("SELECT revision FROM CatalogMeta WHERE id=1", null)) {
+            return meta.moveToFirst() ? meta.getLong(0) : null;
+        }
+    }
+
     public Catalog readCatalog() {
         SQLiteDatabase db = getReadableDatabase();
         // The revision, dictionaries and recipe rows must come from the same SQLite snapshot.
         db.beginTransactionNonExclusive();
         try {
-            Long revision;
-            try (Cursor meta = db.rawQuery("SELECT revision FROM CatalogMeta WHERE id=1", null)) {
-                revision = meta.moveToFirst() ? meta.getLong(0) : null;
-            }
+            Long revision = readRevision(db);
             Map<String, String> categories = readNames(db, "Category");
             Map<String, String> diets = readNames(db, "Diet");
             Map<String, Ingredient> ingredients = readIngredients(db);

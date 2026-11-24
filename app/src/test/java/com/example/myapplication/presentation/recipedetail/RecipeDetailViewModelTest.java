@@ -167,6 +167,35 @@ public class RecipeDetailViewModelTest {
         assertEquals(Status.AVAILABLE, status());
     }
 
+    @Test public void replacementRecalculatesCommittedServingsAndRetainsAnOpenDraft() {
+        repository.recipe = recipe("id", 2, Recipe.IngredientDataStatus.COMPLETE);
+        model.open("id");
+        model.beginAdjustment();
+        model.editServings("4");
+        model.applyServings();
+        model.beginAdjustment();
+        model.editServings("6");
+
+        repository.recipe = recipe("id", 4, Recipe.IngredientDataStatus.COMPLETE);
+        model.catalogReplaced(1);
+
+        assertEquals(4, model.state().getValue().servings);
+        assertEquals("100 g", amount());
+        assertEquals(6, model.draft().getValue().servings);
+        assertEquals("150 g", model.draft().getValue().ingredients.get(0).amount);
+        assertEquals(0, refreshes);
+    }
+
+    @Test public void localReadErrorAfterReplacementKeepsPreviouslyDisplayedRecipe() {
+        repository.recipe = recipe("id", 2, Recipe.IngredientDataStatus.COMPLETE);
+        model.open("id");
+        repository.databaseFailure = true;
+        model.catalogReplaced(1);
+        assertEquals(Status.AVAILABLE, status());
+        assertEquals("100 g", amount());
+        assertEquals(0, refreshes);
+    }
+
     private Status status() { return model.state().getValue().status; }
     private String amount() { return model.state().getValue().ingredients.get(0).amount; }
 

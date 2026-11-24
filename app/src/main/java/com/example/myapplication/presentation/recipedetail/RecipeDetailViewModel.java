@@ -30,61 +30,116 @@ public final class RecipeDetailViewModel extends ViewModel {
 
     private static final Locale DISPLAY_LOCALE = Locale.forLanguageTag("vi-VN");
     private final RecipeCatalogRepository repository;
+    private final Supplier<CompletableFuture<ApplyResult>> ensureSnapshot;
     private final Supplier<CompletableFuture<ApplyResult>> refresh;
     private final Executor io;
     private final Executor main;
+    private final LiveData<Long> catalogReplacements;
     private final MutableLiveData<State> state = new MutableLiveData<>();
     private final MutableLiveData<Draft> draft = new MutableLiveData<>();
     private String recipeId;
     private int request;
+    private long lastReplacement;
+    private boolean reading;
+    private boolean replacementPending;
 
     public RecipeDetailViewModel(RecipeCatalogRepository repository,
                                  Supplier<CompletableFuture<ApplyResult>> refresh,
                                  Executor io, Executor main) {
+        this(repository, refresh, refresh, io, main, new MutableLiveData<>());
+    }
+
+    public RecipeDetailViewModel(RecipeCatalogRepository repository,
+                                 Supplier<CompletableFuture<ApplyResult>> ensureSnapshot,
+                                 Supplier<CompletableFuture<ApplyResult>> refresh,
+                                 Executor io, Executor main, LiveData<Long> catalogReplacements) {
         this.repository = repository;
+        this.ensureSnapshot = ensureSnapshot;
         this.refresh = refresh;
         this.io = io;
         this.main = main;
+        this.catalogReplacements = catalogReplacements;
     }
 
     public LiveData<State> state() { return state; }
     public LiveData<Draft> draft() { return draft; }
+    public LiveData<Long> catalogReplacements() { return catalogReplacements; }
 
     public void open(String id) {
         if (id.equals(recipeId)) return;
         close();
         recipeId = id;
         if (id.trim().isEmpty()) state.setValue(State.status(id, Status.MISSING));
-        else load();
+        else load(false);
     }
 
     public void close() {
         ++request;
         recipeId = null;
+        reading = false;
+        replacementPending = false;
         draft.setValue(null);
         state.setValue(null);
     }
 
     public void retry() {
         State current = state.getValue();
-        if (current != null && current.canRetry()) load();
+        if (current != null && current.canRetry()) load(true);
     }
 
-    private void load() {
+    private void load(boolean manualRetry) {
         String id = recipeId;
         int loadingRequest = ++request;
+        reading = true;
         state.setValue(State.status(id, Status.LOADING));
         CompletableFuture.supplyAsync(() -> read(id), io)
                 .thenCompose(initial -> {
                     if (initial.status != Status.NOT_LOADED) return CompletableFuture.completedFuture(initial);
-                    return refresh.get().handle((result, error) -> error == null)
+                    return (manualRetry ? refresh : ensureSnapshot).get().handle((result, error) -> error == null)
                             .thenApplyAsync(success -> success ? read(id) : State.status(id, Status.REMOTE_ERROR), io);
                 })
-                .whenCompleteAsync((result, error) -> {
-                    if (loadingRequest == request) {
-                        state.setValue(error == null ? result : State.status(id, Status.REMOTE_ERROR));
-                    }
-                }, main);
+                .whenCompleteAsync((result, error) -> finishRead(loadingRequest,
+                        error == null ? result : State.status(id, Status.REMOTE_ERROR), false), main);
+    }
+
+    public void catalogReplaced(long replacement) {
+        if (replacement <= lastReplacement) return;
+        lastReplacement = replacement;
+        if (recipeId == null || recipeId.isEmpty()) return;
+        if (reading) replacementPending = true;
+        else reloadLocal();
+    }
+
+    private void reloadLocal() {
+        String id = recipeId;
+        int loadingRequest = ++request;
+        reading = true;
+        CompletableFuture.supplyAsync(() -> read(id), io)
+                .whenCompleteAsync((result, error) -> finishRead(loadingRequest,
+                        error == null ? result : State.status(id, Status.DATABASE_ERROR), true), main);
+    }
+
+    private void finishRead(int id, State next, boolean replacement) {
+        if (id != request) return;
+        State previous = state.getValue();
+        boolean keepLocal = replacement && previous != null && previous.status == Status.AVAILABLE
+                && (next.status == Status.DATABASE_ERROR || next.status == Status.NOT_LOADED);
+        if (!keepLocal) {
+            if (replacement && previous != null && next.canAdjust && previous.recipeId.equals(next.recipeId)
+                    && ServingCalculator.isValidServings(previous.servings)) {
+                next = new State(next.recipeId, next.status, next.recipe, previous.servings,
+                        ingredients(next.recipe, previous.servings));
+            }
+            Draft editing = draft.getValue();
+            if (!next.canAdjust) cancelAdjustment();
+            state.setValue(next);
+            if (editing != null && next.canAdjust) updateDraft(editing.input, next);
+        }
+        reading = false;
+        if (replacementPending) {
+            replacementPending = false;
+            reloadLocal();
+        }
     }
 
     private State read(String id) {

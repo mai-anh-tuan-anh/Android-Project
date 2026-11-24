@@ -54,8 +54,8 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
         }
         if (modelClass == RecipeDetailViewModel.class) {
             return (T) new RecipeDetailViewModel(appContainer.recipeCatalogRepository,
-                    appContainer.catalogRefreshService::refresh, appContainer.ioExecutor,
-                    ContextCompat.getMainExecutor(application));
+                    appContainer.catalogSync::ensureSnapshot, appContainer.catalogSync::refresh, appContainer.ioExecutor,
+                    ContextCompat.getMainExecutor(application), appContainer.catalogSync.replacements());
         }
         throw new IllegalArgumentException("Unknown ViewModel class: " + modelClass.getName());
     }

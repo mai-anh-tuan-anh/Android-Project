@@ -33,6 +33,7 @@ import com.example.myapplication.core.ui.DebouncedSearchTextWatcher;
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
+import com.example.myapplication.data.image.RecipeImageLoader;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.main.MainActivity.Screen;
@@ -306,6 +307,7 @@ public final class DiscoverFragment extends Fragment {
             recipeDetailViewModel.draft().observe(getViewLifecycleOwner(), draftValue -> {
                 if (catalogDetailView != null) catalogDetailView.displayDraft(draftValue);
             });
+            recipeDetailViewModel.catalogReplacements().observe(getViewLifecycleOwner(), recipeDetailViewModel::catalogReplaced);
         }
         String catalogId = PREVIEW_DEMO_ID.equals(detailRecipeId) ? CATALOG_DEMO_ID : detailRecipeId;
         Recipe preview = previewRecipeById(detailRecipeId);
@@ -313,7 +315,9 @@ public final class DiscoverFragment extends Fragment {
             releaseCatalogView();
             root.removeAllViews();
             renderedCatalogId = catalogId;
-            catalogDetailView = new RecipeDetailView(requireContext(), recipeDetailViewModel,
+            RecipeImageLoader images = ((BepNhaApplication) requireActivity().getApplication())
+                    .getAppContainer().recipeImageLoader;
+            catalogDetailView = new RecipeDetailView(requireContext(), recipeDetailViewModel, images,
                     new RecipeDetailView.Actions() {
                         @Override public void back() { handleBackPressed(); }
                         @Override public void discover() {
