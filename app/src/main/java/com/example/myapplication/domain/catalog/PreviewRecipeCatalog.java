@@ -3,6 +3,7 @@ package com.example.myapplication.domain.catalog;
 import com.example.myapplication.domain.model.Recipe;
 
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -157,8 +158,28 @@ public final class PreviewRecipeCatalog {
         if ("vegetarian".equals(kind)) diet = "Món chay";
         String imageName = "recipe_" + slug(title).replace('-', '_');
         String id = "preview-vn-" + slug(title);
+        long publishedAtMillis = previewPublishedAt(title);
         return new Recipe(id, title, imageName, "Chưa cập nhật", "Chưa xác định",
-                Recipe.UNKNOWN_DURATION_MINUTES, diet, categories, Collections.emptyList(), 0L, false);
+                Recipe.UNKNOWN_DURATION_MINUTES, diet, categories, Collections.emptyList(),
+                publishedAtMillis, false);
+    }
+
+    /** Five dated demo publications so the Discover "Món mới" section is populated offline. */
+    private static long previewPublishedAt(String title) {
+        switch (title) {
+            case "Phở bò":
+                return Instant.parse("2026-11-24T08:00:00Z").toEpochMilli();
+            case "Canh chua cá lóc":
+                return Instant.parse("2026-11-23T08:00:00Z").toEpochMilli();
+            case "Thịt kho trứng":
+                return Instant.parse("2026-11-22T08:00:00Z").toEpochMilli();
+            case "Rau muống xào tỏi":
+                return Instant.parse("2026-11-21T08:00:00Z").toEpochMilli();
+            case "Cá kho tộ":
+                return Instant.parse("2026-11-20T08:00:00Z").toEpochMilli();
+            default:
+                return 0L;
+        }
     }
 
     private static List<String> categoriesForPreview(String title, String kind) {
