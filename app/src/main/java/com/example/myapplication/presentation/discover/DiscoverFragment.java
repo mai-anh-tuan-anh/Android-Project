@@ -1646,7 +1646,7 @@ public final class DiscoverFragment extends Fragment {
 
     private ImageView recipeImage(Recipe recipe) {
         ImageView image = new ImageView(requireContext());
-        int resource = recipeDrawable(recipe.id);
+        int resource = recipeDrawable(recipe);
         image.setImageResource(resource);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setBackground(roundRect(BORDER, BORDER, 12));
@@ -1654,21 +1654,13 @@ public final class DiscoverFragment extends Fragment {
         return image;
     }
 
-    private int recipeDrawable(String recipeId) {
-        switch (recipeId) {
-            case "sample-canh-chua-ca":
-                return R.drawable.recipe_canh_chua;
-            case "sample-ga-chien-nuoc-mam":
-                return R.drawable.recipe_ga_chien;
-            case "sample-mi-y-sot-bo-bam":
-                return R.drawable.recipe_mi_y;
-            case "sample-com-rang-dua-bo":
-                return R.drawable.recipe_com_rang;
-            case "sample-salad-rau-cu":
-                return R.drawable.recipe_salad;
-            default:
-                return R.drawable.recipe_canh_chua;
+    private int recipeDrawable(Recipe recipe) {
+        if (recipe != null && recipe.imageName != null && !recipe.imageName.trim().isEmpty()) {
+            int resource = getResources().getIdentifier(
+                    recipe.imageName, "drawable", requireContext().getPackageName());
+            if (resource != 0) return resource;
         }
+        return R.drawable.category_vietnamese;
     }
 
     private ImageView iconView(int resourceId, int tint) {
