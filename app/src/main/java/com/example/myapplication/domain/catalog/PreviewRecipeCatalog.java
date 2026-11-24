@@ -12,6 +12,12 @@ import java.util.Locale;
 /** Local preview fixtures; preview IDs and incomplete metadata are not production catalog data. */
 public final class PreviewRecipeCatalog {
     private static final String[][] VIETNAMESE_PREVIEWS = {
+        {"Phở bò", "soup"},
+        {"Phở gà", "soup"},
+        {"Bún bò Huế", "soup"},
+        {"Bún riêu cua", "soup"},
+        {"Bún chả Hà Nội", "main"},
+        {"Hủ tiếu Nam Vang", "soup"},
         {"Canh chua cá lóc", "soup"},
         {"Canh chua tôm", "soup"},
         {"Canh cua rau đay", "soup"},
@@ -129,13 +135,13 @@ public final class PreviewRecipeCatalog {
                         30, "Không giới hạn", Arrays.asList("Món canh"),
                         Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ")),
                 new Recipe("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
-                        25, "Không giới hạn", Arrays.asList("Món cơm", "Món chiên"),
+                        25, "Không giới hạn", Arrays.asList("Món mặn", "Món chiên"),
                         Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô")),
                 new Recipe("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
                         35, "Không giới hạn", Arrays.asList("Món khác"),
                         Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi")),
                 new Recipe("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
-                        20, "Không giới hạn", Arrays.asList("Món cơm", "Món rang"),
+                        20, "Không giới hạn", Arrays.asList("Món mặn", "Món rang"),
                         Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi")),
                 new Recipe("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
                         15, "Món chay", Arrays.asList("Món chay"),
@@ -185,8 +191,9 @@ public final class PreviewRecipeCatalog {
         if (noodle) {
             categories.add("Bún/Phở");
         }
-        if (!soup && !noodle && !dish.contains("mì ý") && !dish.contains("salad")) {
-            categories.add("Món cơm");
+        boolean vegetarian = "vegetarian".equals(kind) || dish.contains("chay");
+        if (!soup && !noodle && !dish.contains("mì ý") && !dish.contains("salad") && !vegetarian) {
+            categories.add("Món mặn");
         }
         if (dish.contains("xào")) categories.add("Món xào");
         if ((dish.contains("kho") && !dish.contains("kho quẹt")) || dish.contains("rim")) {
@@ -196,7 +203,7 @@ public final class PreviewRecipeCatalog {
         if (dish.contains("chiên")) categories.add("Món chiên");
         if (dish.contains("hấp") || dish.contains("luộc")) categories.add("Món hấp/luộc");
         if (dish.contains("nướng")) categories.add("Món nướng");
-        if ("vegetarian".equals(kind) || dish.contains("chay")) categories.add("Món chay");
+        if (vegetarian) categories.add("Món chay");
         if (categories.isEmpty()) categories.add("Món khác");
         return categories;
     }
