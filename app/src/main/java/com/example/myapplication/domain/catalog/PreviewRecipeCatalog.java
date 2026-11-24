@@ -126,19 +126,19 @@ public final class PreviewRecipeCatalog {
     private static List<Recipe> createDesignRecipes() {
         List<Recipe> recipes = new ArrayList<>(Arrays.asList(
                 new Recipe("sample-canh-chua-ca", "Canh chua cá", "recipe_canh_chua", "30 phút", "Dễ",
-                        30, "Không giới hạn", Arrays.asList("Món Việt", "Canh & súp", "Món nhanh", "Dễ làm"),
+                        30, "Không giới hạn", Arrays.asList("Món canh"),
                         Arrays.asList("Cá basa", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ")),
                 new Recipe("sample-ga-chien-nuoc-mam", "Gà chiên nước mắm", "recipe_ga_chien", "25 phút", "Dễ",
-                        25, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh"),
+                        25, "Không giới hạn", Arrays.asList("Món cơm", "Món chiên"),
                         Arrays.asList("Thịt gà", "Nước mắm", "Tỏi", "Đường", "Hành khô")),
                 new Recipe("sample-mi-y-sot-bo-bam", "Mì Ý sốt bò bằm", "recipe_mi_y", "35 phút", "Vừa",
-                        35, "Không giới hạn", Arrays.asList("Món Âu", "Món chính", "Món nhanh"),
+                        35, "Không giới hạn", Arrays.asList("Món khác"),
                         Arrays.asList("Mì Ý", "Thịt bò", "Cà chua", "Hành tây", "Tỏi")),
                 new Recipe("sample-com-rang-dua-bo", "Cơm rang dưa bò", "recipe_com_rang", "20 phút", "Dễ",
-                        20, "Không giới hạn", Arrays.asList("Món Việt", "Món Á", "Món chính", "Món nhanh", "Dễ làm"),
+                        20, "Không giới hạn", Arrays.asList("Món cơm", "Món rang"),
                         Arrays.asList("Cơm nguội", "Thịt bò", "Dưa chua", "Trứng gà", "Tỏi")),
                 new Recipe("sample-salad-rau-cu", "Salad rau củ", "recipe_salad", "15 phút", "Dễ",
-                        15, "Món chay", Arrays.asList("Món chay", "Món Âu", "Món nhanh", "Dễ làm"),
+                        15, "Món chay", Arrays.asList("Món chay"),
                         Arrays.asList("Xà lách", "Cà chua", "Dưa chuột", "Sốt mè rang", "Bắp ngọt"))));
 
         for (String[] dish : VIETNAMESE_PREVIEWS) recipes.add(createPreviewRecipe(dish[0], dish[1]));
@@ -146,21 +146,17 @@ public final class PreviewRecipeCatalog {
     }
 
     private static Recipe createPreviewRecipe(String title, String kind) {
-        List<String> categories = new ArrayList<>();
-        categories.add("Món Việt");
+        List<String> categories = categoriesForPreview(title, kind);
         String imageName;
         String diet = "Chưa xác định";
         switch (kind) {
             case "soup":
-                categories.add("Canh & súp");
                 imageName = "category_soup";
                 break;
             case "breakfast":
-                categories.add("Bữa sáng");
                 imageName = "category_breakfast";
                 break;
             case "vegetarian":
-                categories.add("Món chay");
                 imageName = "category_vegetarian";
                 diet = "Món chay";
                 break;
@@ -171,13 +167,38 @@ public final class PreviewRecipeCatalog {
                 imageName = "category_quick";
                 break;
             default:
-                categories.add("Món chính");
                 imageName = "category_main";
                 break;
         }
         String id = "preview-vn-" + slug(title);
         return new Recipe(id, title, imageName, "Chưa cập nhật", "Chưa xác định",
                 Recipe.UNKNOWN_DURATION_MINUTES, diet, categories, Collections.emptyList(), 0L, false);
+    }
+
+    private static List<String> categoriesForPreview(String title, String kind) {
+        List<String> categories = new ArrayList<>();
+        String dish = title.toLowerCase(Locale.ROOT);
+
+        boolean soup = dish.contains("canh ");
+        boolean noodle = dish.contains("bún") || dish.contains("phở") || dish.contains("hủ tiếu");
+        if (soup) categories.add("Món canh");
+        if (noodle) {
+            categories.add("Bún/Phở");
+        }
+        if (!soup && !noodle && !dish.contains("mì ý") && !dish.contains("salad")) {
+            categories.add("Món cơm");
+        }
+        if (dish.contains("xào")) categories.add("Món xào");
+        if ((dish.contains("kho") && !dish.contains("kho quẹt")) || dish.contains("rim")) {
+            categories.add("Món kho");
+        }
+        if (dish.contains("rang")) categories.add("Món rang");
+        if (dish.contains("chiên")) categories.add("Món chiên");
+        if (dish.contains("hấp") || dish.contains("luộc")) categories.add("Món hấp/luộc");
+        if (dish.contains("nướng")) categories.add("Món nướng");
+        if ("vegetarian".equals(kind) || dish.contains("chay")) categories.add("Món chay");
+        if (categories.isEmpty()) categories.add("Món khác");
+        return categories;
     }
 
     private static String slug(String value) {

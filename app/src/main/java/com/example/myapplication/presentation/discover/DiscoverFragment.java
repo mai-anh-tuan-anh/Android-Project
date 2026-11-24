@@ -410,7 +410,8 @@ public final class DiscoverFragment extends Fragment {
         LinearLayout catRow = new LinearLayout(requireContext());
         catRow.setOrientation(LinearLayout.HORIZONTAL);
         String[] categories = {
-            "Món Việt", "Món Á", "Món Âu", "Bữa sáng", "Món chay", "Món nhanh", "Dễ làm"
+            "Món cơm", "Món canh", "Bún/Phở", "Món xào", "Món kho", "Món rang",
+            "Món chiên", "Món hấp/luộc", "Món nướng", "Món chay", "Món khác"
         };
         for (String cat : categories) {
             TextView chip = text(cat, 13, TEXT, true);
@@ -468,12 +469,17 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
         String[][] categories = {
-            {"Món Việt", "category_vietnamese"},
-            {"Món chính", "category_main"},
-            {"Canh & súp", "category_soup"},
-            {"Món nhanh", "category_quick"},
+            {"Món cơm", "category_main"},
+            {"Món canh", "category_soup"},
+            {"Bún/Phở", "category_vietnamese"},
+            {"Món xào", "category_quick"},
+            {"Món kho", "category_main"},
+            {"Món rang", "category_main"},
+            {"Món chiên", "category_main"},
+            {"Món hấp/luộc", "category_main"},
+            {"Món nướng", "category_main"},
             {"Món chay", "category_vegetarian"},
-            {"Bữa sáng", "category_breakfast"}
+            {"Món khác", "category_main"}
         };
         for (int i = 0; i < categories.length; i += 2) {
             LinearLayout row = new LinearLayout(requireContext());
