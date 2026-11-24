@@ -204,7 +204,7 @@ public class MainActivityStateTest {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             scenario.onActivity(activity -> {
                 Recipe recipe = PreviewRecipeCatalog.designRecipes().get(0);
-                activity.onPersonalOpenNote(recipe);
+                openNoteFromRecipeDetail(activity, recipe);
                 activity.onPersonalCreateCookingLog(recipe.id);
                 CookingJournalFragment journal = (CookingJournalFragment) activity.getSupportFragmentManager()
                         .findFragmentByTag(CookingJournalFragment.class.getName());
@@ -284,10 +284,13 @@ public class MainActivityStateTest {
                 activity.onPersonalCreateCollection();
                 assertEquals(MainActivity.Screen.COLLECTION_FORM, getFieldUnchecked(activity, "screen"));
                 assertTrue(containsText(fragment.getView(), "Chọn món để thêm"));
-                activity.onPersonalOpenNote(com.example.myapplication.domain.catalog.PreviewRecipeCatalog
-                        .designRecipes().get(0));
+                openNoteFromRecipeDetail(activity, PreviewRecipeCatalog.designRecipes().get(0));
                 assertEquals(MainActivity.Screen.NOTE, getFieldUnchecked(activity, "screen"));
-                assertTrue(containsText(fragment.getView(), "Ghi chú sau khi nấu"));
+                PersonalDataFragment note = (PersonalDataFragment) activity.getSupportFragmentManager()
+                        .findFragmentByTag(PersonalDataFragment.class.getName());
+                if (note == null || note.getView() == null)
+                    throw new AssertionError("Personal note Fragment is not attached");
+                assertTrue(containsText(note.getView(), "Ghi chú sau khi nấu"));
             });
         }
     }
@@ -663,6 +666,19 @@ public class MainActivityStateTest {
             });
             if (!deleted.await(5, TimeUnit.SECONDS)) throw new AssertionError("Cooking log delete did not complete");
         }
+    }
+
+    private static void openNoteFromRecipeDetail(MainActivity activity, Recipe recipe) {
+        activity.onPersonalNavigateTab(3);
+        activity.onPersonalOpenRecipe(recipe);
+        assertEquals(MainActivity.Screen.RECIPE_DETAIL, getFieldUnchecked(activity, "screen"));
+        DiscoverFragment detail = (DiscoverFragment) activity.getSupportFragmentManager()
+                .findFragmentByTag(DiscoverFragment.class.getName());
+        if (detail == null || detail.getView() == null)
+            throw new AssertionError("Recipe detail Fragment is not attached");
+        TextView noteButton = findTextView(detail.getView(), "📝 Ghi chú");
+        if (noteButton == null) throw new AssertionError("Recipe detail note button is missing");
+        assertTrue("Recipe detail note button did not handle the click", noteButton.performClick());
     }
 
     private static boolean containsText(View view, String expected) {
