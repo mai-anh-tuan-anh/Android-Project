@@ -11,23 +11,6 @@ import java.util.Locale;
 
 /** Local preview fixtures; preview IDs and incomplete metadata are not production catalog data. */
 public final class PreviewRecipeCatalog {
-    private static final List<String> SPECIFIC_PREVIEW_IMAGES = Arrays.asList(
-            "recipe_pho_bo", "recipe_pho_ga", "recipe_bun_bo_hue",
-            "recipe_hu_tieu_nam_vang", "recipe_thit_kho_trung",
-            "recipe_thit_kho_tieu", "recipe_ca_kho_to", "recipe_ca_kho_rieng",
-            "recipe_tom_rim_thit_ba_chi", "recipe_tom_rim_nuoc_mam",
-            "recipe_trung_kho_thit", "recipe_ga_xao_sa_ot", "recipe_ga_nuong_muoi_ot",
-            "recipe_ca_chien_sa_ot",
-            "recipe_muc_xao_can_toi", "recipe_rau_muong_xao_toi", "recipe_com_chien_trung",
-            "recipe_canh_bi_xanh_nau_suon", "recipe_canh_bi_do_nau_tom",
-            "recipe_canh_cai_nau_thit_bam", "recipe_canh_cai_ca_ro",
-            "recipe_canh_rau_ngot_nau_thit_bam", "recipe_canh_khoai_mo_nau_tom",
-            "recipe_canh_kho_qua_nhoi_thit", "recipe_canh_mang_suon", "recipe_canh_ga_nau_nam",
-            "recipe_canh_bap_cai_cuon_thit", "recipe_ca_basa_kho_tieu", "recipe_tep_rang_khe",
-            "recipe_thit_kho_mang", "recipe_thit_kho_cu_cai", "recipe_bap_cai_xao_trung",
-            "recipe_ca_tim_xao_thit_bam", "recipe_ga_xao_ot_chuong",
-            "recipe_ca_dieu_hong_hap_xi_dau", "recipe_ca_hap_gung_hanh", "recipe_ga_hap_hanh");
-
     private static final String[][] VIETNAMESE_PREVIEWS = {
         {"Phở bò", "soup"},
         {"Phở gà", "soup"},
@@ -170,31 +153,9 @@ public final class PreviewRecipeCatalog {
 
     private static Recipe createPreviewRecipe(String title, String kind) {
         List<String> categories = categoriesForPreview(title, kind);
-        String imageName;
         String diet = "Chưa xác định";
-        switch (kind) {
-            case "soup":
-                imageName = "category_soup";
-                break;
-            case "breakfast":
-                imageName = "category_breakfast";
-                break;
-            case "vegetarian":
-                imageName = "category_vegetarian";
-                diet = "Món chay";
-                break;
-            case "dessert":
-                imageName = "category_vietnamese";
-                break;
-            case "snack":
-                imageName = "category_quick";
-                break;
-            default:
-                imageName = "category_main";
-                break;
-        }
-        String specificImage = "recipe_" + slug(title).replace('-', '_');
-        if (SPECIFIC_PREVIEW_IMAGES.contains(specificImage)) imageName = specificImage;
+        if ("vegetarian".equals(kind)) diet = "Món chay";
+        String imageName = "recipe_" + slug(title).replace('-', '_');
         String id = "preview-vn-" + slug(title);
         return new Recipe(id, title, imageName, "Chưa cập nhật", "Chưa xác định",
                 Recipe.UNKNOWN_DURATION_MINUTES, diet, categories, Collections.emptyList(), 0L, false);
