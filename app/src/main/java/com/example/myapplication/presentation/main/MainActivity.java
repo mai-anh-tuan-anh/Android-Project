@@ -1018,15 +1018,6 @@ public class MainActivity extends AppCompatActivity
         screen = Screen.COOKING_JOURNAL;
         render();
     }
-
-
-
-
-
-
-
-
-
     private void openRecipeDetail(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
         detailReturnScreen = screen;
@@ -1034,21 +1025,6 @@ public class MainActivity extends AppCompatActivity
         screen = Screen.RECIPE_DETAIL;
         render();
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     private void openCollectionForm(Long collectionId) {
         collectionFormReturnScreen = collectionId == null ? screen : Screen.COLLECTION;
         if (collectionId == null) {
@@ -1072,6 +1048,16 @@ public class MainActivity extends AppCompatActivity
         render();
     }
 
+    private void returnFromCollection() {
+        if (collectionReturnScreen == Screen.COLLECTION && !collectionBackStack.isEmpty()) {
+            selectedCollectionId = collectionBackStack.remove(collectionBackStack.size() - 1);
+        } else {
+            selectedCollectionId = -1L;
+            screen = collectionReturnScreen;
+        }
+        render();
+    }
+
     private void openRecipeNote(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
         noteReturnScreen = screen;
@@ -1079,37 +1065,11 @@ public class MainActivity extends AppCompatActivity
         screen = Screen.NOTE;
         render();
     }
-
     private RecipeCollection findCollection(long id) {
         for (RecipeCollection row : personalDataViewModel.getCollections())
             if (row.id == id) return row;
         return null;
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     private Recipe recipeById(String id) {
         for (Recipe recipe : PreviewRecipeCatalog.designRecipes())
             if (recipe.id.equals(id)) return recipe;
