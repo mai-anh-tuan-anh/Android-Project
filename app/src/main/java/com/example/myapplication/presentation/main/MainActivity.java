@@ -836,6 +836,17 @@ public class MainActivity extends AppCompatActivity
         returnFromCollection();
     }
 
+    private void returnFromCollection() {
+        if (collectionReturnScreen == Screen.COLLECTION && !collectionBackStack.isEmpty()) {
+            selectedCollectionId = collectionBackStack.remove(collectionBackStack.size() - 1);
+            screen = Screen.COLLECTION;
+        } else {
+            screen = collectionReturnScreen;
+            selectedCollectionId = -1L;
+        }
+        render();
+    }
+
     @Override
     public void onPersonalCollectionSaved(long collectionId) {
         selectedCollectionId = collectionId;
