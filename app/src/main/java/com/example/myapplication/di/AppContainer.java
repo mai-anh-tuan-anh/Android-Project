@@ -1,7 +1,11 @@
 package com.example.myapplication.di;
 
+import com.example.myapplication.data.remote.FirebaseCatalogRemoteDataSource;
+import com.example.myapplication.data.repository.CatalogRefreshService;
 import com.example.myapplication.data.repository.LocalPersonalDataRepository;
+import com.example.myapplication.data.repository.LocalRecipeCatalogRepository;
 import com.example.myapplication.domain.repository.PersonalDataRepository;
+import com.example.myapplication.domain.repository.RecipeCatalogRepository;
 import com.example.myapplication.domain.repository.SearchHistoryRepository;
 import com.example.myapplication.data.local.storage.SharedPreferencesSearchHistoryRepository;
 import android.app.Application;
@@ -13,6 +17,8 @@ import java.util.concurrent.Executors;
 /** Application-scoped dependencies shared by all feature ViewModels. */
 public final class AppContainer {
     public final PersonalDataRepository personalDataRepository;
+    public final RecipeCatalogRepository recipeCatalogRepository;
+    public final CatalogRefreshService catalogRefreshService;
     public final SearchHistoryRepository searchHistoryRepository;
     public final ExecutorService ioExecutor;
 
@@ -23,6 +29,14 @@ public final class AppContainer {
             return thread;
         });
         personalDataRepository = new LocalPersonalDataRepository(application);
+        LocalRecipeCatalogRepository localCatalog = new LocalRecipeCatalogRepository(application);
+        recipeCatalogRepository = localCatalog;
+        catalogRefreshService = new CatalogRefreshService(new FirebaseCatalogRemoteDataSource(),
+                localCatalog::applySnapshot, Executors.newSingleThreadExecutor(runnable -> {
+                    Thread thread = new Thread(runnable, "bep-nha-catalog-refresh");
+                    thread.setDaemon(true);
+                    return thread;
+                }));
         searchHistoryRepository = new SharedPreferencesSearchHistoryRepository(application);
     }
 }

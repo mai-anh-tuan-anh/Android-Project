@@ -1,0 +1,13 @@
+{
+  "database": [
+    {
+      "instance": "bep-nha-2ca75-default-rtdb",
+      "rules": "database.rules.json"
+    }
+  ],
+  "hosting": {
+    "site": "bep-nha-2ca75",
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  }
+}

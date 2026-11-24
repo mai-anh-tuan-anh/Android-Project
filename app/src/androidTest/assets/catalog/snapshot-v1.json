@@ -1,0 +1,92 @@
+{
+  "meta": { "schemaVersion": 1, "revision": 12 },
+  "categories": {
+    "cat-soup": { "name": "Món canh" },
+    "cat-viet": { "name": "Món Việt" }
+  },
+  "diets": {
+    "diet-plant": { "name": "Món chay" },
+    "diet-gluten-free": { "name": "Không gluten" }
+  },
+  "ingredients": {
+    "ing-tomato": {
+      "name": "Cà chua",
+      "groupName": "Rau củ",
+      "status": "ACTIVE",
+      "aliases": ["Cà chua đỏ"]
+    },
+    "ing-herb": { "name": "Rau thơm", "status": "ACTIVE" }
+  },
+  "recipes": {
+    "recipe-soup": {
+      "title": "Canh mẫu kiểm thử",
+      "description": "Dữ liệu kỹ thuật cho kiểm thử catalog.",
+      "imagePath": "recipes/recipe-soup/cover-v2.webp",
+      "baseServings": 3,
+      "prepMinutes": 10,
+      "cookMinutes": 20,
+      "durationMinutes": 30,
+      "difficulty": "EASY",
+      "publicationStatus": "PUBLISHED",
+      "ingredientDataStatus": "COMPLETE",
+      "publishedAtMillis": 1780000000000,
+      "updatedAtMillis": 1780100000000,
+      "categoryIds": { "cat-viet": true, "cat-soup": true },
+      "dietIds": { "diet-plant": true, "diet-gluten-free": true },
+      "tools": ["Nồi", "Dao"],
+      "tip": "Thêm rau thơm trước khi dùng.",
+      "ingredientLines": {
+        "line-a-herb": { "ingredientId": "ing-herb", "qualitativeNote": "Vừa đủ", "sortOrder": 4 },
+        "line-b-tomato": { "ingredientId": "ing-tomato", "amountDecimal": "100.2500", "unitId": "G", "sortOrder": 1 }
+      },
+      "steps": {
+        "step-a-cook": {
+          "title": "Nấu canh",
+          "instruction": "Đun sôi và thêm rau thơm.",
+          "sortOrder": 7,
+          "durationSeconds": 300,
+          "recipeIngredientIds": { "line-a-herb": true, "line-b-tomato": true }
+        },
+        "step-b-prep": {
+          "title": "Sơ chế",
+          "instruction": "Rửa và cắt cà chua.",
+          "sortOrder": 2,
+          "imagePath": "recipes/recipe-soup/prep-v3.webp",
+          "recipeIngredientIds": { "line-b-tomato": true }
+        }
+      }
+    },
+    "recipe-partial": {
+      "title": "Công thức thiếu định lượng",
+      "baseServings": 2,
+      "publicationStatus": "PUBLISHED",
+      "ingredientDataStatus": "INCOMPLETE",
+      "ingredientLines": {
+        "line-b-tomato": { "ingredientId": "ing-tomato", "sortOrder": 1 }
+      },
+      "steps": {
+        "step-b-prep": {
+          "title": "Sơ chế",
+          "instruction": "Chuẩn bị nguyên liệu.",
+          "sortOrder": 2,
+          "recipeIngredientIds": { "line-not-yet-supplied": true }
+        }
+      }
+    },
+    "recipe-draft": {
+      "title": "Bản nháp kỹ thuật",
+      "baseServings": 1,
+      "publicationStatus": "DRAFT",
+      "ingredientDataStatus": "UNKNOWN"
+    },
+    "recipe-archived": {
+      "title": "Bản lưu trữ kỹ thuật",
+      "baseServings": 1,
+      "publicationStatus": "ARCHIVED",
+      "ingredientDataStatus": "UNKNOWN"
+    }
+  },
+  "removed": {
+    "recipe-removed": { "removedAtMillis": 1780200000000 }
+  }
+}
