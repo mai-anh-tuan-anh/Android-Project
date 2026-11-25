@@ -34,6 +34,8 @@ import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+import com.example.myapplication.domain.catalog.IngredientSuggestionMatcher;
+import com.example.myapplication.domain.model.Ingredient;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.main.MainActivity.Screen;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
@@ -42,7 +44,9 @@ import com.example.myapplication.domain.model.PantryIngredient;
 
 import java.text.Normalizer;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /** Owns discovery, search, ingredient suggestions, and recipe detail UI. */
@@ -180,10 +184,23 @@ public final class DiscoverFragment extends Fragment {
                                     && !value.loading
                                     && screen == Screen.WHAT_TO_COOK_INGREDIENTS) render();
                         });
+        searchViewModel
+                .recipeCatalogState()
+                .observe(
+                        getViewLifecycleOwner(),
+                        value -> {
+                            if (value == null) return;
+                            if (!value.loading && value.hasSnapshot) {
+                                searchViewModel.canonicalizeSelectedCookingIngredients();
+                            }
+                            if (screen == Screen.WHAT_TO_COOK_INGREDIENTS
+                                    || screen == Screen.WHAT_TO_COOK_RESULTS) render();
+                        });
         PantryViewModel.PantryState pantryState = pantryViewModel.pantryState().getValue();
         if (pantryState == null || (pantryState.loading && pantryState.items.isEmpty())) {
             pantryViewModel.refreshItems();
         }
+        searchViewModel.loadRecipeCatalog();
         render();
         return root;
     }
@@ -202,11 +219,21 @@ public final class DiscoverFragment extends Fragment {
         selectedCategory = category == null ? "" : category;
         if (recipeId != null) detailRecipeId = recipeId;
         detailReturnScreen = detailReturn == null ? Screen.DISCOVER : detailReturn;
-        if (changed) render();
+        if (changed) {
+            if (screen == Screen.WHAT_TO_COOK_INGREDIENTS
+                    || screen == Screen.WHAT_TO_COOK_RESULTS) {
+                searchViewModel.loadRecipeCatalog();
+            }
+            render();
+        }
     }
 
     private void showScreen(Screen value) {
         screen = value;
+        if (screen == Screen.WHAT_TO_COOK_INGREDIENTS
+                || screen == Screen.WHAT_TO_COOK_RESULTS) {
+            searchViewModel.loadRecipeCatalog();
+        }
         host.onDiscoverScreenChanged(screen, selectedCategory, detailRecipeId, detailReturnScreen);
     }
 
@@ -269,6 +296,8 @@ public final class DiscoverFragment extends Fragment {
 
     private Recipe recipeById(String id) {
         for (Recipe recipe : PreviewRecipeCatalog.designRecipes())
+            if (recipe.id.equals(id)) return recipe;
+        for (Recipe recipe : searchViewModel.getCatalogRecipes())
             if (recipe.id.equals(id)) return recipe;
         return PreviewRecipeCatalog.designRecipes().isEmpty()
                 ? null
@@ -1088,45 +1117,7 @@ public final class DiscoverFragment extends Fragment {
                 0,
                 16);
 
-        String[][] ingredientGroups = {
-            {"Thịt / Hải sản", "Thịt bò", "Thịt lợn", "Thịt gà", "Cá basa"},
-            {
-                "Rau củ",
-                "Cà chua",
-                "Dứa",
-                "Đậu bắp",
-                "Giá đỗ",
-                "Xà lách",
-                "Dưa chuột",
-                "Hành tây",
-                "Hành lá"
-            },
-            {"Trứng / Đậu", "Trứng gà", "Đậu phụ"},
-            {"Gia vị", "Nước mắm", "Tỏi", "Đường", "Hành khô"}
-        };
-        LinearLayout ingSection = vertical();
-        ingSection.setBackground(roundRect(WHITE, BORDER, 16));
-        ingSection.setPadding(dp(16), dp(12), dp(16), dp(12));
-        for (int groupIndex = 0; groupIndex < ingredientGroups.length; groupIndex++) {
-            String[] group = ingredientGroups[groupIndex];
-            addText(ingSection, group[0], 14, TEXT, true, 0, groupIndex == 0 ? 0 : 12, 0, 8);
-            LinearLayout chipRow = new LinearLayout(requireContext());
-            chipRow.setOrientation(LinearLayout.HORIZONTAL);
-            for (int i = 1; i < group.length; i++) {
-                String ingredient = group[i];
-                TextView chip = text(ingredient, 12, TEXT, false);
-                styleCookingIngredientChip(chip, ingredient);
-                chip.setPadding(dp(12), dp(8), dp(12), dp(8));
-                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
-                chipParams.rightMargin = dp(8);
-                chipRow.addView(chip, chipParams);
-            }
-            HorizontalScrollView chipScroll = new HorizontalScrollView(requireContext());
-            chipScroll.setHorizontalScrollBarEnabled(false);
-            chipScroll.addView(chipRow);
-            ingSection.addView(chipScroll, new LinearLayout.LayoutParams(-1, -2));
-        }
-        page.addView(ingSection, new LinearLayout.LayoutParams(-1, -2));
+        renderCookingIngredientOptions(page);
 
         addText(page, "Tủ nguyên liệu", 16, TEXT, true, 0, 20, 0, 4);
         addText(
@@ -1251,6 +1242,78 @@ public final class DiscoverFragment extends Fragment {
         addBottomNavigation(0);
     }
 
+    private void renderCookingIngredientOptions(LinearLayout page) {
+        DiscoverSearchViewModel.RecipeCatalogState state =
+                searchViewModel.recipeCatalogState().getValue();
+        if (state == null || state.loading) {
+            addText(page, "Đang tải nguyên liệu trong kho công thức…", 13, MUTED,
+                    false, 0, 0, 0, 12);
+        } else if (!state.hasSnapshot) {
+            addText(page, "Kho công thức chưa được đồng bộ trên thiết bị; danh sách dưới đây là nguyên liệu mẫu.",
+                    13, MUTED, false, 0, 0, 0, 12);
+        } else if (state.failed) {
+            addText(page, "Không đọc được kho công thức. Đang giữ dữ liệu đã lưu nếu có.",
+                    13, MUTED, false, 0, 0, 0, 12);
+        }
+
+        Map<String, List<Ingredient>> groups = new LinkedHashMap<>();
+        for (Ingredient ingredient : searchViewModel.getCatalogIngredients()) {
+            if (ingredient == null || ingredient.status != Ingredient.Status.ACTIVE) continue;
+            String groupName = ingredient.groupName == null || ingredient.groupName.trim().isEmpty()
+                    ? "Khác" : ingredient.groupName.trim();
+            groups.computeIfAbsent(groupName, ignored -> new java.util.ArrayList<>()).add(ingredient);
+        }
+
+        LinearLayout section = vertical();
+        section.setBackground(roundRect(WHITE, BORDER, 16));
+        section.setPadding(dp(16), dp(12), dp(16), dp(12));
+        if (!groups.isEmpty()) {
+            int groupIndex = 0;
+            for (Map.Entry<String, List<Ingredient>> group : groups.entrySet()) {
+                addText(section, group.getKey(), 14, TEXT, true,
+                        0, groupIndex++ == 0 ? 0 : 12, 0, 8);
+                LinearLayout chipRow = new LinearLayout(requireContext());
+                chipRow.setOrientation(LinearLayout.HORIZONTAL);
+                for (Ingredient ingredient : group.getValue()) {
+                    addCookingIngredientChip(chipRow, ingredient.canonicalName);
+                }
+                HorizontalScrollView chipScroll = new HorizontalScrollView(requireContext());
+                chipScroll.setHorizontalScrollBarEnabled(false);
+                chipScroll.addView(chipRow);
+                section.addView(chipScroll, new LinearLayout.LayoutParams(-1, -2));
+            }
+        } else {
+            String[][] ingredientGroups = {
+                {"Thịt / Hải sản", "Thịt bò", "Thịt lợn", "Thịt gà", "Cá basa"},
+                {"Rau củ", "Cà chua", "Dứa", "Đậu bắp", "Giá đỗ", "Xà lách", "Dưa chuột", "Hành tây", "Hành lá"},
+                {"Trứng / Đậu", "Trứng gà", "Đậu phụ"},
+                {"Gia vị", "Nước mắm", "Tỏi", "Đường", "Hành khô"}
+            };
+            for (int groupIndex = 0; groupIndex < ingredientGroups.length; groupIndex++) {
+                String[] group = ingredientGroups[groupIndex];
+                addText(section, group[0], 14, TEXT, true,
+                        0, groupIndex == 0 ? 0 : 12, 0, 8);
+                LinearLayout chipRow = new LinearLayout(requireContext());
+                chipRow.setOrientation(LinearLayout.HORIZONTAL);
+                for (int i = 1; i < group.length; i++) addCookingIngredientChip(chipRow, group[i]);
+                HorizontalScrollView chipScroll = new HorizontalScrollView(requireContext());
+                chipScroll.setHorizontalScrollBarEnabled(false);
+                chipScroll.addView(chipRow);
+                section.addView(chipScroll, new LinearLayout.LayoutParams(-1, -2));
+            }
+        }
+        page.addView(section, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void addCookingIngredientChip(LinearLayout parent, String ingredient) {
+        TextView chip = text(ingredient, 12, TEXT, false);
+        styleCookingIngredientChip(chip, ingredient);
+        chip.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
+        chipParams.rightMargin = dp(8);
+        parent.addView(chip, chipParams);
+    }
+
     private void styleCookingIngredientChip(TextView chip, String ingredient) {
         boolean selected = searchViewModel.isCookingIngredientSelected(ingredient);
         chip.setTextColor(selected ? GREEN : TEXT);
@@ -1335,6 +1398,9 @@ public final class DiscoverFragment extends Fragment {
         page.setPadding(dp(24), dp(8), dp(24), dp(24));
         addBackTitle(page, "Món gợi ý phù hợp");
         Set<String> available = searchViewModel.getSelectedCookingIngredients();
+        DiscoverSearchViewModel.RecipeCatalogState catalogState =
+                searchViewModel.recipeCatalogState().getValue();
+        List<Recipe> catalogRecipes = searchViewModel.getCatalogRecipes();
         if (available.isEmpty()) {
             addEmptyCard(
                     page,
@@ -1344,15 +1410,33 @@ public final class DiscoverFragment extends Fragment {
                         showScreen(Screen.WHAT_TO_COOK_INGREDIENTS);
                         render();
                     });
+        } else if (catalogState == null || catalogState.loading) {
+            addEmptyCard(
+                    page,
+                    "Đang tải công thức",
+                    "Đang đọc danh sách món đã lưu trên thiết bị. Hãy thử lại sau ít giây.",
+                    () -> searchViewModel.loadRecipeCatalog());
+        } else if (catalogState.failed && !catalogState.hasSnapshot) {
+            addEmptyCard(
+                    page,
+                    "Không đọc được kho công thức",
+                    "Hãy kiểm tra lại sau khi kho công thức được đồng bộ.",
+                    () -> searchViewModel.loadRecipeCatalog());
+        } else if (!catalogState.hasSnapshot) {
+            addEmptyCard(
+                    page,
+                    "Kho công thức chưa được đồng bộ",
+                    "Cần có snapshot công thức đã công bố trên thiết bị trước khi gợi ý.",
+                    () -> showScreen(Screen.WHAT_TO_COOK_INGREDIENTS));
         } else {
             List<Recipe> matches =
-                    searchViewModel.suggestRecipes(PreviewRecipeCatalog.designRecipes());
+                    searchViewModel.suggestRecipes(catalogRecipes);
             if (!searchViewModel.hasCompleteRecipeIngredients(
-                    PreviewRecipeCatalog.designRecipes())) {
+                    catalogRecipes)) {
                 addEmptyCard(
                         page,
-                        "Chưa có đủ dữ liệu nguyên liệu",
-                        "Gợi ý sẽ xuất hiện khi kho công thức cung cấp đầy đủ nguyên liệu cho món.",
+                        "Chưa có món đủ dữ liệu nguyên liệu",
+                        "Kho đã đồng bộ nhưng chưa có công thức nào khai báo danh sách nguyên liệu đầy đủ.",
                         () -> {
                             showScreen(Screen.WHAT_TO_COOK_INGREDIENTS);
                             render();
@@ -1360,8 +1444,12 @@ public final class DiscoverFragment extends Fragment {
             } else if (matches.isEmpty()) {
                 addEmptyCard(
                         page,
-                        "Không có món phù hợp",
-                        "Thử chọn thêm nguyên liệu để tìm được nhiều món hơn.",
+                        searchViewModel.hasIncompleteRecipeIngredients(catalogRecipes)
+                                ? "Chưa có kết quả chắc chắn"
+                                : "Không có món phù hợp",
+                        searchViewModel.hasIncompleteRecipeIngredients(catalogRecipes)
+                                ? "Thử chọn thêm nguyên liệu. Một số món chưa được xét vì danh sách nguyên liệu còn thiếu."
+                                : "Thử chọn thêm nguyên liệu để tìm được nhiều món hơn.",
                         () -> {
                             showScreen(Screen.WHAT_TO_COOK_INGREDIENTS);
                             render();
@@ -1379,7 +1467,7 @@ public final class DiscoverFragment extends Fragment {
                         0,
                         16);
                 if (searchViewModel.hasIncompleteRecipeIngredients(
-                        PreviewRecipeCatalog.designRecipes())) {
+                        catalogRecipes)) {
                     addText(
                             page,
                             "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.",
@@ -1665,6 +1753,15 @@ public final class DiscoverFragment extends Fragment {
             int resource = getResources().getIdentifier(
                     recipe.imageName, "drawable", requireContext().getPackageName());
             if (resource != 0) return resource;
+        }
+        if (recipe != null && recipe.title != null) {
+            String title = IngredientSuggestionMatcher.normalize(recipe.title);
+            for (Recipe preview : PreviewRecipeCatalog.designRecipes()) {
+                if (!title.equals(IngredientSuggestionMatcher.normalize(preview.title))) continue;
+                int resource = getResources().getIdentifier(
+                        preview.imageName, "drawable", requireContext().getPackageName());
+                if (resource != 0) return resource;
+            }
         }
         return R.drawable.category_vietnamese;
     }
