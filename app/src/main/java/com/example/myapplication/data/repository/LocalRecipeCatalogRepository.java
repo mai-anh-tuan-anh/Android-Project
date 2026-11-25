@@ -27,6 +27,12 @@ public final class LocalRecipeCatalogRepository implements RecipeCatalogReposito
     }
 
     @Override
+    public Long readRevision() {
+        requireIoThread();
+        return database.readRevision();
+    }
+
+    @Override
     public Lookup findById(String recipeId) {
         requireIoThread();
         if (recipeId == null || recipeId.trim().isEmpty()) {

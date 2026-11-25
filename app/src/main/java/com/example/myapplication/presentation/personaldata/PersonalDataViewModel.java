@@ -129,6 +129,15 @@ public final class PersonalDataViewModel extends ViewModel {
     public List<Recipe> getFavorites() { return new ArrayList<>(favorites); }
     public List<Recipe> getHistory() { return new ArrayList<>(history); }
 
+    public Recipe findSavedRecipe(String id) {
+        for (Recipe recipe : favorites) if (recipe.id.equals(id)) return recipe;
+        for (Recipe recipe : history) if (recipe.id.equals(id)) return recipe;
+        for (List<Recipe> recipes : collectionRecipes.values()) {
+            for (Recipe recipe : recipes) if (recipe.id.equals(id)) return recipe;
+        }
+        return null;
+    }
+
     public void recordViewedRecipe(Recipe recipe) {
         if (recipe == null) return;
         history.removeIf(item -> recipe.id.equals(item.id));
@@ -223,6 +232,22 @@ public final class PersonalDataViewModel extends ViewModel {
     }
 
     public String getNote(String recipeId) { return recipeId == null ? "" : notes.getOrDefault(recipeId, ""); }
+    public boolean hasLoadedNote(String recipeId) { return notes.containsKey(recipeId); }
+
+    public void loadNote(String recipeId) {
+        if (recipeId == null || hasLoadedNote(recipeId)) return;
+        ioExecutor.execute(() -> {
+            try {
+                String note = repository.getNote(recipeId);
+                Map<String, String> updated = new HashMap<>(notes);
+                updated.put(recipeId, note);
+                notes = updated;
+                personalDataState.postValue(snapshot(false, null));
+            } catch (RuntimeException error) {
+                postError(error);
+            }
+        });
+    }
 
     public void saveNote(Recipe recipe, String note) {
         if (recipe == null) return;

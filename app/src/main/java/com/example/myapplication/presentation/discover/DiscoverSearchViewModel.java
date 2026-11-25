@@ -7,7 +7,6 @@ import androidx.lifecycle.MutableLiveData;
 import com.example.myapplication.domain.catalog.IngredientSuggestionMatcher;
 import com.example.myapplication.domain.model.Ingredient;
 import com.example.myapplication.domain.model.Recipe;
-import com.example.myapplication.domain.repository.RecipeCatalogRepository;
 import com.example.myapplication.domain.repository.SearchHistoryRepository;
 
 import java.text.Normalizer;
@@ -17,8 +16,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -33,7 +32,6 @@ public final class DiscoverSearchViewModel extends ViewModel {
     private static final long RECENT_SEARCH_TTL_MS = 60L * 60L * 1000L;
 
     private final SearchHistoryRepository searchHistoryRepository;
-    private final RecipeCatalogRepository recipeCatalogRepository;
     private final Executor ioExecutor;
     private final MutableLiveData<RecentSearchState> recentSearchState = new MutableLiveData<>(
             new RecentSearchState(Collections.emptyList(), true));
@@ -56,95 +54,12 @@ public final class DiscoverSearchViewModel extends ViewModel {
     private String draftIncludeIngredient = "";
     private String draftExcludeIngredient = "";
     private final Set<String> selectedCookingIngredients = new LinkedHashSet<>();
-    private final MutableLiveData<RecipeCatalogState> recipeCatalogState =
-            new MutableLiveData<>(RecipeCatalogState.empty());
-    private boolean catalogLoadInFlight;
+    private Map<String, Ingredient> cookingIngredientCatalog = Collections.emptyMap();
 
     public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository, Executor ioExecutor) {
-        this(searchHistoryRepository, null, ioExecutor);
-    }
-
-    public DiscoverSearchViewModel(SearchHistoryRepository searchHistoryRepository,
-                                   RecipeCatalogRepository recipeCatalogRepository,
-                                   Executor ioExecutor) {
         this.searchHistoryRepository = searchHistoryRepository;
-        this.recipeCatalogRepository = recipeCatalogRepository;
         this.ioExecutor = ioExecutor;
         ioExecutor.execute(this::loadRecentSearches);
-    }
-
-    public LiveData<RecipeCatalogState> recipeCatalogState() {
-        return recipeCatalogState;
-    }
-
-    public List<Recipe> getCatalogRecipes() {
-        RecipeCatalogState state = recipeCatalogState.getValue();
-        return state == null ? Collections.emptyList() : state.recipes;
-    }
-
-    public List<Ingredient> getCatalogIngredients() {
-        RecipeCatalogState state = recipeCatalogState.getValue();
-        return state == null ? Collections.emptyList() : state.ingredients;
-    }
-
-    /** Reads the last published offline snapshot; remote refresh remains owned by the catalog feature. */
-    public synchronized void loadRecipeCatalog() {
-        if (catalogLoadInFlight) return;
-        catalogLoadInFlight = true;
-        RecipeCatalogState previous = recipeCatalogState.getValue();
-        recipeCatalogState.setValue(RecipeCatalogState.loading(previous));
-        ioExecutor.execute(() -> {
-            try {
-                if (recipeCatalogRepository == null) {
-                    throw new IllegalStateException("Recipe catalog repository is unavailable");
-                }
-                RecipeCatalogRepository.Catalog catalog = recipeCatalogRepository.readCatalog();
-                synchronized (DiscoverSearchViewModel.this) {
-                    catalogLoadInFlight = false;
-                }
-                recipeCatalogState.postValue(RecipeCatalogState.loaded(catalog));
-            } catch (RuntimeException error) {
-                synchronized (DiscoverSearchViewModel.this) {
-                    catalogLoadInFlight = false;
-                }
-                recipeCatalogState.postValue(RecipeCatalogState.failed(previous));
-            }
-        });
-    }
-
-    public synchronized void canonicalizeSelectedCookingIngredients() {
-        RecipeCatalogState state = recipeCatalogState.getValue();
-        Map<String, Ingredient> ingredients = state == null
-                ? Collections.emptyMap() : state.ingredientMap;
-        Set<String> canonical = new LinkedHashSet<>();
-        for (String selected : selectedCookingIngredients) {
-            canonical.add(canonicalIngredientName(selected, ingredients));
-        }
-        selectedCookingIngredients.clear();
-        selectedCookingIngredients.addAll(canonical);
-    }
-
-    private String canonicalIngredientName(String value) {
-        RecipeCatalogState state = recipeCatalogState.getValue();
-        return canonicalIngredientName(value, state == null
-                ? Collections.emptyMap() : state.ingredientMap);
-    }
-
-    private String canonicalIngredientName(String value, Map<String, Ingredient> ingredients) {
-        if (value == null) return "";
-        String normalized = IngredientSuggestionMatcher.normalize(value);
-        for (Ingredient ingredient : ingredients.values()) {
-            if (ingredient.status != Ingredient.Status.ACTIVE) continue;
-            if (IngredientSuggestionMatcher.normalize(ingredient.canonicalName).equals(normalized)) {
-                return ingredient.canonicalName;
-            }
-            for (String alias : ingredient.aliases) {
-                if (IngredientSuggestionMatcher.normalize(alias).equals(normalized)) {
-                    return ingredient.canonicalName;
-                }
-            }
-        }
-        return value.trim();
     }
 
     private void loadRecentSearches() {
@@ -270,51 +185,36 @@ public final class DiscoverSearchViewModel extends ViewModel {
         }
     }
 
-    public static final class RecipeCatalogState {
-        public final boolean loading;
-        public final boolean hasSnapshot;
-        public final boolean failed;
-        public final List<Recipe> recipes;
-        public final List<Ingredient> ingredients;
-        private final Map<String, Ingredient> ingredientMap;
-
-        private RecipeCatalogState(boolean loading, boolean hasSnapshot, boolean failed,
-                                   List<Recipe> recipes, Map<String, Ingredient> ingredients) {
-            this.loading = loading;
-            this.hasSnapshot = hasSnapshot;
-            this.failed = failed;
-            this.recipes = Collections.unmodifiableList(new ArrayList<>(recipes));
-            this.ingredientMap = Collections.unmodifiableMap(new LinkedHashMap<>(ingredients));
-            this.ingredients = Collections.unmodifiableList(new ArrayList<>(ingredients.values()));
-        }
-
-        private static RecipeCatalogState empty() {
-            return new RecipeCatalogState(false, false, false, Collections.emptyList(),
-                    Collections.emptyMap());
-        }
-
-        private static RecipeCatalogState loading(RecipeCatalogState previous) {
-            RecipeCatalogState value = previous == null ? empty() : previous;
-            return new RecipeCatalogState(true, value.hasSnapshot, false, value.recipes,
-                    value.ingredientMap);
-        }
-
-        private static RecipeCatalogState loaded(RecipeCatalogRepository.Catalog catalog) {
-            return new RecipeCatalogState(false, catalog.revision != null, false, catalog.recipes,
-                    catalog.ingredients);
-        }
-
-        private static RecipeCatalogState failed(RecipeCatalogState previous) {
-            RecipeCatalogState value = previous == null ? empty() : previous;
-            return new RecipeCatalogState(false, value.hasSnapshot, true, value.recipes,
-                    value.ingredientMap);
-        }
-    }
-
     public boolean isCookingIngredientSelected(String ingredient) {
         String wanted = normalize(canonicalIngredientName(ingredient));
         for (String selected : selectedCookingIngredients) if (normalize(selected).equals(wanted)) return true;
         return false;
+    }
+
+    public synchronized void setCookingIngredientCatalog(Map<String, Ingredient> ingredients) {
+        cookingIngredientCatalog = Collections.unmodifiableMap(
+                new LinkedHashMap<>(ingredients == null ? Collections.emptyMap() : ingredients));
+        Set<String> canonical = new LinkedHashSet<>();
+        for (String selected : selectedCookingIngredients) canonical.add(canonicalIngredientName(selected));
+        selectedCookingIngredients.clear();
+        selectedCookingIngredients.addAll(canonical);
+    }
+
+    private String canonicalIngredientName(String value) {
+        if (value == null) return "";
+        String normalized = IngredientSuggestionMatcher.normalize(value);
+        for (Ingredient ingredient : cookingIngredientCatalog.values()) {
+            if (ingredient.status != Ingredient.Status.ACTIVE) continue;
+            if (IngredientSuggestionMatcher.normalize(ingredient.canonicalName).equals(normalized)) {
+                return ingredient.canonicalName;
+            }
+            for (String alias : ingredient.aliases) {
+                if (IngredientSuggestionMatcher.normalize(alias).equals(normalized)) {
+                    return ingredient.canonicalName;
+                }
+            }
+        }
+        return value.trim();
     }
 
     public Set<String> getSelectedCookingIngredients() {
@@ -327,7 +227,7 @@ public final class DiscoverSearchViewModel extends ViewModel {
         String wanted = normalize(canonical);
         String existing = null;
         for (String selected : selectedCookingIngredients) if (normalize(selected).equals(wanted)) existing = selected;
-        if (existing == null) selectedCookingIngredients.add(canonical.trim());
+        if (existing == null) selectedCookingIngredients.add(canonical);
         else selectedCookingIngredients.remove(existing);
     }
 

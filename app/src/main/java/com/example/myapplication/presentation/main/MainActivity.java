@@ -15,6 +15,7 @@ import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
+import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.RecipeCollection;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
@@ -84,7 +85,7 @@ public class MainActivity extends AppCompatActivity
     private Screen collectionFormReturnScreen = Screen.LIBRARY;
     private final ArrayList<Long> collectionBackStack = new ArrayList<>();
     private Screen detailReturnScreen = Screen.DISCOVER;
-    private String detailRecipeId = PreviewRecipeCatalog.designRecipes().get(0).id;
+    private String detailRecipeId = "";
     private String selectedCategory = "";
     private String discoverSearchQuery = "";
     private long selectedCollectionId = -1L;
@@ -256,9 +257,7 @@ public class MainActivity extends AppCompatActivity
         if (savedCollectionBackStack != null) {
             for (long collectionId : savedCollectionBackStack) collectionBackStack.add(collectionId);
         }
-        detailRecipeId =
-                state.getString(
-                        STATE_DETAIL_RECIPE_ID, PreviewRecipeCatalog.designRecipes().get(0).id);
+        detailRecipeId = state.getString(STATE_DETAIL_RECIPE_ID, "");
         String savedDetailReturn =
                 state.getString(STATE_DETAIL_RETURN_SCREEN, Screen.DISCOVER.name());
         try {
@@ -724,8 +723,20 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
+    public void onDiscoverOpenSavedNote(String recipeId) {
+        showRecipeNote(recipeId);
+    }
+
+    @Override
     public void onDiscoverOpenMealPlanPicker(Recipe recipe) {
         openMealPlanPicker();
+    }
+
+    @Override
+    public void onDiscoverStartCooking(String canonicalRecipeId, int servings) {
+        // N2-10 will open the cooking session with this canonical ID and selected servings.
+        android.widget.Toast.makeText(this, "Chế độ nấu từng bước chưa khả dụng.",
+                android.widget.Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -1020,7 +1031,7 @@ public class MainActivity extends AppCompatActivity
         render();
     }
     private void openRecipeDetail(Recipe recipe) {
-        personalDataViewModel.recordViewedRecipe(recipe);
+        if (recipe.details == null) personalDataViewModel.recordViewedRecipe(recipe);
         detailReturnScreen = screen;
         detailRecipeId = recipe.id;
         screen = Screen.RECIPE_DETAIL;
@@ -1051,8 +1062,12 @@ public class MainActivity extends AppCompatActivity
 
     private void openRecipeNote(Recipe recipe) {
         personalDataViewModel.recordViewedRecipe(recipe);
+        showRecipeNote(recipe.id);
+    }
+
+    private void showRecipeNote(String recipeId) {
         noteReturnScreen = screen;
-        noteRecipeId = recipe.id;
+        noteRecipeId = recipeId;
         screen = Screen.NOTE;
         render();
     }
@@ -1064,6 +1079,10 @@ public class MainActivity extends AppCompatActivity
     private Recipe recipeById(String id) {
         for (Recipe recipe : PreviewRecipeCatalog.designRecipes())
             if (recipe.id.equals(id)) return recipe;
-        return PreviewRecipeCatalog.designRecipes().get(0);
+        Recipe saved = personalDataViewModel.findSavedRecipe(id);
+        if (saved != null) return saved;
+        for (PlannedRecipe planned : mealPlanViewModel.getMealPlanRecipes())
+            if (planned.recipe.id.equals(id)) return planned.recipe;
+        return new Recipe(id, "Công thức đã lưu", "", "", "");
     }
 }
