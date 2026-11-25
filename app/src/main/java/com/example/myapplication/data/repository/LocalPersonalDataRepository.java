@@ -20,7 +20,11 @@ public final class LocalPersonalDataRepository implements PersonalDataRepository
     private final CookingJournalPhotoStore photoStore;
 
     public LocalPersonalDataRepository(Application application) {
-        database = new PersonalDataDbHelper(application.getApplicationContext());
+        this(application, new PersonalDataDbHelper(application.getApplicationContext()));
+    }
+
+    public LocalPersonalDataRepository(Application application, PersonalDataDbHelper database) {
+        this.database = database;
         photoStore = new CookingJournalPhotoStore(application.getApplicationContext());
     }
 

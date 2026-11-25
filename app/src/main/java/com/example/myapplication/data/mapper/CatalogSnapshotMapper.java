@@ -3,6 +3,8 @@ package com.example.myapplication.data.mapper;
 import android.util.JsonReader;
 import android.util.JsonToken;
 
+import com.example.myapplication.data.image.HostingImageUrlResolver;
+
 import com.example.myapplication.domain.model.CookingStep;
 import com.example.myapplication.domain.model.Ingredient;
 import com.example.myapplication.domain.model.Recipe;
@@ -11,8 +13,6 @@ import com.example.myapplication.domain.model.RecipeIngredient;
 import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -140,24 +140,8 @@ public final class CatalogSnapshotMapper {
 
     private static String imagePath(Map<String, Object> fields) {
         String value = optionalText(fields, "imagePath");
-        if (value == null) return null;
-        try {
-            URI uri = new URI(value);
-            String path = uri.getPath();
-            if (uri.isAbsolute() || uri.getRawAuthority() != null || uri.getRawQuery() != null
-                    || uri.getRawFragment() != null || path == null || path.indexOf('\\') >= 0) {
-                throw invalid("imagePath must be a relative asset path");
-            }
-            for (String segment : path.split("/", -1)) {
-                if (segment.isEmpty() || segment.equals(".") || segment.equals("..")
-                        || segment.chars().anyMatch(Character::isISOControl)) {
-                    throw invalid("imagePath contains an invalid segment");
-                }
-            }
-            return value;
-        } catch (URISyntaxException error) {
-            throw new IllegalArgumentException("invalid imagePath", error);
-        }
+        if (value != null) HostingImageUrlResolver.relativePath(value);
+        return value;
     }
 
     private static Map<String, String> namedEntries(Map<String, Object> root, String key) {
