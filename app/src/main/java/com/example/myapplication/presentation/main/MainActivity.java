@@ -18,6 +18,8 @@ import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
 import com.example.myapplication.domain.model.PlannedRecipe;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.RecipeCollection;
+import com.example.myapplication.presentation.cooking.CookingSessionFragment;
+import com.example.myapplication.presentation.cooking.CookingSessionViewModel;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalFragment;
 import com.example.myapplication.presentation.discover.DiscoverFragment;
 import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
@@ -40,7 +42,8 @@ public class MainActivity extends AppCompatActivity
                 MealPlanFragment.Host,
                 PersonalDataFragment.Host,
                 CookingJournalFragment.Host,
-                DiscoverFragment.Host {
+                DiscoverFragment.Host,
+                CookingSessionFragment.Host {
     private static final String STATE_APP_SCREEN = "app.currentScreen";
     private static final String STATE_JOURNAL_RETURN_SCREEN = "journal.returnScreen";
     private static final String STATE_JOURNAL_RECIPE_ID = "journal.recipeId";
@@ -72,6 +75,7 @@ public class MainActivity extends AppCompatActivity
     private ShoppingViewModel shoppingViewModel;
     private PantryViewModel pantryViewModel;
     private DiscoverSearchViewModel searchViewModel;
+    private CookingSessionViewModel cookingSessionViewModel;
     private FrameLayout mainContent;
     private FrameLayout fragmentContainer;
     private Screen cookingLogReturnScreen = Screen.NOTE;
@@ -106,6 +110,7 @@ public class MainActivity extends AppCompatActivity
         WHAT_TO_COOK_INGREDIENTS,
         WHAT_TO_COOK_RESULTS,
         RECIPE_DETAIL,
+        COOKING_SESSION,
         LIBRARY,
         FAVORITES,
         COLLECTION_LIST,
@@ -138,6 +143,13 @@ public class MainActivity extends AppCompatActivity
                             public void handleOnBackPressed() {
                                 if (screen == Screen.DISCOVER) {
                                     finish();
+                                    return;
+                                } else if (screen == Screen.COOKING_SESSION) {
+                                    Fragment fragment = getSupportFragmentManager()
+                                            .findFragmentByTag(CookingSessionFragment.class.getName());
+                                    if (fragment instanceof CookingSessionFragment)
+                                        ((CookingSessionFragment) fragment).handleBack();
+                                    else onCookingSessionExit(false);
                                     return;
                                 } else if (isCookingJournalScreen()) {
                                     CookingJournalFragment fragment =
@@ -215,8 +227,12 @@ public class MainActivity extends AppCompatActivity
         pantryViewModel = new ViewModelProvider(this, viewModelFactory).get(PantryViewModel.class);
         searchViewModel =
                 new ViewModelProvider(this, viewModelFactory).get(DiscoverSearchViewModel.class);
+        cookingSessionViewModel =
+                new ViewModelProvider(this, viewModelFactory).get(CookingSessionViewModel.class);
         personalDataViewModel.seedDesignPreviewIfNeeded(PreviewRecipeCatalog.designRecipes());
         restoreAppState(savedInstanceState);
+        if (screen == Screen.COOKING_SESSION && cookingSessionViewModel.state().getValue() == null)
+            screen = Screen.RECIPE_DETAIL;
         searchViewModel.setSearchQuery(discoverSearchQuery);
         restoreMealPlanState(savedInstanceState);
         if (screen == Screen.PANTRY) pantryViewModel.refreshItems();
@@ -403,6 +419,17 @@ public class MainActivity extends AppCompatActivity
     private void render() {
         if (getSupportFragmentManager().isStateSaved()) {
             renderPending = true;
+            return;
+        }
+        if (screen == Screen.COOKING_SESSION) {
+            removeLegacyContent();
+            fragmentContainer.setVisibility(View.VISIBLE);
+            String tag = CookingSessionFragment.class.getName();
+            if (getSupportFragmentManager().findFragmentByTag(tag) == null) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.main_fragment_container, new CookingSessionFragment(), tag)
+                        .commitNow();
+            }
             return;
         }
         if (isDiscoverScreen()) {
@@ -734,9 +761,18 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onDiscoverStartCooking(String canonicalRecipeId, int servings) {
-        // N2-10 will open the cooking session with this canonical ID and selected servings.
-        android.widget.Toast.makeText(this, "Chế độ nấu từng bước chưa khả dụng.",
-                android.widget.Toast.LENGTH_SHORT).show();
+        if (screen != Screen.RECIPE_DETAIL) return;
+        cookingSessionViewModel.start(canonicalRecipeId, servings);
+        screen = Screen.COOKING_SESSION;
+        render();
+    }
+
+    @Override
+    public void onCookingSessionExit(boolean discover) {
+        if (screen != Screen.COOKING_SESSION) return;
+        cookingSessionViewModel.leave();
+        screen = discover ? Screen.DISCOVER : Screen.RECIPE_DETAIL;
+        render();
     }
 
     @Override

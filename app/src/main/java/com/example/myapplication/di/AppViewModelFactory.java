@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.BepNhaApplication;
 import com.example.myapplication.presentation.catalog.CatalogHomeViewModel;
+import com.example.myapplication.presentation.cooking.CookingSessionViewModel;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
 import com.example.myapplication.presentation.discover.DiscoverViewModel;
@@ -17,6 +18,8 @@ import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
 import com.example.myapplication.presentation.recipedetail.RecipeDetailViewModel;
 import com.example.myapplication.presentation.shopping.ShoppingViewModel;
+
+import java.util.UUID;
 
 /** Supplies feature ViewModels with application-scoped repository contracts. */
 public final class AppViewModelFactory implements ViewModelProvider.Factory {
@@ -61,6 +64,11 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
             return (T) new RecipeDetailViewModel(appContainer.recipeCatalogRepository,
                     appContainer.catalogSync::ensureSnapshot, appContainer.catalogSync::refresh, appContainer.ioExecutor,
                     ContextCompat.getMainExecutor(application), appContainer.catalogSync.replacements());
+        }
+        if (modelClass == CookingSessionViewModel.class) {
+            return (T) new CookingSessionViewModel(appContainer.recipeCatalogRepository, appContainer.ioExecutor,
+                    ContextCompat.getMainExecutor(application), System::currentTimeMillis,
+                    () -> UUID.randomUUID().toString());
         }
         throw new IllegalArgumentException("Unknown ViewModel class: " + modelClass.getName());
     }

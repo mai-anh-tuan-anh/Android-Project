@@ -1,0 +1,72 @@
+{
+  "meta": { "schemaVersion": 1, "revision": 1 },
+  "categories": {
+    "cat-soup": { "name": "Canh & súp" },
+    "cat-vietnamese": { "name": "Món Việt" }
+  },
+  "diets": {},
+  "ingredients": {
+    "ing-0001": { "name": "Cá", "status": "ACTIVE" },
+    "ing-0002": { "name": "Cà chua", "status": "ACTIVE" },
+    "ing-0003": { "name": "Me", "status": "ACTIVE" },
+    "ing-0004": { "name": "Rau thơm", "status": "ACTIVE" },
+    "ing-0005": { "name": "Nước", "status": "ACTIVE" }
+  },
+  "recipes": {
+    "recipe-0001": {
+      "title": "Canh chua cá",
+      "description": "Dữ liệu demo kỹ thuật lấy từ prototype. Vị chua dịu từ me, cá mềm và rau thơm cho bữa cơm nhà.",
+      "imagePath": "recipes/recipe-0001/cover-v1.jpg",
+      "baseServings": 2,
+      "prepMinutes": 10,
+      "cookMinutes": 20,
+      "durationMinutes": 30,
+      "difficulty": "EASY",
+      "publicationStatus": "PUBLISHED",
+      "publishedAtMillis": 1795543502007,
+      "updatedAtMillis": 1795543502007,
+      "ingredientDataStatus": "COMPLETE",
+      "categoryIds": { "cat-soup": true, "cat-vietnamese": true },
+      "dietIds": {},
+      "tools": ["Nồi", "Dao", "Thớt"],
+      "tip": "Nêm lại vị chua trước khi tắt bếp.",
+      "ingredientLines": {
+        "line-01": { "ingredientId": "ing-0001", "amountDecimal": "300", "unitId": "G", "sortOrder": 1 },
+        "line-02": { "ingredientId": "ing-0002", "amountDecimal": "2", "unitId": "QUA", "sortOrder": 2 },
+        "line-03": { "ingredientId": "ing-0003", "amountDecimal": "20", "unitId": "G", "sortOrder": 3 },
+        "line-04": { "ingredientId": "ing-0004", "qualitativeNote": "Vừa đủ", "sortOrder": 4 },
+        "line-05": { "ingredientId": "ing-0005", "qualitativeNote": "Vừa đủ", "sortOrder": 5 }
+      },
+      "steps": {
+        "step-01": {
+          "title": "Chuẩn bị cá",
+          "instruction": "Rửa, để ráo và cắt miếng.",
+          "sortOrder": 1,
+          "recipeIngredientIds": { "line-01": true }
+        },
+        "step-02": {
+          "title": "Sơ chế rau củ",
+          "instruction": "Cắt cà chua thành múi cau. Rửa rau thơm, để ráo rồi thái nhỏ. Chuẩn bị me cho bước nấu nước dùng.",
+          "sortOrder": 2,
+          "durationSeconds": 300,
+          "recipeIngredientIds": { "line-02": true, "line-04": true }
+        },
+        "step-03": {
+          "title": "Nấu nước dùng",
+          "instruction": "Đun nước với me và cà chua. Thêm cá và nấu đến khi cá chín.",
+          "sortOrder": 3,
+          "imagePath": "recipes/recipe-0001/cover-v1.jpg",
+          "recipeIngredientIds": { "line-01": true, "line-02": true, "line-03": true, "line-05": true }
+        },
+        "step-04": {
+          "title": "Nêm và trình bày",
+          "instruction": "Nêm lại vị chua, thêm rau thơm và múc canh ra tô.",
+          "sortOrder": 4,
+          "imagePath": "recipes/recipe-0001/cover-v1.jpg",
+          "recipeIngredientIds": { "line-04": true }
+        }
+      }
+    }
+  },
+  "removed": {}
+}
