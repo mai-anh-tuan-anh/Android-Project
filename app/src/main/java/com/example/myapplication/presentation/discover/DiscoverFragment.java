@@ -507,7 +507,8 @@ public final class DiscoverFragment extends Fragment {
         LinearLayout catRow = new LinearLayout(requireContext());
         catRow.setOrientation(LinearLayout.HORIZONTAL);
         String[] categories = {
-            "Món Việt", "Món Á", "Món Âu", "Bữa sáng", "Món chay", "Món nhanh", "Dễ làm"
+            "Món canh", "Bún/Phở", "Món rau", "Món xào", "Món kho", "Món rang",
+            "Món chiên", "Món hấp/luộc", "Món nướng", "Món chay", "Món khác"
         };
         for (String cat : categories) {
             TextView chip = text(cat, 13, TEXT, true);
@@ -565,12 +566,17 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
         String[][] categories = {
-            {"Món Việt", "category_vietnamese"},
-            {"Món chính", "category_main"},
-            {"Canh & súp", "category_soup"},
-            {"Món nhanh", "category_quick"},
+            {"Món canh", "recipe_canh_chua"},
+            {"Bún/Phở", "recipe_pho_bo"},
+            {"Món rau", "recipe_rau_muong_xao_toi"},
+            {"Món xào", "recipe_ga_xao_sa_ot"},
+            {"Món kho", "recipe_thit_kho_trung"},
+            {"Món rang", "recipe_tep_rang_khe"},
+            {"Món chiên", "recipe_ca_chien_sa_ot"},
+            {"Món hấp/luộc", "recipe_ga_hap_hanh"},
+            {"Món nướng", "recipe_ga_nuong_muoi_ot"},
             {"Món chay", "category_vegetarian"},
-            {"Bữa sáng", "category_breakfast"}
+            {"Món khác", "recipe_mi_y"}
         };
         for (int i = 0; i < categories.length; i += 2) {
             LinearLayout row = new LinearLayout(requireContext());
@@ -1743,7 +1749,7 @@ public final class DiscoverFragment extends Fragment {
 
     private ImageView recipeImage(Recipe recipe) {
         ImageView image = new ImageView(requireContext());
-        int resource = recipeDrawable(recipe.id);
+        int resource = recipeDrawable(recipe);
         image.setImageResource(resource);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setBackground(roundRect(BORDER, BORDER, 12));
@@ -1751,21 +1757,13 @@ public final class DiscoverFragment extends Fragment {
         return image;
     }
 
-    private int recipeDrawable(String recipeId) {
-        switch (recipeId) {
-            case "sample-canh-chua-ca":
-                return R.drawable.recipe_canh_chua;
-            case "sample-ga-chien-nuoc-mam":
-                return R.drawable.recipe_ga_chien;
-            case "sample-mi-y-sot-bo-bam":
-                return R.drawable.recipe_mi_y;
-            case "sample-com-rang-dua-bo":
-                return R.drawable.recipe_com_rang;
-            case "sample-salad-rau-cu":
-                return R.drawable.recipe_salad;
-            default:
-                return R.drawable.recipe_canh_chua;
+    private int recipeDrawable(Recipe recipe) {
+        if (recipe != null && recipe.imageName != null && !recipe.imageName.trim().isEmpty()) {
+            int resource = getResources().getIdentifier(
+                    recipe.imageName, "drawable", requireContext().getPackageName());
+            if (resource != 0) return resource;
         }
+        return R.drawable.category_vietnamese;
     }
 
     private ImageView iconView(int resourceId, int tint) {

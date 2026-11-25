@@ -38,7 +38,7 @@ public class RecipeDetailUiTest {
         catalog.loaded = true;
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             installModel(scenario, catalog);
-            onView(withText("Món Việt")).perform(click());
+            onView(withText("Món canh")).perform(click());
             onView(withText("Canh chua cá")).perform(click());
             onView(withText("2 người")).check(matches(isDisplayed())).perform(click());
             onView(withContentDescription("Tăng khẩu phần")).perform(click());
@@ -56,7 +56,7 @@ public class RecipeDetailUiTest {
             onView(withText("300 g")).check(matches(isDisplayed()));
             assertEquals("300", catalog.recipe.details.ingredientLines.get(0).amountDecimal);
             pressBack();
-            onView(withText("Món Việt")).check(matches(isDisplayed()));
+            onView(withText("Món canh")).check(matches(isDisplayed()));
         }
     }
 
@@ -64,7 +64,7 @@ public class RecipeDetailUiTest {
         FakeCatalog catalog = new FakeCatalog();
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
             installModel(scenario, catalog);
-            onView(withText("Món Việt")).perform(click());
+            onView(withText("Món canh")).perform(click());
             onView(withText("Canh chua cá")).perform(click());
             onView(withText("Đang chuẩn bị kho món")).check(matches(isDisplayed()));
             scenario.onActivity(activity -> catalog.response.completeExceptionally(new IOException("offline")));
@@ -78,8 +78,9 @@ public class RecipeDetailUiTest {
             });
             onView(withText("300 g")).check(matches(isDisplayed()));
             pressBack();
-            onView(withText("Món Việt")).check(matches(isDisplayed()));
-            onView(withText("Gà chiên nước mắm")).perform(click());
+            onView(withText("Món canh")).check(matches(isDisplayed()));
+            onView(withText("Canh chua cá lóc")).perform(click());
+            onView(withText("Canh chua cá lóc")).check(matches(isDisplayed()));
             onView(withText("📝 Ghi chú")).check(matches(isDisplayed()));
         }
     }
