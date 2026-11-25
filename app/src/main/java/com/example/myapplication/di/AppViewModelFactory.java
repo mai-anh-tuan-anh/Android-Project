@@ -1,6 +1,7 @@
 package com.example.myapplication.di;
 
 import android.app.Application;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -68,7 +69,7 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
         if (modelClass == CookingSessionViewModel.class) {
             return (T) new CookingSessionViewModel(appContainer.recipeCatalogRepository, appContainer.ioExecutor,
                     ContextCompat.getMainExecutor(application), System::currentTimeMillis,
-                    () -> UUID.randomUUID().toString());
+                    () -> UUID.randomUUID().toString(), SystemClock::elapsedRealtime);
         }
         throw new IllegalArgumentException("Unknown ViewModel class: " + modelClass.getName());
     }

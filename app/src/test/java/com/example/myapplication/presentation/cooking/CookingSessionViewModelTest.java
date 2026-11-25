@@ -4,6 +4,7 @@ import androidx.arch.core.executor.ArchTaskExecutor;
 import androidx.arch.core.executor.TaskExecutor;
 
 import com.example.myapplication.domain.model.CookingSession;
+import com.example.myapplication.domain.model.CookingTimer;
 import com.example.myapplication.domain.model.CookingStep;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.RecipeIngredient;
@@ -30,6 +31,7 @@ public final class CookingSessionViewModelTest {
     private final FakeCatalog catalog = new FakeCatalog();
     private CookingSessionViewModel model;
     private long clock = 1000;
+    private long elapsed = 4000;
     private int nextId;
 
     @Before public void setUp() {
@@ -39,7 +41,7 @@ public final class CookingSessionViewModelTest {
             @Override public boolean isMainThread() { return true; }
         });
         model = new CookingSessionViewModel(catalog, Runnable::run, Runnable::run,
-                () -> clock, () -> "session-" + ++nextId);
+                () -> clock, () -> "session-" + ++nextId, () -> elapsed);
     }
 
     @After public void tearDown() { ArchTaskExecutor.getInstance().setDelegate(null); }
@@ -195,7 +197,7 @@ public final class CookingSessionViewModelTest {
         ArrayDeque<Runnable> queued = new ArrayDeque<>();
         catalog.lookup = Lookup.available(sample());
         model = new CookingSessionViewModel(catalog, queued::add, Runnable::run, () -> clock,
-                () -> "session-" + ++nextId);
+                () -> "session-" + ++nextId, () -> elapsed);
         model.start(RECIPE, 2);
         model.start(RECIPE, 3);
         assertEquals(1, queued.size());
@@ -205,6 +207,121 @@ public final class CookingSessionViewModelTest {
         assertNull(model.state().getValue().session);
         queued.remove().run();
         assertEquals(4, session().snapshot.servings);
+    }
+
+    @Test public void timerStartsFromTheStepDurationAndUsesElapsedDeadline() {
+        startSample();
+        model.startOrResumeTimer();
+        assertNull(model.currentTimer());
+        assertTrue(model.timerSnapshots().isEmpty());
+        model.next();
+        CookingTimer ready = model.currentTimer();
+        assertEquals(CookingTimer.Status.READY, ready.status);
+        assertEquals("session-1", ready.sessionId);
+        assertEquals("step-02", ready.stepId);
+        assertEquals(300_000L, model.remainingMillis(ready));
+        model.startOrResumeTimer();
+        CookingTimer running = model.currentTimer();
+        assertEquals(304_000L, running.deadlineElapsedMillis);
+        clock += 8_000_000L;
+        elapsed += 23_545L;
+        assertTrue(model.refreshTimers());
+        assertEquals(276_455L, model.remainingMillis(model.currentTimer()));
+        assertSame(running, model.currentTimer());
+    }
+
+    @Test public void pauseFreezesExactRemainingTimeAndResumeAndResetAreExplicit() {
+        startSample();
+        model.next();
+        model.startOrResumeTimer();
+        elapsed += 1299;
+        model.pauseTimer();
+        CookingTimer paused = model.currentTimer();
+        assertEquals(CookingTimer.Status.PAUSED, paused.status);
+        assertEquals(298_701L, paused.fixedRemainingMillis);
+        elapsed += 22_000;
+        assertEquals(298_701L, model.remainingMillis(model.currentTimer()));
+        model.startOrResumeTimer();
+        assertEquals(elapsed + 298_701L, model.currentTimer().deadlineElapsedMillis);
+        model.resetTimer();
+        assertEquals(CookingTimer.Status.READY, model.currentTimer().status);
+        assertEquals(300_000L, model.remainingMillis(model.currentTimer()));
+    }
+
+    @Test public void lateForegroundTickFinishesOnceWithoutChangingStepOrGoingNegative() {
+        startSample();
+        model.next();
+        model.startOrResumeTimer();
+        elapsed += 340_000;
+        assertEquals(0, model.remainingMillis(model.currentTimer()));
+        assertFalse(model.refreshTimers());
+        CookingTimer finished = model.currentTimer();
+        assertEquals(CookingTimer.Status.FINISHED, finished.status);
+        assertSame(finished, model.takeTimerCompletion());
+        model.pauseTimer();
+        model.startOrResumeTimer();
+        assertFalse(model.refreshTimers());
+        assertSame(finished, model.currentTimer());
+        assertNull(model.takeTimerCompletion());
+        assertEquals(1, session().stepIndex);
+        model.resetTimer();
+        model.startOrResumeTimer();
+        elapsed += 300_000;
+        assertFalse(model.refreshTimers());
+        assertNotNull(model.takeTimerCompletion());
+        assertNull(model.takeTimerCompletion());
+    }
+
+    @Test public void switchingStepsPreservesTimersAndOnlyOneCanRun() {
+        catalog.lookup = Lookup.available(recipe(Recipe.IngredientDataStatus.UNKNOWN, emptyList(), Arrays.asList(
+                step("first", 0, 5), step("second", 1, 8), step("third", 2, null))));
+        model.start(RECIPE, 2);
+        model.startOrResumeTimer();
+        model.next();
+        elapsed += 1500;
+        model.startOrResumeTimer();
+        model.previous();
+        assertEquals(CookingTimer.Status.PAUSED, model.currentTimer().status);
+        assertEquals(3500L, model.remainingMillis(model.currentTimer()));
+        model.next();
+        assertEquals(CookingTimer.Status.RUNNING, model.currentTimer().status);
+        model.next();
+        assertNull(model.currentTimer());
+        elapsed += 8000;
+        assertFalse(model.refreshTimers());
+        assertEquals("second", model.takeTimerCompletion().stepId);
+        model.previous();
+        assertEquals(CookingTimer.Status.FINISHED, model.currentTimer().status);
+    }
+
+    @Test public void pausingSessionFreezesRunningTimerAndTerminalActionsClearIt() {
+        startSample();
+        model.next();
+        model.startOrResumeTimer();
+        elapsed += 500;
+        model.pause();
+        elapsed += 500;
+        assertFalse(model.refreshTimers());
+        model.resume();
+        assertEquals(CookingTimer.Status.PAUSED, model.currentTimer().status);
+        assertEquals(299_500L, model.remainingMillis(model.currentTimer()));
+        model.startOrResumeTimer();
+        model.next();
+        model.next();
+        model.complete();
+        assertTrue(model.timerSnapshots().isEmpty());
+        assertNull(model.takeTimerCompletion());
+
+        model.leave();
+        startSample();
+        model.next();
+        model.startOrResumeTimer();
+        assertEquals("session-2", model.currentTimer().sessionId);
+        model.cancel();
+        elapsed += 400_000;
+        assertFalse(model.refreshTimers());
+        assertTrue(model.timerSnapshots().isEmpty());
+        assertNull(model.takeTimerCompletion());
     }
 
     private CookingSession session() { return model.state().getValue().session; }

@@ -4,6 +4,8 @@ import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +15,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -27,6 +30,7 @@ import com.example.myapplication.R;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.CookingSession;
 import com.example.myapplication.domain.model.CookingSession.IngredientLine;
+import com.example.myapplication.domain.model.CookingTimer;
 
 import java.math.RoundingMode;
 import java.util.Locale;
@@ -44,9 +48,24 @@ public final class CookingSessionFragment extends Fragment {
     private static final int MUTED = 0xff58665c;
     private static final int WHITE = 0xffffffff;
     private static final Locale VIETNAMESE = Locale.forLanguageTag("vi-VN");
+    private static final String TIMER_OPEN = "timerOpen";
+    private final Handler timerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable timerTick = this::updateTimerUi;
     private CookingSessionViewModel model;
     private LinearLayout root;
     private AlertDialog cancelDialog;
+    private boolean timerOpen;
+    private CookingTimerView timerView;
+
+    @Override public void onCreate(@Nullable Bundle state) {
+        super.onCreate(state);
+        timerOpen = state != null && state.getBoolean(TIMER_OPEN);
+    }
+
+    @Override public void onSaveInstanceState(@NonNull Bundle out) {
+        out.putBoolean(TIMER_OPEN, timerOpen);
+        super.onSaveInstanceState(out);
+    }
 
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -66,10 +85,17 @@ public final class CookingSessionFragment extends Fragment {
     }
 
     @Override public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        model.state().observe(getViewLifecycleOwner(), this::render);
+        model.state().observe(getViewLifecycleOwner(), state -> {
+            render(state);
+            updateTimerUi();
+        });
     }
 
     public void handleBack() {
+        if (timerOpen) {
+            showTimer(false);
+            return;
+        }
         CookingSessionViewModel.State state = model.state().getValue();
         CookingSession session = state == null ? null : state.session;
         if (session == null) exit(false);
@@ -79,9 +105,15 @@ public final class CookingSessionFragment extends Fragment {
     }
 
     private void render(CookingSessionViewModel.State state) {
+        timerView = null;
         if (state == null) return;
         root.removeAllViews();
         CookingSession session = state.session;
+        if (timerOpen && model.currentTimer() != null) {
+            renderTimer(session);
+            return;
+        }
+        timerOpen = false;
         String title = "Nấu từng bước";
         if (session != null) {
             if (session.status == CookingSession.Status.PAUSED) title = "Tiếp tục nấu";
@@ -152,9 +184,8 @@ public final class CookingSessionFragment extends Fragment {
         }
         CookingSession.TimerInput timer = session.timerInput();
         if (timer != null) {
-            String duration = timer.durationSeconds % 60 == 0 ? timer.durationSeconds / 60 + " phút"
-                    : timer.durationSeconds + " giây";
-            add(body, label("Thời lượng gợi ý · " + duration, 14, MUTED, false), 18);
+            add(body, button("Hẹn giờ " + CookingTimerView.duration(timer.durationSeconds),
+                    false, () -> showTimer(true)), 18);
         }
 
         LinearLayout controls = new LinearLayout(requireContext());
@@ -168,6 +199,66 @@ public final class CookingSessionFragment extends Fragment {
                 : button("Hoàn thành bước", true, model::next);
         controls.addView(next, new LinearLayout.LayoutParams(0, -2, 1.35f));
         add(root, controls, 8);
+    }
+
+    private void renderTimer(CookingSession session) {
+        header("Hẹn giờ nấu", false);
+        ScrollView scroll = new ScrollView(requireContext());
+        timerView = new CookingTimerView(requireContext(), session.snapshot.recipeTitle, session.stepIndex + 1,
+                session.currentStep().source.title, status -> {
+                    switch (status) {
+                        case READY:
+                        case PAUSED: model.startOrResumeTimer(); break;
+                        case RUNNING: model.pauseTimer(); break;
+                        case FINISHED: showTimer(false); return;
+                    }
+                    updateTimerUi();
+                }, () -> {
+                    model.resetTimer();
+                    updateTimerUi();
+                }, () -> {
+                    model.resetTimer();
+                    showTimer(false);
+                });
+        scroll.addView(timerView);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+
+    private void showTimer(boolean open) {
+        timerOpen = open;
+        render(model.state().getValue());
+        updateTimerUi();
+    }
+
+    private void updateTimerUi() {
+        timerHandler.removeCallbacks(timerTick);
+        if (root == null || !isResumed()) return;
+        boolean running = model.refreshTimers();
+        CookingTimer timer = model.currentTimer();
+        if (timerView != null && timer != null) timerView.show(timer, model.remainingMillis(timer));
+        CookingTimer finished;
+        while ((finished = model.takeTimerCompletion()) != null) announceTimerCompletion(finished);
+        if (running) timerHandler.postDelayed(timerTick, 250);
+    }
+
+    private void announceTimerCompletion(CookingTimer finished) {
+        CookingSession session = model.state().getValue().session;
+        for (int step = 0; step < session.snapshot.steps.size(); step++) {
+            if (finished.stepId.equals(session.snapshot.steps.get(step).source.stepId)) {
+                Toast.makeText(requireContext(), "Đã hết giờ · Bước " + (step + 1), Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+    }
+
+    @Override public void onResume() {
+        super.onResume();
+        updateTimerUi();
+    }
+
+    @Override public void onPause() {
+        timerHandler.removeCallbacks(timerTick);
+        super.onPause();
     }
 
     private void progress(LinearLayout body, CookingSession session) {
@@ -219,6 +310,8 @@ public final class CookingSessionFragment extends Fragment {
     }
 
     @Override public void onDestroyView() {
+        timerHandler.removeCallbacks(timerTick);
+        timerView = null;
         if (cancelDialog != null) cancelDialog.dismiss();
         root = null;
         super.onDestroyView();

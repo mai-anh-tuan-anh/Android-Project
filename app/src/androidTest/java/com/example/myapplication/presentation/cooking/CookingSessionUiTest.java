@@ -1,6 +1,7 @@
 package com.example.myapplication.presentation.cooking;
 
 import android.graphics.Bitmap;
+import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 
 import androidx.lifecycle.MutableLiveData;
@@ -19,6 +20,7 @@ import com.example.myapplication.data.repository.LocalRecipeCatalogRepository;
 import com.example.myapplication.di.AppContainer;
 import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.domain.model.CookingSession;
+import com.example.myapplication.domain.model.CookingTimer;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.presentation.main.MainActivity;
 import com.example.myapplication.testing.OfflineTestApplication;
@@ -34,11 +36,14 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.scrollTo;
 import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isClickable;
@@ -74,7 +79,7 @@ public final class CookingSessionUiTest {
             visible("Bước 2 / 4");
             visible("Cà chua · 4 quả");
             visible("Rau thơm · Vừa đủ");
-            visible("Thời lượng gợi ý · 5 phút");
+            visible("Hẹn giờ 5 phút");
             onView(withText("Me · 40 g")).check(doesNotExist());
             CookingSession.Snapshot started = session(activity, fixture).snapshot;
             assertEquals(RECIPE_ID, started.recipeId);
@@ -116,6 +121,74 @@ public final class CookingSessionUiTest {
             visible("4 người");
             visible("600 g");
             fixture.verifyPersonalData();
+        }
+    }
+
+    @Test public void fiveMinuteTimerStartsPausesResumesAndResetsAcrossRecreationAndBackground() throws Exception {
+        try (Fixture fixture = new Fixture();
+             ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
+            openDetail();
+            tap("Bắt đầu nấu");
+            visible("Bước 1 / 4");
+            onView(withText("Hẹn giờ 5 phút")).check(doesNotExist());
+            tap("Hoàn thành bước");
+            tap("Hẹn giờ 5 phút");
+            visible("05:00");
+            captureTimer("01-ready");
+            tap("Bắt đầu");
+            visible("Tạm dừng");
+            SystemClock.sleep(1150);
+            assertTrue(remaining(activity, fixture) < 299_000);
+            captureTimer("02-running");
+            tap("Tạm dừng");
+            visible("Đang tạm dừng");
+            long paused = remaining(activity, fixture);
+            SystemClock.sleep(1050);
+            assertEquals(paused, remaining(activity, fixture));
+            captureTimer("03-paused");
+            tap("Tiếp tục");
+            long deadline = currentTimer(activity, fixture).deadlineElapsedMillis;
+            activity.recreate();
+            visible("Hẹn giờ nấu");
+            visible("Tạm dừng");
+            assertEquals(deadline, currentTimer(activity, fixture).deadlineElapsedMillis);
+            long beforeBackground = remaining(activity, fixture);
+            homeAndReopen(1250);
+            awaitWindowFocus(activity);
+            assertEquals(deadline, currentTimer(activity, fixture).deadlineElapsedMillis);
+            long afterBackground = remaining(activity, fixture);
+            assertTrue(beforeBackground - afterBackground >= 1250);
+            assertTrue(Math.abs(afterBackground - (deadline - SystemClock.elapsedRealtime())) < 500);
+            onView(withText("Đặt lại")).perform(scrollTo(), click());
+            assertEquals(CookingTimer.Status.READY, currentTimer(activity, fixture).status);
+            visible("05:00");
+            visible("Bắt đầu");
+            tap("Hủy hẹn giờ");
+            visible("Bước 2 / 4");
+        }
+    }
+
+    @Test public void elapsedTimerFinishesInBackgroundAndReturnsToTheSameStep() throws Exception {
+        try (Fixture fixture = new Fixture(3);
+             ActivityScenario<MainActivity> activity = ActivityScenario.launch(MainActivity.class)) {
+            openDetail();
+            tap("Bắt đầu nấu");
+            tap("Hoàn thành bước");
+            tap("Hẹn giờ 3 giây");
+            visible("00:03");
+            tap("Bắt đầu");
+            homeAndReopen(3250);
+            awaitWindowFocus(activity);
+            visible("00:00");
+            visible("Đã hết giờ");
+            assertEquals(CookingTimer.Status.FINISHED, currentTimer(activity, fixture).status);
+            tap("Về bước nấu");
+            visible("Bước 2 / 4");
+            tap("Hẹn giờ 3 giây");
+            visible("00:00");
+            captureTimer("04-finished");
+            tap("Đặt lại");
+            visible("00:03");
         }
     }
 
@@ -167,25 +240,79 @@ public final class CookingSessionUiTest {
         }
     }
 
+    private static void awaitWindowFocus(ActivityScenario<MainActivity> activity) {
+        long limit = SystemClock.elapsedRealtime() + 5000;
+        AtomicBoolean focused = new AtomicBoolean();
+        do {
+            activity.onActivity(host -> focused.set(host.getWindow().getDecorView().hasWindowFocus()));
+            if (focused.get()) return;
+            SystemClock.sleep(25);
+        } while (SystemClock.elapsedRealtime() < limit);
+        fail("Cooking window did not regain input focus");
+    }
+
+    private static void homeAndReopen(long waitMillis) throws IOException {
+        runShell("input keyevent KEYCODE_HOME");
+        SystemClock.sleep(waitMillis);
+        String result = runShell("am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "
+                + "-n com.example.myapplication/.presentation.main.MainActivity");
+        assertTrue(result, result.contains("Status: ok"));
+    }
+
+    private static String runShell(String command) throws IOException {
+        ParcelFileDescriptor descriptor = InstrumentationRegistry.getInstrumentation().getUiAutomation()
+                .executeShellCommand(command);
+        try (InputStream input = new ParcelFileDescriptor.AutoCloseInputStream(descriptor);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
     private static CookingSession session(ActivityScenario<MainActivity> activity, Fixture fixture) {
         AtomicReference<CookingSession> current = new AtomicReference<>();
-        activity.onActivity(host -> {
-            CookingSessionViewModel model = new ViewModelProvider(host, new AppViewModelFactory(fixture.app))
-                    .get(CookingSessionViewModel.class);
-            current.set(model.state().getValue().session);
-        });
+        activity.onActivity(host -> current.set(model(host, fixture).state().getValue().session));
         assertNotNull(current.get());
         return current.get();
     }
 
+    private static CookingTimer currentTimer(ActivityScenario<MainActivity> activity, Fixture fixture) {
+        AtomicReference<CookingTimer> timer = new AtomicReference<>();
+        activity.onActivity(host -> timer.set(model(host, fixture).currentTimer()));
+        return timer.get();
+    }
+
+    private static long remaining(ActivityScenario<MainActivity> activity, Fixture fixture) {
+        AtomicLong remaining = new AtomicLong();
+        activity.onActivity(host -> {
+            CookingSessionViewModel model = model(host, fixture);
+            remaining.set(model.remainingMillis(model.currentTimer()));
+        });
+        return remaining.get();
+    }
+
+    private static CookingSessionViewModel model(MainActivity host, Fixture fixture) {
+        return new ViewModelProvider(host, new AppViewModelFactory(fixture.app)).get(CookingSessionViewModel.class);
+    }
+
+    private static void captureTimer(String name) throws IOException {
+        capture("timerCapture", "n2-11-", name);
+    }
+
     private static void capture(String name) throws IOException {
-        if (!"1".equals(InstrumentationRegistry.getArguments().getString("cookingCapture"))) return;
+        capture("cookingCapture", "n2-10-", name);
+    }
+
+    private static void capture(String argument, String prefix, String name) throws IOException {
+        if (!"1".equals(InstrumentationRegistry.getArguments().getString(argument))) return;
         OfflineTestApplication app = ApplicationProvider.getApplicationContext();
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
         SystemClock.sleep(160);
         Bitmap screenshot = InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         assertNotNull(screenshot);
-        try (FileOutputStream stream = new FileOutputStream(new File(app.getCacheDir(), "n2-10-" + name + ".png"))) {
+        try (FileOutputStream stream = new FileOutputStream(new File(app.getCacheDir(), prefix + name + ".png"))) {
             if (!screenshot.compress(Bitmap.CompressFormat.PNG, 100, stream)) throw new IOException(name);
         } finally {
             screenshot.recycle();
@@ -211,9 +338,13 @@ public final class CookingSessionUiTest {
         final AtomicReference<String> nextSnapshot = new AtomicReference<>();
         final AppContainer graph;
 
-        Fixture() throws IOException {
+        Fixture() throws IOException { this(300); }
+
+        Fixture(int timerDuration) throws IOException {
             LocalRecipeCatalogRepository local = new LocalRecipeCatalogRepository(catalog);
             String json = approvedFixture();
+            if (timerDuration != 300) json = json.replace("\"durationSeconds\": 300",
+                    "\"durationSeconds\": " + timerDuration);
             local.applySnapshot(json);
             nextSnapshot.set(json);
             Recipe saved = local.findById(RECIPE_ID).recipe;
