@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.BepNhaApplication;
+import com.example.myapplication.presentation.catalog.CatalogHomeViewModel;
 import com.example.myapplication.presentation.cookingjournal.CookingJournalViewModel;
 import com.example.myapplication.presentation.discover.DiscoverSearchViewModel;
 import com.example.myapplication.presentation.discover.DiscoverViewModel;
@@ -51,6 +52,10 @@ public final class AppViewModelFactory implements ViewModelProvider.Factory {
         }
         if (modelClass == DiscoverViewModel.class) {
             return (T) new DiscoverViewModel();
+        }
+        if (modelClass == CatalogHomeViewModel.class) {
+            return (T) new CatalogHomeViewModel(appContainer.recipeCatalogRepository, appContainer.catalogSync,
+                    appContainer.catalogConnectivity, appContainer.ioExecutor, ContextCompat.getMainExecutor(application));
         }
         if (modelClass == RecipeDetailViewModel.class) {
             return (T) new RecipeDetailViewModel(appContainer.recipeCatalogRepository,

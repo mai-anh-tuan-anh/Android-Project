@@ -19,8 +19,10 @@ import org.json.JSONException;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Stores only the replaceable recipe catalog, separate from personal data. */
 public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
@@ -36,7 +38,7 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
         this(context, DB_NAME);
     }
 
-    RecipeCatalogDbHelper(Context context, String databaseName) {
+    public RecipeCatalogDbHelper(Context context, String databaseName) {
         super(context, databaseName, null, DB_VERSION);
     }
 
@@ -97,11 +99,13 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
                 }
             }
 
+            // A later snapshot may omit an old tombstone. Preserve known removals until republished.
+            db.execSQL("INSERT OR IGNORE INTO RemovedRecipe(recipe_id,removed_at) "
+                    + "SELECT recipe_id,COALESCE(updated_at,0) FROM Recipe WHERE publication_status='ARCHIVED'");
             db.delete("Recipe", null, null);
             db.delete("Category", null, null);
             db.delete("Diet", null, null);
             db.delete("Ingredient", null, null);
-            db.delete("RemovedRecipe", null, null);
             for (Map.Entry<String, String> category : snapshot.categories.entrySet()) {
                 db.execSQL("INSERT INTO Category(id,name) VALUES(?,?)", new Object[]{category.getKey(), category.getValue()});
             }
@@ -114,8 +118,10 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
                                 ingredient.status.name(), new JSONArray(ingredient.aliases).toString()});
             }
             for (Recipe recipe : snapshot.recipes.values()) insertRecipe(db, recipe);
+            db.execSQL("DELETE FROM RemovedRecipe WHERE recipe_id IN "
+                    + "(SELECT recipe_id FROM Recipe WHERE publication_status='PUBLISHED')");
             for (Map.Entry<String, Long> removal : snapshot.removed.entrySet()) {
-                db.execSQL("INSERT INTO RemovedRecipe(recipe_id,removed_at) VALUES(?,?)",
+                db.execSQL("INSERT OR REPLACE INTO RemovedRecipe(recipe_id,removed_at) VALUES(?,?)",
                         new Object[]{removal.getKey(), removal.getValue()});
             }
             db.execSQL("INSERT OR REPLACE INTO CatalogMeta(id,schema_version,revision,fingerprint) VALUES(1,?,?,?)",
@@ -181,8 +187,13 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
                     + "WHERE publication_status='PUBLISHED' ORDER BY recipe_id", null)) {
                 while (rows.moveToNext()) recipes.add(readRecipe(db, rows, categories, diets, ingredients));
             }
+            Set<String> removed = new LinkedHashSet<>();
+            try (Cursor rows = db.rawQuery("SELECT recipe_id FROM RemovedRecipe UNION "
+                    + "SELECT recipe_id FROM Recipe WHERE publication_status='ARCHIVED'", null)) {
+                while (rows.moveToNext()) removed.add(rows.getString(0));
+            }
             db.setTransactionSuccessful();
-            return new Catalog(revision, recipes, categories, diets, ingredients);
+            return new Catalog(revision, recipes, categories, diets, ingredients, removed);
         } finally {
             db.endTransaction();
         }
@@ -192,7 +203,7 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getReadableDatabase();
         db.beginTransactionNonExclusive();
         try {
-            Lookup result;
+            Lookup result = Lookup.missing();
             try (Cursor row = db.rawQuery("SELECT " + RECIPE_COLUMNS + " FROM Recipe WHERE recipe_id=?",
                     new String[]{recipeId})) {
                 if (row.moveToFirst()) {
@@ -203,11 +214,12 @@ public final class RecipeCatalogDbHelper extends SQLiteOpenHelper {
                     } else {
                         result = status == Recipe.PublicationStatus.ARCHIVED ? Lookup.removed() : Lookup.missing();
                     }
-                } else {
-                    try (Cursor removed = db.rawQuery("SELECT 1 FROM RemovedRecipe WHERE recipe_id=?",
-                            new String[]{recipeId})) {
-                        result = removed.moveToFirst() ? Lookup.removed() : Lookup.missing();
-                    }
+                }
+            }
+            if (result.status == Lookup.Status.MISSING) {
+                try (Cursor removed = db.rawQuery("SELECT 1 FROM RemovedRecipe WHERE recipe_id=?",
+                        new String[]{recipeId})) {
+                    if (removed.moveToFirst()) result = Lookup.removed();
                 }
             }
             db.setTransactionSuccessful();

@@ -6,8 +6,10 @@ import com.example.myapplication.domain.model.Recipe;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Synchronous local catalog reads. Call on an I/O executor. */
 public interface RecipeCatalogRepository {
@@ -24,14 +26,21 @@ public interface RecipeCatalogRepository {
         public final Map<String, String> categories;
         public final Map<String, String> diets;
         public final Map<String, Ingredient> ingredients;
+        public final Set<String> removedRecipeIds;
 
         public Catalog(Long revision, List<Recipe> recipes, Map<String, String> categories,
                        Map<String, String> diets, Map<String, Ingredient> ingredients) {
+            this(revision, recipes, categories, diets, ingredients, Collections.emptySet());
+        }
+
+        public Catalog(Long revision, List<Recipe> recipes, Map<String, String> categories,
+                       Map<String, String> diets, Map<String, Ingredient> ingredients, Set<String> removedRecipeIds) {
             this.revision = revision;
             this.recipes = Collections.unmodifiableList(new ArrayList<>(recipes));
             this.categories = Collections.unmodifiableMap(new LinkedHashMap<>(categories));
             this.diets = Collections.unmodifiableMap(new LinkedHashMap<>(diets));
             this.ingredients = Collections.unmodifiableMap(new LinkedHashMap<>(ingredients));
+            this.removedRecipeIds = Collections.unmodifiableSet(new LinkedHashSet<>(removedRecipeIds));
         }
     }
 

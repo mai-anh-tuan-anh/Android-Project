@@ -221,6 +221,7 @@ public class RecipeCatalogDbHelperTest {
             personal.addFavorite(saved);
             personal.saveNote(saved, "Ghi chú của tôi");
             personal.addMealPlanRecipe(saved, 4);
+            assertTrue(personal.saveCookingLog(null, saved, 1780100000000L, 4, 28, 5, "Nêm nhạt", null));
         }
         byte[] before = databaseBytes(PERSONAL_DB);
 
@@ -233,11 +234,31 @@ public class RecipeCatalogDbHelperTest {
             assertTrue(personal.isFavorite("recipe-soup"));
             assertEquals("Ghi chú của tôi", personal.getNote("recipe-soup"));
             assertEquals(4, personal.getMealPlanRecipes().get(0).servings);
+            assertEquals("Nêm nhạt", personal.getCookingLogs("recipe-soup").get(0).adjustmentNote);
             try (Cursor version = personal.getReadableDatabase().rawQuery("PRAGMA user_version", null)) {
                 assertTrue(version.moveToFirst());
                 assertEquals(10, version.getInt(0));
             }
         }
+    }
+
+    @Test
+    public void knownTombstonesSurviveLaterSnapshotsUntilRepublished() {
+        repository.applySnapshot(fixture);
+        repository.applySnapshot("{\"meta\":{\"schemaVersion\":1,\"revision\":13},\"removed\":{"
+                + "\"recipe-soup\":{\"removedAtMillis\":1780200000000}}}");
+        repository.applySnapshot("{\"meta\":{\"schemaVersion\":1,\"revision\":14}}");
+
+        assertEquals(Lookup.Status.REMOVED, repository.findById("recipe-soup").status);
+        assertEquals(Lookup.Status.REMOVED, repository.findById("recipe-archived").status);
+        assertEquals(Lookup.Status.REMOVED, repository.findById("recipe-removed").status);
+        assertEquals(Lookup.Status.MISSING, repository.findById("unknown").status);
+        assertTrue(repository.readCatalog().removedRecipeIds.contains("recipe-soup"));
+
+        assertEquals(ApplyResult.APPLIED, repository.applySnapshot(
+                fixture.replace("\"revision\": 12", "\"revision\": 15")));
+        assertEquals(Lookup.Status.AVAILABLE, repository.findById("recipe-soup").status);
+        assertFalse(repository.readCatalog().removedRecipeIds.contains("recipe-soup"));
     }
 
     @Test

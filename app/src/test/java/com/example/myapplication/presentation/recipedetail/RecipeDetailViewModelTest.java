@@ -4,6 +4,7 @@ import androidx.arch.core.executor.ArchTaskExecutor;
 import androidx.arch.core.executor.TaskExecutor;
 
 import com.example.myapplication.data.local.database.RecipeCatalogDbHelper.ApplyResult;
+import com.example.myapplication.domain.model.CookingStep;
 import com.example.myapplication.domain.model.Recipe;
 import com.example.myapplication.domain.model.RecipeIngredient;
 import com.example.myapplication.domain.repository.RecipeCatalogRepository;
@@ -196,6 +197,36 @@ public class RecipeDetailViewModelTest {
         assertEquals(0, refreshes);
     }
 
+    @Test public void removalWhileDetailIsOpenClearsTheDraftAndBlocksCooking() {
+        repository.recipe = recipe("id", 2, Recipe.IngredientDataStatus.COMPLETE);
+        model.open("id");
+        model.beginAdjustment();
+        model.editServings("4");
+        repository.recipe = null;
+        repository.removedId = "id";
+        model.catalogReplaced(1);
+
+        assertEquals(Status.REMOVED, status());
+        assertEquals("id", model.state().getValue().recipeId);
+        assertNull(model.draft().getValue());
+        List<String> starts = new java.util.ArrayList<>();
+        model.startCooking((id, servings) -> starts.add(id));
+        assertTrue(starts.isEmpty());
+    }
+
+    @Test public void startCookingRechecksSqliteBeforeDispatchingFromAnOldDetail() {
+        repository.recipe = recipe("id", 2, Recipe.IngredientDataStatus.COMPLETE);
+        model.open("id");
+        List<String> starts = new java.util.ArrayList<>();
+        model.startCooking((id, servings) -> starts.add(id + ":" + servings));
+        assertEquals(Collections.singletonList("id:2"), starts);
+        repository.recipe = null;
+        repository.removedId = "id";
+        model.startCooking((id, servings) -> starts.add(id + ":" + servings));
+        assertEquals(Collections.singletonList("id:2"), starts);
+        assertEquals(Status.REMOVED, status());
+    }
+
     private Status status() { return model.state().getValue().status; }
     private String amount() { return model.state().getValue().ingredients.get(0).amount; }
 
@@ -205,7 +236,9 @@ public class RecipeDetailViewModelTest {
                 new RecipeIngredient("herbs", id, "herbs", null, null, "Vừa đủ", 2));
         Recipe.Details details = new Recipe.Details(null, null, servings, null, null, null,
                 Recipe.PublicationStatus.PUBLISHED, null, null, data, Collections.emptyList(),
-                Collections.emptyList(), Collections.emptyList(), null, ingredients, Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), null, ingredients,
+                Collections.singletonList(new CookingStep("step", id, "Nấu", "Nấu canh", 1,
+                        null, null, Collections.singletonList("fish"))));
         return Recipe.fromCatalog(id, "Canh", "", "Dễ", null, Collections.emptyList(), Arrays.asList("Cá", "Rau thơm"), details);
     }
 

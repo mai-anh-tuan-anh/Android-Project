@@ -36,6 +36,9 @@ import com.example.myapplication.di.AppViewModelFactory;
 import com.example.myapplication.data.image.RecipeImageLoader;
 import com.example.myapplication.domain.catalog.PreviewRecipeCatalog;
 import com.example.myapplication.domain.model.Recipe;
+import com.example.myapplication.domain.repository.RecipeCatalogRepository.Catalog;
+import com.example.myapplication.presentation.catalog.CatalogHomeViewModel;
+import com.example.myapplication.presentation.catalog.CatalogStatusView;
 import com.example.myapplication.presentation.main.MainActivity.Screen;
 import com.example.myapplication.presentation.pantry.PantryViewModel;
 import com.example.myapplication.presentation.personaldata.PersonalDataViewModel;
@@ -44,8 +47,11 @@ import com.example.myapplication.presentation.recipedetail.RecipeDetailViewModel
 import com.example.myapplication.domain.model.PantryIngredient;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /** Owns discovery, search, ingredient suggestions, and recipe detail UI. */
@@ -55,6 +61,8 @@ public final class DiscoverFragment extends Fragment {
                 Screen screen, String category, String recipeId, Screen detailReturn);
 
         void onDiscoverOpenNote(Recipe recipe);
+
+        void onDiscoverOpenSavedNote(String recipeId);
 
         void onDiscoverOpenMealPlanPicker(Recipe recipe);
 
@@ -83,6 +91,9 @@ public final class DiscoverFragment extends Fragment {
     private DiscoverViewModel discoverViewModel;
     private PantryViewModel pantryViewModel;
     private PersonalDataViewModel personalDataViewModel;
+    private CatalogHomeViewModel catalogHome;
+    private Catalog homeCatalog;
+    private RecipeImageLoader images;
     private RecipeDetailViewModel recipeDetailViewModel;
     private RecipeDetailView catalogDetailView;
     private String renderedCatalogId;
@@ -145,6 +156,8 @@ public final class DiscoverFragment extends Fragment {
                         .get(DiscoverSearchViewModel.class);
         discoverViewModel =
                 new ViewModelProvider(requireActivity(), factory).get(DiscoverViewModel.class);
+        catalogHome = new ViewModelProvider(requireActivity(), factory).get(CatalogHomeViewModel.class);
+        images = ((BepNhaApplication) requireActivity().getApplication()).getAppContainer().recipeImageLoader;
         personalDataViewModel =
                 new ViewModelProvider(requireActivity(), factory).get(PersonalDataViewModel.class);
         pantryViewModel =
@@ -195,6 +208,17 @@ public final class DiscoverFragment extends Fragment {
         if (pantryState == null || (pantryState.loading && pantryState.items.isEmpty())) {
             pantryViewModel.refreshItems();
         }
+        catalogHome.state().observe(getViewLifecycleOwner(), value -> {
+            boolean changedCatalog = value.catalog != homeCatalog;
+            homeCatalog = value.catalog;
+            if (screen == Screen.DISCOVER || (changedCatalog && (screen == Screen.CATEGORY_LIST
+                    || screen == Screen.CATEGORY_RECIPES || screen == Screen.NEW_RECIPES
+                    || screen == Screen.SEARCH_RESULTS || screen == Screen.WHAT_TO_COOK_RESULTS
+                    || (screen == Screen.RECIPE_DETAIL && PREVIEW_DEMO_ID.equals(detailRecipeId))))) {
+                render();
+            }
+        });
+        catalogHome.readLocal();
         render();
         return root;
     }
@@ -228,10 +252,11 @@ public final class DiscoverFragment extends Fragment {
                 || screen == Screen.SEARCH_RESULTS) {
             searchViewModel.setSearchQuery("");
         }
-        detailRecipeId = recipe.id;
+        detailRecipeId = personalId(recipe.id);
         detailReturnScreen = returnScreen == Screen.RECIPE_DETAIL ? Screen.DISCOVER : returnScreen;
         openingNewDetail = usesCatalogDetail();
-        if (recipe.details == null) personalDataViewModel.recordViewedRecipe(recipe);
+        Recipe personalRecipe = previewRecipeById(detailRecipeId);
+        personalDataViewModel.recordViewedRecipe(personalRecipe == null ? recipe : personalRecipe);
         showScreen(Screen.RECIPE_DETAIL);
         render();
     }
@@ -287,10 +312,43 @@ public final class DiscoverFragment extends Fragment {
         return null;
     }
 
+    private static String personalId(String id) {
+        return CATALOG_DEMO_ID.equals(id) ? PREVIEW_DEMO_ID : id;
+    }
+
+    private boolean demoRemoved() {
+        return homeCatalog != null && homeCatalog.removedRecipeIds.contains(CATALOG_DEMO_ID);
+    }
+
+    private List<Recipe> publicRecipes() {
+        Map<String, Recipe> recipes = new LinkedHashMap<>();
+        if (homeCatalog != null) {
+            for (Recipe recipe : homeCatalog.recipes) recipes.put(personalId(recipe.id), recipe);
+        }
+        for (Recipe preview : PreviewRecipeCatalog.designRecipes()) {
+            if (!PREVIEW_DEMO_ID.equals(preview.id) || !demoRemoved()) recipes.putIfAbsent(preview.id, preview);
+        }
+        return new ArrayList<>(recipes.values());
+    }
+
+    private List<String> discoverCategories(Recipe recipe) {
+        if (!CATALOG_DEMO_ID.equals(recipe.id)) return recipe.categories;
+        List<String> labels = new ArrayList<>(recipe.categories);
+        labels.addAll(previewRecipeById(PREVIEW_DEMO_ID).categories);
+        return labels;
+    }
+
     private boolean usesCatalogDetail() {
-        // Temporary bridge for discovery routes. Personal entry points keep their preview ID.
+        // Personal references keep their ID, but still honour the catalog's known removal.
         return previewRecipeById(detailRecipeId) == null
-                || (PREVIEW_DEMO_ID.equals(detailRecipeId) && isDiscoverRoute(detailReturnScreen));
+                || (PREVIEW_DEMO_ID.equals(detailRecipeId) && (isDiscoverRoute(detailReturnScreen) || demoRemoved()));
+    }
+
+    private Recipe detailPersonalRecipe() {
+        Recipe preview = previewRecipeById(detailRecipeId);
+        if (preview != null) return preview;
+        RecipeDetailViewModel.State current = recipeDetailViewModel.state().getValue();
+        return current != null && current.recipeId.equals(renderedCatalogId) ? current.recipe : null;
     }
 
     private void renderCatalogDetail() {
@@ -300,8 +358,7 @@ public final class DiscoverFragment extends Fragment {
             recipeDetailViewModel.state().observe(getViewLifecycleOwner(), stateValue -> {
                 if (catalogDetailView != null && stateValue != null
                         && stateValue.recipeId.equals(renderedCatalogId)) {
-                    Recipe source = previewRecipeById(detailRecipeId);
-                    catalogDetailView.display(stateValue, source != null && personalDataViewModel.isFavorite(source.id));
+                    catalogDetailView.display(stateValue, personalDataViewModel.isFavorite(detailRecipeId));
                 }
             });
             recipeDetailViewModel.draft().observe(getViewLifecycleOwner(), draftValue -> {
@@ -315,8 +372,6 @@ public final class DiscoverFragment extends Fragment {
             releaseCatalogView();
             root.removeAllViews();
             renderedCatalogId = catalogId;
-            RecipeImageLoader images = ((BepNhaApplication) requireActivity().getApplication())
-                    .getAppContainer().recipeImageLoader;
             catalogDetailView = new RecipeDetailView(requireContext(), recipeDetailViewModel, images,
                     new RecipeDetailView.Actions() {
                         @Override public void back() { handleBackPressed(); }
@@ -325,15 +380,28 @@ public final class DiscoverFragment extends Fragment {
                             showScreen(Screen.DISCOVER);
                             render();
                         }
-                        @Override public void openNote() { host.onDiscoverOpenNote(preview); }
+                        @Override public void openNote() {
+                            Recipe recipe = detailPersonalRecipe();
+                            if (recipe != null) host.onDiscoverOpenNote(recipe);
+                        }
+                        @Override public void openSavedNote() {
+                            host.onDiscoverOpenSavedNote(detailRecipeId);
+                        }
                         @Override public void toggleFavorite() {
-                            if (personalDataViewModel.isFavorite(preview.id)) personalDataViewModel.removeFavorite(preview.id);
-                            else personalDataViewModel.addFavorite(preview);
+                            Recipe recipe = detailPersonalRecipe();
+                            if (recipe == null) return;
+                            if (personalDataViewModel.isFavorite(recipe.id)) personalDataViewModel.removeFavorite(recipe.id);
+                            else personalDataViewModel.addFavorite(recipe);
                             render();
                         }
                         @Override public void openMealPlan() { host.onDiscoverOpenMealPlanPicker(preview); }
                         @Override public void startCooking(String canonicalRecipeId, int servings) {
-                            host.onDiscoverStartCooking(canonicalRecipeId, servings);
+                            if (catalogDetailView == null || recipeDetailViewModel == null) return;
+                            RecipeDetailViewModel.State current = recipeDetailViewModel.state().getValue();
+                            if (current != null && current.status == RecipeDetailViewModel.Status.AVAILABLE
+                                    && canonicalRecipeId.equals(current.recipeId)) {
+                                host.onDiscoverStartCooking(canonicalRecipeId, servings);
+                            }
                         }
                     }, preview);
             root.addView(catalogDetailView, new FrameLayout.LayoutParams(-1, -1));
@@ -344,7 +412,7 @@ public final class DiscoverFragment extends Fragment {
         }
         recipeDetailViewModel.open(catalogId);
         catalogDetailView.display(recipeDetailViewModel.state().getValue(),
-                preview != null && personalDataViewModel.isFavorite(preview.id));
+                personalDataViewModel.isFavorite(detailRecipeId));
         if (catalogDetailView.isAttachedToWindow()) {
             catalogDetailView.displayDraft(recipeDetailViewModel.draft().getValue());
         }
@@ -436,6 +504,13 @@ public final class DiscoverFragment extends Fragment {
     }
 
     private void renderDiscover() {
+        CatalogHomeViewModel.State catalogState = catalogHome.state().getValue();
+        CatalogStatusView status = new CatalogStatusView(requireContext(), catalogState, catalogHome::retry);
+        if (CatalogStatusView.replacesHome(catalogState)) {
+            pageRoot.addView(status, new LinearLayout.LayoutParams(-1, 0, 1));
+            addBottomNavigation(0);
+            return;
+        }
         ScrollView scroll = scrollContent();
         LinearLayout content = vertical();
         content.setPadding(dp(24), dp(28), dp(24), dp(24));
@@ -458,6 +533,9 @@ public final class DiscoverFragment extends Fragment {
             render();
         });
         content.addView(searchBar, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(10);
+        content.addView(status, statusParams);
 
         LinearLayout banner = vertical();
         banner.setBackground(roundRect(PALE_GREEN, GREEN, 16));
@@ -506,10 +584,15 @@ public final class DiscoverFragment extends Fragment {
         catScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout catRow = new LinearLayout(requireContext());
         catRow.setOrientation(LinearLayout.HORIZONTAL);
-        String[] categories = {
+        List<String> categories = new ArrayList<>(java.util.Arrays.asList(
             "Món canh", "Bún/Phở", "Món rau", "Món xào", "Món kho", "Món rang",
             "Món chiên", "Món hấp/luộc", "Món nướng", "Món chay", "Món khác"
-        };
+        ));
+        if (homeCatalog != null) {
+            for (String category : homeCatalog.categories.values()) {
+                if (!categories.contains(category)) categories.add(category);
+            }
+        }
         for (String cat : categories) {
             TextView chip = text(cat, 13, TEXT, true);
             chip.setPadding(dp(14), dp(8), dp(14), dp(8));
@@ -526,6 +609,7 @@ public final class DiscoverFragment extends Fragment {
         catScroll.addView(catRow);
         content.addView(catScroll, new LinearLayout.LayoutParams(-1, -2));
 
+        List<Recipe> recipes = publicRecipes();
         addSectionHeader(
                 content,
                 "Món mới công bố",
@@ -537,17 +621,17 @@ public final class DiscoverFragment extends Fragment {
                 24);
         List<Recipe> newRecipes =
                 discoverViewModel.newlyPublished(
-                        PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
+                        recipes, recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
             addText(content, "Chưa có món mới công bố.", 13, MUTED, false, 0, 0, 0, 0);
         } else {
-            addRecipeGrid(content, newRecipes, true, true);
+            addRecipeGrid(content, newRecipes, true, true, true);
         }
 
         addSectionHeader(content, "Món nhanh & Dễ làm", "", () -> {}, 24);
         List<Recipe> quickRecipes =
                 discoverViewModel.quickAndEasy(
-                        PreviewRecipeCatalog.designRecipes(),
+                        recipes,
                         recipe -> recipe.durationMinutes,
                         recipe -> recipe.difficulty);
         if (quickRecipes.isEmpty())
@@ -565,7 +649,7 @@ public final class DiscoverFragment extends Fragment {
         addBackTitle(page, "Danh mục món ăn");
         addText(page, "Chọn nhóm món bạn muốn khám phá.", 14, MUTED, false, 0, 0, 0, 20);
 
-        String[][] categories = {
+        String[][] presets = {
             {"Món canh", "recipe_canh_chua"},
             {"Bún/Phở", "recipe_pho_bo"},
             {"Món rau", "recipe_rau_muong_xao_toi"},
@@ -578,28 +662,40 @@ public final class DiscoverFragment extends Fragment {
             {"Món chay", "category_vegetarian"},
             {"Món khác", "recipe_mi_y"}
         };
-        for (int i = 0; i < categories.length; i += 2) {
+        List<String[]> categories = new ArrayList<>(java.util.Arrays.asList(presets));
+        if (homeCatalog != null) {
+            for (String name : homeCatalog.categories.values()) {
+                if (categories.stream().noneMatch(tile -> name.equals(tile[0]))) {
+                    categories.add(new String[]{name, ""});
+                }
+            }
+        }
+        renderCategoryTiles(page, categories);
+        scroll.addView(page);
+        pageRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addBottomNavigation(0);
+    }
+
+    private void renderCategoryTiles(LinearLayout page, List<String[]> categories) {
+        for (int i = 0; i < categories.size(); i += 2) {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
             rowParams.bottomMargin = dp(20);
             row.addView(
-                    createCategoryTile(categories[i][0], categories[i][1]),
+                    createCategoryTile(categories.get(i)[0], categories.get(i)[1]),
                     new LinearLayout.LayoutParams(0, -2, 1));
             View gap = new View(requireContext());
             row.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-            if (i + 1 < categories.length) {
+            if (i + 1 < categories.size()) {
                 row.addView(
-                        createCategoryTile(categories[i + 1][0], categories[i + 1][1]),
+                        createCategoryTile(categories.get(i + 1)[0], categories.get(i + 1)[1]),
                         new LinearLayout.LayoutParams(0, -2, 1));
             } else {
                 row.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, 1, 1));
             }
             page.addView(row, rowParams);
         }
-        scroll.addView(page);
-        pageRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addBottomNavigation(0);
     }
 
     private View createCategoryTile(String title, String imageName) {
@@ -607,6 +703,7 @@ public final class DiscoverFragment extends Fragment {
         card.setBackground(roundRect(WHITE, BORDER, 17));
         card.setClipToOutline(true);
         ImageView image = new ImageView(requireContext());
+        image.setBackgroundColor(PALE_GREEN);
         int imageId =
                 getResources()
                         .getIdentifier(imageName, "drawable", requireContext().getPackageName());
@@ -636,9 +733,9 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Các công thức phù hợp thuộc danh mục.", 14, MUTED, false, 0, 0, 0, 16);
         List<Recipe> matches =
                 discoverViewModel.recipesInCategory(
-                        PreviewRecipeCatalog.designRecipes(),
+                        publicRecipes(),
                         selectedCategory,
-                        recipe -> recipe.categories);
+                        this::discoverCategories);
         if (matches.isEmpty())
             addText(page, "Danh mục này hiện chưa có món nào.", 14, MUTED, false, 0, 8, 0, 0);
         else addRecipeGrid(page, matches, true, true);
@@ -655,7 +752,7 @@ public final class DiscoverFragment extends Fragment {
         addText(page, "Sắp xếp theo ngày công bố gần nhất.", 14, MUTED, false, 0, 4, 0, 20);
         List<Recipe> newRecipes =
                 discoverViewModel.newlyPublished(
-                        PreviewRecipeCatalog.designRecipes(), recipe -> recipe.publishedAtMillis);
+                        publicRecipes(), recipe -> recipe.publishedAtMillis);
         if (newRecipes.isEmpty()) {
             addEmptyCard(
                     page,
@@ -666,7 +763,7 @@ public final class DiscoverFragment extends Fragment {
                         render();
                     });
         } else {
-            addRecipeGrid(page, newRecipes, true, true);
+            addRecipeGrid(page, newRecipes, true, true, true);
         }
         scroll.addView(page);
         pageRoot.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -832,7 +929,7 @@ public final class DiscoverFragment extends Fragment {
 
         // Section "Món phù hợp"
         addSectionHeader(page, "Món phù hợp", "", () -> {}, 20);
-        List<Recipe> matches = searchViewModel.filterRecipes(PreviewRecipeCatalog.designRecipes());
+        List<Recipe> matches = searchViewModel.filterRecipes(publicRecipes());
         for (Recipe r : matches) {
             addSearchDishItem(page, r);
         }
@@ -1114,7 +1211,7 @@ public final class DiscoverFragment extends Fragment {
 
     private void renderSearchMatches(LinearLayout matchesContainer) {
         matchesContainer.removeAllViews();
-        List<Recipe> matches = searchViewModel.filterRecipes(PreviewRecipeCatalog.designRecipes());
+        List<Recipe> matches = searchViewModel.filterRecipes(publicRecipes());
         if (!matches.isEmpty()) {
             TextView countText = text(matches.size() + " món phù hợp", 13, MUTED, false);
             countText.setPadding(0, 0, 0, dp(12));
@@ -1443,9 +1540,9 @@ public final class DiscoverFragment extends Fragment {
                     });
         } else {
             List<Recipe> matches =
-                    searchViewModel.suggestRecipes(PreviewRecipeCatalog.designRecipes());
+                    searchViewModel.suggestRecipes(publicRecipes());
             if (!searchViewModel.hasCompleteRecipeIngredients(
-                    PreviewRecipeCatalog.designRecipes())) {
+                    publicRecipes())) {
                 addEmptyCard(
                         page,
                         "Chưa có đủ dữ liệu nguyên liệu",
@@ -1476,7 +1573,7 @@ public final class DiscoverFragment extends Fragment {
                         0,
                         16);
                 if (searchViewModel.hasIncompleteRecipeIngredients(
-                        PreviewRecipeCatalog.designRecipes())) {
+                        publicRecipes())) {
                     addText(
                             page,
                             "Một số món chưa đủ dữ liệu nguyên liệu nên chưa được xét.",
@@ -1615,12 +1712,17 @@ public final class DiscoverFragment extends Fragment {
 
     private void addRecipeGrid(
             LinearLayout parent, List<Recipe> recipes, boolean showFavorite, boolean removable) {
+        addRecipeGrid(parent, recipes, showFavorite, removable, false);
+    }
+
+    private void addRecipeGrid(LinearLayout parent, List<Recipe> recipes, boolean showFavorite,
+                               boolean removable, boolean publications) {
         if (recipes.isEmpty()) return;
         GridLayout grid = new GridLayout(requireContext());
         grid.setColumnCount(2);
         int index = 0;
         for (Recipe recipe : recipes) {
-            LinearLayout card = recipeCard(recipe, showFavorite, removable);
+            LinearLayout card = recipeCard(recipe, showFavorite, removable, publications);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = 0;
             params.columnSpec = GridLayout.spec(index % 2, 1f);
@@ -1631,15 +1733,26 @@ public final class DiscoverFragment extends Fragment {
         parent.addView(grid, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    private LinearLayout recipeCard(Recipe recipe, boolean showFavorite, boolean removable) {
+    private LinearLayout recipeCard(Recipe recipe, boolean showFavorite, boolean removable,
+                                    boolean publication) {
         LinearLayout card = vertical();
         card.setBackground(roundRect(WHITE, BORDER, 15));
         card.setClipToOutline(true);
         FrameLayout imageFrame = new FrameLayout(requireContext());
         ImageView image = recipeImage(recipe);
         imageFrame.addView(image, new FrameLayout.LayoutParams(-1, dp(96)));
+        if (publication && recipe.details != null) {
+            TextView badge = text("Vừa công bố", 11, TEXT, true);
+            badge.setPadding(dp(8), dp(4), dp(8), dp(4));
+            badge.setBackground(roundRect(0xfffdefda, 0xfffdefda, 12));
+            FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
+            badgeParams.setMargins(dp(6), dp(6), dp(48), 0);
+            imageFrame.addView(badge, badgeParams);
+        }
         if (showFavorite) {
-            boolean favorite = personalDataViewModel.isFavorite(recipe.id);
+            Recipe preview = previewRecipeById(personalId(recipe.id));
+            Recipe saved = preview == null ? recipe : preview;
+            boolean favorite = personalDataViewModel.isFavorite(saved.id);
             ImageView star =
                     iconView(
                             favorite ? R.drawable.ic_star_filled : R.drawable.ic_star_outline,
@@ -1656,9 +1769,9 @@ public final class DiscoverFragment extends Fragment {
             touchParams.setMargins(0, dp(2), dp(2), 0);
             imageFrame.addView(starTouchTarget, touchParams);
             starTouchTarget.setOnClickListener(v -> {
-                if (personalDataViewModel.isFavorite(recipe.id))
-                    personalDataViewModel.removeFavorite(recipe.id);
-                else personalDataViewModel.addFavorite(recipe);
+                if (personalDataViewModel.isFavorite(saved.id))
+                    personalDataViewModel.removeFavorite(saved.id);
+                else personalDataViewModel.addFavorite(saved);
                 render();
             });
         }
@@ -1749,11 +1862,11 @@ public final class DiscoverFragment extends Fragment {
 
     private ImageView recipeImage(Recipe recipe) {
         ImageView image = new ImageView(requireContext());
-        int resource = recipeDrawable(recipe);
-        image.setImageResource(resource);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setBackground(roundRect(BORDER, BORDER, 12));
         image.setClipToOutline(true);
+        if (recipe.details == null) image.setImageResource(recipeDrawable(recipe));
+        else images.bind(image, recipe.details.imagePath);
         return image;
     }
 

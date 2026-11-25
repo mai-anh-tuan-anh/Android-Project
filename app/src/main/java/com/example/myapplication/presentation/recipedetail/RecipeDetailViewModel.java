@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 public final class RecipeDetailViewModel extends ViewModel {
@@ -87,6 +88,22 @@ public final class RecipeDetailViewModel extends ViewModel {
         if (current != null && current.canRetry()) load(true);
     }
 
+    public void startCooking(BiConsumer<String, Integer> start) {
+        State shown = state.getValue();
+        if (reading || shown == null || shown.status != Status.AVAILABLE || shown.recipe.details == null
+                || shown.recipe.details.steps.isEmpty()) return;
+        int visibleRequest = request;
+        CompletableFuture.supplyAsync(() -> read(shown.recipeId), io).thenAcceptAsync(local -> {
+            if (visibleRequest != request || state.getValue() != shown) return;
+            if (local.status == Status.AVAILABLE && local.recipe.details != null
+                    && !local.recipe.details.steps.isEmpty()) {
+                start.accept(shown.recipeId, shown.servings);
+            } else if (local.status != Status.AVAILABLE) {
+                finishRead(visibleRequest, local, false);
+            }
+        }, main);
+    }
+
     private void load(boolean manualRetry) {
         String id = recipeId;
         int loadingRequest = ++request;
@@ -149,6 +166,7 @@ public final class RecipeDetailViewModel extends ViewModel {
             if (lookup.status == Lookup.Status.REMOVED) return State.status(id, Status.REMOVED);
             Catalog catalog = repository.readCatalog();
             if (catalog.revision == null) return State.status(id, Status.NOT_LOADED);
+            if (catalog.removedRecipeIds.contains(id)) return State.status(id, Status.REMOVED);
             for (Recipe recipe : catalog.recipes) {
                 if (id.equals(recipe.id)) return State.available(recipe);
             }

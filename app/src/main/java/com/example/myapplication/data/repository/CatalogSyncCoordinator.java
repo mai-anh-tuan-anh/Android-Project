@@ -17,6 +17,7 @@ import java.util.function.Supplier;
 
 /** Applies the foreground refresh policy and publishes successful catalog replacements. */
 public final class CatalogSyncCoordinator {
+    public enum Phase { IDLE, RUNNING, CONFIRMED, STALE, FAILED }
     public static final long DEFAULT_INTERVAL_MILLIS = TimeUnit.MINUTES.toMillis(15);
     public static final long DEFAULT_RETRY_DELAY_MILLIS = TimeUnit.MINUTES.toMillis(1);
 
@@ -30,11 +31,13 @@ public final class CatalogSyncCoordinator {
     private final long interval;
     private final long retryDelay;
     private final MutableLiveData<Long> replacements = new MutableLiveData<>();
+    private final MutableLiveData<Phase> phase = new MutableLiveData<>(Phase.IDLE);
 
     private CompletableFuture<ApplyResult> inFlight;
     private CompletableFuture<ApplyResult> lastRequest;
     private Long lastCompletion;
     private Long lastSuccess;
+    private volatile long confirmedWallTime;
     private boolean lastConfirmed;
     private long generation;
 
@@ -55,6 +58,11 @@ public final class CatalogSyncCoordinator {
     }
 
     public LiveData<Long> replacements() { return replacements; }
+    public LiveData<Phase> phase() { return phase; }
+
+    public long lastConfirmedAtMillis() {
+        return confirmedWallTime > 0 ? confirmedWallTime : storedSuccess.getAsLong();
+    }
 
     /** Completes with null when the foreground check decides to skip the network. */
     public CompletableFuture<ApplyResult> onForeground(BooleanSupplier stillForeground) {
@@ -98,6 +106,7 @@ public final class CatalogSyncCoordinator {
         if (inFlight != null) return inFlight.thenApply(Function.identity());
         CompletableFuture<ApplyResult> result = new CompletableFuture<>();
         inFlight = result;
+        phase.postValue(Phase.RUNNING);
         try {
             refresh.get().whenCompleteAsync((applied, error) -> complete(result, applied, error), io);
         } catch (RuntimeException error) {
@@ -112,13 +121,16 @@ public final class CatalogSyncCoordinator {
             lastConfirmed = applied == ApplyResult.APPLIED || applied == ApplyResult.UNCHANGED;
             if (lastConfirmed) {
                 lastSuccess = lastCompletion;
+                confirmedWallTime = wallClock.getAsLong();
                 try {
-                    saveSuccess.accept(wallClock.getAsLong());
+                    saveSuccess.accept(confirmedWallTime);
                 } catch (RuntimeException unavailable) {
                     // The in-process policy and committed SQLite snapshot still work.
                 }
             }
             if (applied == ApplyResult.APPLIED) replacements.postValue(++generation);
+            phase.postValue(lastConfirmed ? Phase.CONFIRMED
+                    : applied == ApplyResult.STALE ? Phase.STALE : Phase.FAILED);
             lastRequest = result;
             inFlight = null;
         }

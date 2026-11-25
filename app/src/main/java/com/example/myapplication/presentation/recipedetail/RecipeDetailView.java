@@ -38,6 +38,7 @@ public final class RecipeDetailView extends FrameLayout {
         void back();
         void discover();
         void openNote();
+        void openSavedNote();
         void toggleFavorite();
         void openMealPlan();
         void startCooking(String canonicalId, int servings);
@@ -147,13 +148,11 @@ public final class RecipeDetailView extends FrameLayout {
         LayoutParams backParams = new LayoutParams(dp(48), dp(48), Gravity.START | Gravity.TOP);
         backParams.setMargins(dp(16), dp(12), dp(16), 0);
         hero.addView(back, backParams);
-        if (legacySource != null) {
-            star = icon(R.drawable.ic_star_outline, "Yêu thích", actions::toggleFavorite);
-            LayoutParams starParams = new LayoutParams(dp(48), dp(48), Gravity.END | Gravity.TOP);
-            starParams.setMargins(dp(16), dp(12), dp(16), 0);
-            hero.addView(star, starParams);
-            updateStar();
-        }
+        star = icon(R.drawable.ic_star_outline, "Yêu thích", actions::toggleFavorite);
+        LayoutParams starParams = new LayoutParams(dp(48), dp(48), Gravity.END | Gravity.TOP);
+        starParams.setMargins(dp(16), dp(12), dp(16), 0);
+        hero.addView(star, starParams);
+        updateStar();
         int widthDp = getResources().getConfiguration().screenWidthDp;
         contents.addView(hero, new LinearLayout.LayoutParams(-1, dp(Math.max(160, Math.min(250, widthDp * 59 / 100)))));
 
@@ -205,13 +204,11 @@ public final class RecipeDetailView extends FrameLayout {
             }
             if (hasText(details.tip)) info(body, "Mẹo", details.tip, null);
         }
-        if (legacySource != null) {
-            TextView note = label("Ghi chú cá nhân ›", 14, GREEN, true);
-            note.setGravity(Gravity.CENTER_VERTICAL);
-            note.setMinimumHeight(dp(48));
-            note.setOnClickListener(view -> actions.openNote());
-            body.addView(note);
-        }
+        TextView note = label("Ghi chú cá nhân ›", 14, GREEN, true);
+        note.setGravity(Gravity.CENTER_VERTICAL);
+        note.setMinimumHeight(dp(48));
+        note.setOnClickListener(view -> actions.openNote());
+        body.addView(note);
     }
 
     private void updateStar() {
@@ -251,8 +248,7 @@ public final class RecipeDetailView extends FrameLayout {
     private void addFooter(LinearLayout page, boolean onlyCook) {
         LinearLayout footer = row();
         footer.setPadding(dp(24), dp(6), dp(24), dp(12));
-        TextView cook = button("Bắt đầu nấu", WHITE, GREEN, GREEN,
-                () -> actions.startCooking(state.recipeId, state.servings));
+        TextView cook = button("Bắt đầu nấu", WHITE, GREEN, GREEN, () -> model.startCooking(actions::startCooking));
         cook.setEnabled(state.recipe.details != null && !state.recipe.details.steps.isEmpty());
         if (!onlyCook && legacySource != null) {
             TextView plan = button("Thêm vào Nấu hôm nay", GREEN, PALE, PALE, actions::openMealPlan);
@@ -268,16 +264,16 @@ public final class RecipeDetailView extends FrameLayout {
         contents.setPadding(dp(24), dp(8), dp(24), dp(24));
         header(contents, "Chi tiết công thức", actions::back);
         Status status = state == null ? Status.LOADING : state.status;
+        if (status == Status.REMOVED) {
+            removed(contents);
+            return;
+        }
         String title;
         String message;
         switch (status) {
             case EMPTY:
                 title = "Kho công thức đang trống";
                 message = "Hiện chưa có món nào được công bố.";
-                break;
-            case REMOVED:
-                title = "Công thức đã được gỡ";
-                message = "Bạn có thể tìm món khác. Ghi chú cá nhân của bạn vẫn được lưu.";
                 break;
             case MISSING:
                 title = "Không tìm thấy công thức";
@@ -316,10 +312,25 @@ public final class RecipeDetailView extends FrameLayout {
             add(contents, button("Thử lại", WHITE, GREEN, GREEN, model::retry), 24);
         } else if (status != Status.LOADING) {
             add(contents, button("Về Khám phá", WHITE, GREEN, GREEN, actions::discover), 24);
-            if (status == Status.REMOVED && legacySource != null) {
-                add(contents, button("Xem ghi chú đã lưu", GREEN, WHITE, BORDER, actions::openNote), 12);
-            }
         }
+    }
+
+    private void removed(LinearLayout contents) {
+        LinearLayout body = column();
+        body.setGravity(Gravity.CENTER);
+        body.setPadding(dp(24), dp(28), dp(24), dp(46));
+        contents.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        ImageView info = new ImageView(getContext());
+        info.setImageResource(R.drawable.ic_catalog_info);
+        info.setPadding(dp(24), dp(24), dp(24), dp(24));
+        info.setBackground(shape(PALE, PALE, 24));
+        body.addView(info, new LinearLayout.LayoutParams(dp(84), dp(84)));
+        TextView title = label("Công thức đã được gỡ", 23, TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        add(body, title, 18);
+        add(body, label("Bạn có thể tìm món khác. Ghi chú cá nhân của bạn vẫn được lưu.", 15, MUTED, false), 12);
+        add(body, button("Về Khám phá", WHITE, GREEN, GREEN, actions::discover), 32);
+        add(body, button("Xem ghi chú đã lưu", GREEN, WHITE, BORDER, actions::openSavedNote), 12);
     }
 
     public void displayDraft(Draft draft) {

@@ -3,15 +3,18 @@ package com.example.myapplication.di;
 import android.app.Application;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.net.ConnectivityManager;
 import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.LiveData;
 
 import com.example.myapplication.data.image.HostingImageSource;
 import com.example.myapplication.data.image.HostingImageUrlResolver;
 import com.example.myapplication.data.image.RecipeImageLoader;
 import com.example.myapplication.data.remote.CatalogRemoteDataSource;
+import com.example.myapplication.data.remote.CatalogConnectivity;
 import com.example.myapplication.data.remote.FirebaseCatalogRemoteDataSource;
 import com.example.myapplication.data.repository.CatalogRefreshService;
 import com.example.myapplication.data.repository.CatalogSyncCoordinator;
@@ -36,6 +39,7 @@ public final class AppContainer {
     public final RecipeCatalogRepository recipeCatalogRepository;
     public final CatalogRefreshService catalogRefreshService;
     public final CatalogSyncCoordinator catalogSync;
+    public final LiveData<Boolean> catalogConnectivity;
     public final RecipeImageLoader recipeImageLoader;
     public final SearchHistoryRepository searchHistoryRepository;
     public final ExecutorService ioExecutor;
@@ -48,16 +52,28 @@ public final class AppContainer {
 
     public AppContainer(Application application, CatalogRemoteDataSource catalogSource,
                         RecipeImageLoader.Source imageSource, File imageDirectory) {
+        this(application, catalogSource, imageSource, imageDirectory,
+                new LocalRecipeCatalogRepository(application),
+                new LocalPersonalDataRepository(application),
+                new CatalogConnectivity(application.getSystemService(ConnectivityManager.class)),
+                "recipe_catalog_sync");
+    }
+
+    public AppContainer(Application application, CatalogRemoteDataSource catalogSource,
+                        RecipeImageLoader.Source imageSource, File imageDirectory,
+                        LocalRecipeCatalogRepository localCatalog, PersonalDataRepository personalData,
+                        LiveData<Boolean> connectivity,
+                        String syncPreferenceName) {
         ioExecutor = worker("bep-nha-data-io");
-        personalDataRepository = new LocalPersonalDataRepository(application);
-        LocalRecipeCatalogRepository localCatalog = new LocalRecipeCatalogRepository(application);
+        personalDataRepository = personalData;
         recipeCatalogRepository = localCatalog;
+        catalogConnectivity = connectivity;
         boolean debug = (application.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         catalogRefreshService = new CatalogRefreshService(() -> {
             if (debug) Log.d("RecipeCatalogSync", "Fetching catalog");
             return catalogSource.fetchSnapshot();
         }, localCatalog::applySnapshot, worker("bep-nha-catalog-refresh"));
-        SharedPreferences syncSettings = application.getSharedPreferences("recipe_catalog_sync", Application.MODE_PRIVATE);
+        SharedPreferences syncSettings = application.getSharedPreferences(syncPreferenceName, Application.MODE_PRIVATE);
         catalogSync = new CatalogSyncCoordinator(localCatalog, catalogRefreshService::refresh, ioExecutor,
                 System::currentTimeMillis, SystemClock::elapsedRealtime,
                 () -> syncSettings.getLong(LAST_SUCCESS, 0),

@@ -143,6 +143,7 @@ public final class PersonalDataFragment extends Fragment {
     this.section = section;
     this.collectionId = collectionId;
     this.noteRecipeId = noteRecipeId;
+    if (viewModel != null && NOTE.equals(section)) viewModel.loadNote(noteRecipeId);
     render();
   }
 
@@ -189,6 +190,7 @@ public final class PersonalDataFragment extends Fragment {
     AppViewModelFactory factory =
         new AppViewModelFactory((BepNhaApplication) requireActivity().getApplication());
     viewModel = new ViewModelProvider(requireActivity(), factory).get(PersonalDataViewModel.class);
+    if (NOTE.equals(section)) viewModel.loadNote(noteRecipeId);
     journalViewModel =
         new ViewModelProvider(requireActivity(), factory).get(CookingJournalViewModel.class);
     root = vertical();
@@ -207,7 +209,10 @@ public final class PersonalDataFragment extends Fragment {
             getViewLifecycleOwner(),
             stateValue -> {
               if (stateValue != null && !stateValue.loading) {
-                if (NOTE.equals(section)) return;
+                if (NOTE.equals(section)) {
+                  if (noteInput != null && !noteInput.isEnabled() && viewModel.hasLoadedNote(noteRecipeId)) render();
+                  return;
+                }
                 if (FAVORITES.equals(section) && searchInputFocused()) return;
                 render();
               }
@@ -560,7 +565,7 @@ public final class PersonalDataFragment extends Fragment {
 
   private void renderNote() {
     Recipe recipe = host.onPersonalResolveRecipe(noteRecipeId);
-    if (recipe == null) recipe = PreviewRecipeCatalog.designRecipes().get(0);
+    if (recipe == null) recipe = new Recipe(noteRecipeId, "Công thức đã lưu", "", "", "");
     final Recipe selectedRecipe = recipe;
     LinearLayout page = vertical();
     page.setPadding(dp(24), dp(8), dp(24), dp(12));
@@ -589,6 +594,8 @@ public final class PersonalDataFragment extends Fragment {
     noteInput = new EditText(requireContext());
     noteInput.setTag("personal-note-input");
     noteInput.setText(viewModel.getNote(selectedRecipe.id));
+    boolean noteReady = viewModel.hasLoadedNote(selectedRecipe.id);
+    noteInput.setEnabled(noteReady);
     noteInput.setTextSize(16);
     noteInput.setTextColor(TEXT);
     noteInput.setGravity(Gravity.TOP | Gravity.START);
@@ -611,6 +618,7 @@ public final class PersonalDataFragment extends Fragment {
     addCookingJournalPreview(content, selectedRecipe);
     page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
     TextView save = button("Lưu ghi chú", true);
+    save.setEnabled(noteReady);
     LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, dp(49));
     saveParams.topMargin = dp(8);
     page.addView(save, saveParams);
@@ -1066,21 +1074,8 @@ public final class PersonalDataFragment extends Fragment {
   }
 
   private ImageView recipeImage(Recipe recipe) {
-    int id = R.drawable.recipe_canh_chua;
-    switch (recipe.id) {
-      case "sample-ga-chien-nuoc-mam":
-        id = R.drawable.recipe_ga_chien;
-        break;
-      case "sample-mi-y-sot-bo-bam":
-        id = R.drawable.recipe_mi_y;
-        break;
-      case "sample-com-rang-dua-bo":
-        id = R.drawable.recipe_com_rang;
-        break;
-      case "sample-salad-rau-cu":
-        id = R.drawable.recipe_salad;
-        break;
-    }
+    int id = recipe.imageName == null || recipe.imageName.isEmpty() ? 0
+        : getResources().getIdentifier(recipe.imageName, "drawable", requireContext().getPackageName());
     ImageView image = icon(id, TEXT);
     image.setColorFilter(null);
     image.setScaleType(ImageView.ScaleType.CENTER_CROP);
